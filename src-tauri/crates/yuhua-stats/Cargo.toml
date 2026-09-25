@@ -9,10 +9,16 @@ repository.workspace = true
 
 [dependencies]
 yuhua-core = { workspace = true }
+# 复用原子写：统计文件同样会随云盘同步，半截 JSON 比没有文件更糟
+yuhua-fs = { workspace = true }
 serde = { workspace = true }
 serde_json = { workspace = true }
 chrono = { workspace = true }
 thiserror = { workspace = true }
+# 会话去重需要「同一次会话在两次序列化后仍相等」，
+# UUID 保证多设备并发开启会话时不会撞号
+uuid = { workspace = true }
+blake3 = { workspace = true }
 
 [dev-dependencies]
 tempfile = { workspace = true }

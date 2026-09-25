@@ -54,10 +54,8 @@ export default defineConfig({
     },
   },
 
-  // vitest 复用同一份配置
-  test: {
-    environment: "jsdom",
-    globals: true,
-    include: ["src/**/*.test.ts", "src/**/*.test.tsx", "tests/**/*.test.ts"],
-  },
+  // 注意：这里**刻意不声明 test 段**。
+  // 测试配置统一放在 vitest.config.ts（vitest 会优先使用该文件），
+  // 避免同一份选项在两处维护而漂移 —— 曾因此出现
+  // 「.tsx 测试拿到服务端构建」这类只在测试环境复现的问题。
 });

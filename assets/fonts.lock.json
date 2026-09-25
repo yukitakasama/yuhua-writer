@@ -1,0 +1,27 @@
+{
+  "$comment": "字体获取锁定文件。字体二进制不入 git，由 scripts/fetch-fonts.mjs 按此处的固定版本与 SHA256 下载并校验。填入真实条目后即可使用。",
+  "schema": 1,
+  "fonts": [],
+  "plannedFonts": [
+    {
+      "family": "Yuhua Serif SC",
+      "source": "Source Han Serif SC (思源宋体)",
+      "license": "SIL OFL 1.1",
+      "weights": [
+        "regular",
+        "bold"
+      ],
+      "subset": true
+    },
+    {
+      "family": "Yuhua Kai SC",
+      "source": "LXGW WenKai (霞鹜文楷)",
+      "license": "SIL OFL 1.1",
+      "weights": [
+        "regular",
+        "bold"
+      ],
+      "subset": true
+    }
+  ]
+}

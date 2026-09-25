@@ -191,7 +191,8 @@ impl TrashManager {
                 out.push(TrashItem { entry, dir });
             }
         }
-        out.sort_by(|a, b| b.entry.deleted_at.cmp(&a.entry.deleted_at));
+        // 按删除时间降序：最近删的排在前面（Reverse 包一层即可）
+        out.sort_by_key(|i| std::cmp::Reverse(i.entry.deleted_at));
         out
     }
 

@@ -1,2 +1,9 @@
+# pnpm 工作区配置。
+#
+# allowBuilds：显式批准哪些依赖可以执行 postinstall 脚本。
+# pnpm 默认拦截所有构建脚本（供应链防护），但 esbuild 与 @tauri-apps/cli
+# 需要 postinstall 来落位平台原生二进制 —— 不批准的话 Vite 构建与
+# tauri CLI 会在运行期报错。这里逐个点名批准，不做全局放宽。
 allowBuilds:
-  esbuild: set this to true or false
+  esbuild: true
+  "@tauri-apps/cli": true

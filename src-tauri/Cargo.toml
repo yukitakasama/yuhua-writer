@@ -1,10 +1,19 @@
 [package]
 name = "yuhua-writer"
-description = "羽化写作 — 桌面应用入口（Tauri 命令层薄壳）"
+description = "羽化写作 — 桌面应用入口（Tauri 命令层，薄壳）"
 version.workspace = true
 edition.workspace = true
 rust-version.workspace = true
 license.workspace = true
+repository.workspace = true
+
+[lib]
+# Tauri 2 要求应用逻辑放在 lib 里，便于移动端复用与集成测试
+name = "yuhua_writer_lib"
+crate-type = ["staticlib", "cdylib", "rlib"]
+
+[build-dependencies]
+tauri-build = { version = "2", features = [] }
 
 [dependencies]
 yuhua-core = { workspace = true }
@@ -12,12 +21,20 @@ yuhua-fs = { workspace = true }
 yuhua-store = { workspace = true }
 yuhua-export = { workspace = true }
 yuhua-stats = { workspace = true }
+
 serde = { workspace = true }
 serde_json = { workspace = true }
 thiserror = { workspace = true }
 chrono = { workspace = true }
-tokio = { version = "1", features = ["rt-multi-thread", "macros", "sync"] }
+uuid = { workspace = true }
+dirs = { workspace = true }
+
 tauri = { version = "2", features = [] }
+tauri-plugin-dialog = "2"
+tauri-plugin-opener = "2"
+
+[dev-dependencies]
+tempfile = { workspace = true }
 
 [lints]
 workspace = true

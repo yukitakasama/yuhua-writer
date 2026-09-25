@@ -376,7 +376,7 @@ fn parse_array(v: &str) -> Vec<String> {
     }
     inner
         .split(',')
-        .map(|s| unquote(s))
+        .map(unquote)
         .filter(|s| !s.is_empty())
         .collect()
 }
@@ -413,7 +413,7 @@ pub fn read_chapter(path: &Path) -> Result<ChapterFile> {
     let fallback_title = path
         .file_stem()
         .map(|s| {
-            let s = s.to_string_lossy().to_string();
+            let s = s.to_string_lossy().into_owned();
             match s.split_once('-') {
                 // 只有前缀看起来确实是纯数字序号时才剥离，
                 // 否则「第一卷-风起」这种正常标题会被误切

@@ -1,0 +1,18 @@
+{
+  "$schema": "../gen/schemas/desktop-schema.json",
+  "identifier": "default",
+  "description": "羽化写作桌面端的默认权限集。遵循最小授权原则：只开放应用真正需要的插件能力；文件读写一律走我们自己的 Rust 命令，不把通用 fs 插件能力暴露给前端。",
+  "windows": [
+    "main"
+  ],
+  "permissions": [
+    "core:default",
+    "core:window:allow-start-dragging",
+    "core:window:allow-set-title",
+    "dialog:allow-open",
+    "dialog:allow-save",
+    "dialog:allow-message",
+    "dialog:allow-ask",
+    "opener:allow-open-url"
+  ]
+}

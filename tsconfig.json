@@ -32,6 +32,11 @@
       "@/*": ["src/*"]
     }
   },
-  "include": ["src/**/*.ts", "src/**/*.tsx", "vite.config.ts", "vitest.config.ts"],
+  // 只检查会进包的应用代码。
+  // vitest.config.ts / vite.config.ts 是构建配置，不参与打包；
+  // 且 vitest 2 内部锁 vite 5、项目主体用 vite 6，两份 PluginOption
+  // 类型天然不兼容。把配置排除在外，避免这类上游版本结构问题
+  // 淹没真正的应用代码类型错误。
+  "include": ["src/**/*.ts", "src/**/*.tsx"],
   "exclude": ["node_modules", "dist", "src-tauri"]
 }

@@ -1,6 +1,6 @@
 [package]
 name = "yuhua-export"
-description = "羽化写作 · 导出引擎：Document IR + TXT/MD/HTML/DOCX/PDF/EPUB 六渲染器"
+description = "羽化写作 · 导出引擎：Document IR + TXT/MD/HTML/DOCX/EPUB 渲染器（PDF 待 WebView 接线）"
 version.workspace = true
 edition.workspace = true
 rust-version.workspace = true
@@ -9,10 +9,16 @@ repository.workspace = true
 
 [dependencies]
 yuhua-core = { workspace = true }
+# Markdown → IR 的解析器。全仓只有这一处依赖它：编辑器侧用 JS 的 Lezer，
+# 导出侧用它，两边靠「冻结子集」（计划书 9.3）与一致性测试对齐。
+pulldown-cmark = { workspace = true }
+# DOCX 与 EPUB 都是 zip 容器，两者共用同一个打包依赖。
+zip = { workspace = true }
 serde = { workspace = true }
 serde_json = { workspace = true }
 chrono = { workspace = true }
 thiserror = { workspace = true }
+uuid = { workspace = true }
 
 [dev-dependencies]
 tempfile = { workspace = true }

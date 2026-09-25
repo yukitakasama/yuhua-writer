@@ -1,0 +1,150 @@
+name: CI
+
+# 触发策略：
+# - push 到 main：完整检查
+# - PR：完整检查
+# 刻意不按路径过滤，因为 Rust 与前端改动常常互相关联（例如 IPC 类型）。
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+env:
+  CARGO_TERM_COLOR: always
+  # 让 clippy 把警告当错误，与本地约定一致
+  RUSTFLAGS: -D warnings
+
+jobs:
+  # ---------------------------------------------------------------- 前端
+  frontend:
+    name: 前端（lint / 类型 / 测试 / 构建）
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 9
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: pnpm
+
+      - name: 安装依赖
+        run: pnpm install --frozen-lockfile
+
+      - name: 格式检查
+        run: pnpm format:check
+
+      - name: ESLint
+        run: pnpm lint
+
+      - name: 类型检查
+        run: pnpm typecheck
+
+      - name: 单元测试
+        run: pnpm test
+
+      - name: 构建前端产物
+        run: pnpm build
+
+  # ---------------------------------------------------------------- Rust
+  rust:
+    name: Rust（fmt / clippy / test）
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          components: rustfmt, clippy
+
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: ". -> target"
+
+      # Tauri 在 Linux 上需要这些系统库才能编译
+      - name: 安装系统依赖
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y \
+            libwebkit2gtk-4.1-dev \
+            libappindicator3-dev \
+            librsvg2-dev \
+            patchelf \
+            libgtk-3-dev
+
+      - name: 格式检查
+        run: cargo fmt --all -- --check
+
+      - name: Clippy（零警告）
+        run: cargo clippy --workspace --all-targets -- -D warnings
+
+      - name: 单元与集成测试
+        run: cargo test --workspace
+
+  # ---------------------------------------------------------------- 跨平台构建
+  build:
+    name: 构建（${{ matrix.platform }}）
+    needs: [frontend, rust]
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - platform: windows-latest
+            label: Windows
+          - platform: macos-latest
+            label: macOS
+          - platform: ubuntu-latest
+            label: Linux
+    runs-on: ${{ matrix.platform }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 9
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: pnpm
+
+      - uses: dtolnay/rust-toolchain@stable
+
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: ". -> target"
+
+      - name: 安装 Linux 系统依赖
+        if: matrix.platform == 'ubuntu-latest'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y \
+            libwebkit2gtk-4.1-dev \
+            libappindicator3-dev \
+            librsvg2-dev \
+            patchelf \
+            libgtk-3-dev
+
+      - name: 安装依赖
+        run: pnpm install --frozen-lockfile
+
+      # 字体与图标是构建期生成的资产，不入 git。
+      # 字体尚未配置固定版本时会跳过（不阻断构建）。
+      - name: 获取字体（可选）
+        continue-on-error: true
+        run: pnpm fonts:fetch
+
+      - name: 派生图标（可选）
+        continue-on-error: true
+        run: pnpm icons
+
+      - name: 确保前端产物存在
+        run: pnpm build
+
+      # 第一阶段只跑通「未签名」构建（计划书 R7）
+      - name: 构建应用（未签名）
+        run: pnpm tauri build --no-bundle

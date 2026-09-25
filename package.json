@@ -5,8 +5,13 @@
   "private": true,
   "type": "module",
   "license": "MIT",
-  "repository": { "type": "git", "url": "https://github.com/yuhua-writer/yuhua-writer.git" },
-  "engines": { "node": ">=20" },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/yuhua-writer/yuhua-writer.git"
+  },
+  "engines": {
+    "node": ">=20"
+  },
   "scripts": {
     "dev": "vite",
     "build": "tsc --noEmit && vite build",
@@ -30,20 +35,21 @@
     "rust:fmt": "cargo fmt --all -- --check"
   },
   "dependencies": {
-    "solid-js": "^1.9.5",
-    "@tauri-apps/api": "^2.2.0",
-    "@tauri-apps/plugin-dialog": "^2.2.0",
-    "@tauri-apps/plugin-opener": "^2.2.0",
-    "@tauri-apps/plugin-fs": "^2.2.0",
-    "@codemirror/state": "^6.5.0",
-    "@codemirror/view": "^6.36.1",
     "@codemirror/commands": "^6.7.1",
+    "@codemirror/lang-markdown": "^6.3.1",
     "@codemirror/language": "^6.10.8",
     "@codemirror/search": "^6.5.8",
-    "@codemirror/lang-markdown": "^6.3.1",
-    "@lezer/markdown": "^1.4.0"
+    "@codemirror/state": "^6.5.0",
+    "@codemirror/view": "^6.36.1",
+    "@lezer/markdown": "^1.4.0",
+    "@tauri-apps/api": "^2.2.0",
+    "@tauri-apps/plugin-dialog": "^2.2.0",
+    "@tauri-apps/plugin-fs": "^2.2.0",
+    "@tauri-apps/plugin-opener": "^2.2.0",
+    "solid-js": "^1.9.5"
   },
   "devDependencies": {
+    "@solidjs/testing-library": "^0.8.10",
     "@tauri-apps/cli": "^2.2.0",
     "@types/node": "^22.10.5",
     "@typescript-eslint/eslint-plugin": "^8.19.1",
@@ -51,11 +57,11 @@
     "eslint": "^9.17.0",
     "eslint-plugin-solid": "^0.14.5",
     "globals": "^15.14.0",
+    "jsdom": "^25.0.1",
     "prettier": "^3.4.2",
     "typescript": "^5.7.2",
-    "vite": "^6.0.7",
+    "vite": "^6.4.3",
     "vite-plugin-solid": "^2.11.0",
-    "vitest": "^2.1.8",
-    "jsdom": "^25.0.1"
+    "vitest": "^2.1.8"
   }
 }

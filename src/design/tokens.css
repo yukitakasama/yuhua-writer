@@ -1,0 +1,293 @@
+/**
+ * 羽化写作 · 设计令牌
+ *
+ * 这是全应用唯一的视觉真相来源：所有颜色、间距、字号、圆角、动效时长
+ * 都从这里取值，组件层不允许出现硬编码的色值或毫秒数。
+ * 这样做有两个直接收益（对应计划书 5.2 / 5.3）：
+ *   1. 主题切换只需改这一处变量，不必逐组件打补丁；
+ *   2. 「字体切换不触发整页重排动画」成为默认行为——字体只走 CSS 变量。
+ *
+ * 命名约定：--c-* 颜色 / --sp-* 间距 / --fs-* 字阶 / --r-* 圆角
+ *          --font-* 字体族 / --d-* 时长 / --e-* 缓动 / --shadow-* 阴影 / --z-* 层级
+ */
+
+/* ============================================================
+   亮色主题（默认）
+   中性灰阶只有一档「冷灰」，避免界面出现多种色温的灰。
+   ============================================================ */
+:root {
+  color-scheme: light;
+
+  /* ---------- 色板 ---------- */
+  --c-bg: #f7f7f5;          /* 应用底色：偏暖的极浅灰，长时间阅读不刺眼 */
+  --c-bg-subtle: #efefec;   /* 次级底色：侧栏、工具条 */
+  --c-surface: #ffffff;     /* 卡片 / 弹层：真正的白，与底色拉开 1 级 */
+  --c-border: #dcdcd6;      /* 1px 描边式层级，代替阴影与色块 */
+  --c-text: #23231f;        /* 正文：对比度约 14.6:1 */
+  --c-text-muted: #6b6b64;  /* 次要文字：对比度约 5.2:1，满足 4.5:1 */
+  --c-accent: #2b6b5f;      /* 强调色：深青墨，与品牌图标同源 */
+  --c-danger: #b4232a;      /* 危险操作：仅用于删除、清空 */
+
+  /* 由上面 8 个基色派生的交互态，避免各处手写 rgba */
+  --c-accent-subtle: #e4efeb;   /* 强调色的极浅底：选中行、标签 */
+  --c-accent-strong: #1d4d44;   /* 强调色按下态 */
+  --c-danger-subtle: #f7e6e7;
+  --c-hover: #ececea;           /* 悬停底：中性，不引入色偏 */
+  --c-active: #e3e3df;          /* 按压底 */
+  --c-focus: #2b6b5f;           /* 焦点环：高对比且可见（计划书 5.6） */
+
+  /* 图表色阶：5 档预计算数组，供 M8 日历与热力图直接取用。
+     绝不逐格做 JS 计算，也不使用渐变插值函数（计划书 10.5）。 */
+  --c-heat-0: #ebedea;
+  --c-heat-1: #cfe0d9;
+  --c-heat-2: #9cc3b6;
+  --c-heat-3: #5f9a89;
+  --c-heat-4: #2b6b5f;
+
+  /* ---------- 间距：4px 基准栅格 ---------- */
+  --sp-1: 4px;
+  --sp-2: 8px;
+  --sp-3: 12px;
+  --sp-4: 16px;
+  --sp-5: 20px;
+  --sp-6: 24px;
+  --sp-7: 28px;
+  --sp-8: 32px;
+
+  /* ---------- 字阶 ---------- */
+  --fs-xs: 12px;
+  --fs-sm: 13px;
+  --fs-base: 15px;
+  --fs-lg: 17px;
+  --fs-xl: 20px;
+  --fs-2xl: 26px;
+
+  --lh-tight: 1.3;   /* 标题、按钮 */
+  --lh-base: 1.6;    /* 界面文本 */
+  --lh-read: 1.8;    /* 正文阅读：计划书 5.1 规定的行高 */
+
+  /* 正文排版参数（设置项直接改这两个变量，不触发重排动画） */
+  --measure-body: 720px;   /* 正文最大宽度，可调 560-960 */
+
+  /* ---------- 圆角 ---------- */
+  --r-sm: 4px;
+  --r-md: 6px;
+  --r-lg: 10px;
+  --r-full: 999px;
+
+  /* ---------- 字体族：三个作用域，用户可独立覆盖 ----------
+     每个作用域都带完整回退链。子集化字体必然缺生僻字，
+     浏览器按字符回退，人名地名不会出现豆腐块（计划书 7.5.4）。 */
+  --font-body: "Yuhua Serif SC", "Noto Serif CJK SC", "Source Han Serif SC",
+    "SimSun", "Songti SC", serif;
+  --font-heading: "Yuhua Kai SC", "LXGW WenKai", "KaiTi", "STKaiti", serif;
+  --font-ui: system-ui, -apple-system, "Segoe UI", "Microsoft YaHei",
+    "PingFang SC", sans-serif;
+  --font-mono: "Cascadia Mono", "Consolas", "Menlo", monospace;
+
+  /* ---------- 动效时长 ---------- */
+  --d-instant: 80ms;   /* 按压反馈：必须快到「像瞬时的」 */
+  --d-fast: 120ms;     /* 悬停、焦点、开关 */
+  --d-base: 180ms;     /* 弹层、面板、列表项进出 */
+  --d-slow: 240ms;     /* 页面切换、抽屉 */
+  --d-page: 320ms;     /* 首次进入、大范围布局变化 */
+
+  /* ---------- 缓动 ---------- */
+  --e-standard: cubic-bezier(0.2, 0, 0, 1);    /* 通用：两端都有缓冲 */
+  --e-decelerate: cubic-bezier(0, 0, 0, 1);    /* 入场：快进慢停 */
+  --e-accelerate: cubic-bezier(0.3, 0, 1, 1);  /* 出场：慢起快走 */
+
+  /* ---------- 阴影：极轻，层级主要靠描边 ---------- */
+  --shadow-sm: 0 1px 2px rgba(28, 28, 24, 0.06);
+  --shadow-md: 0 4px 12px rgba(28, 28, 24, 0.1);
+  --shadow-lg: 0 12px 32px rgba(28, 28, 24, 0.16);
+
+  /* ---------- 层级 ---------- */
+  --z-base: 0;
+  --z-sticky: 10;
+  --z-dropdown: 100;
+  --z-overlay: 200;
+  --z-dialog: 300;
+  --z-toast: 400;
+  --z-tooltip: 500;
+
+  /* ---------- 动效性能开关 ----------
+     默认允许动效；prefers-reduced-motion 时由下面的媒体查询改写。 */
+  --motion-enabled: 1;
+}
+
+/* ============================================================
+   暗色主题
+   不是亮色的简单反转：暗色下纯黑会放大文字边缘的眩光，
+   因此底色取偏青的深灰，强调色提亮以保证 4.5:1 对比度。
+   ============================================================ */
+[data-theme="dark"] {
+  color-scheme: dark;
+
+  --c-bg: #16181a;
+  --c-bg-subtle: #1c1f22;
+  --c-surface: #22262a;
+  --c-border: #343a3f;
+  --c-text: #e6e7e5;
+  --c-text-muted: #a0a5a2;
+  --c-accent: #6fb9a6;
+  --c-danger: #e4808a;
+
+  --c-accent-subtle: #23342f;
+  --c-accent-strong: #93cfbf;
+  --c-danger-subtle: #3a2426;
+  --c-hover: #2a2f33;
+  --c-active: #333940;
+  --c-focus: #6fb9a6;
+
+  --c-heat-0: #23272a;
+  --c-heat-1: #2c4540;
+  --c-heat-2: #3d6b60;
+  --c-heat-3: #579486;
+  --c-heat-4: #8ecdb9;
+
+  --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.4);
+  --shadow-md: 0 4px 12px rgba(0, 0, 0, 0.5);
+  --shadow-lg: 0 12px 32px rgba(0, 0, 0, 0.6);
+}
+
+/* 跟随系统：仅在用户没有显式选择主题时生效。
+   显式选择会写到 html[data-theme]，属性选择器优先级高于媒体查询内的 :root。 */
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    color-scheme: dark;
+
+    --c-bg: #16181a;
+    --c-bg-subtle: #1c1f22;
+    --c-surface: #22262a;
+    --c-border: #343a3f;
+    --c-text: #e6e7e5;
+    --c-text-muted: #a0a5a2;
+    --c-accent: #6fb9a6;
+    --c-danger: #e4808a;
+
+    --c-accent-subtle: #23342f;
+    --c-accent-strong: #93cfbf;
+    --c-danger-subtle: #3a2426;
+    --c-hover: #2a2f33;
+    --c-active: #333940;
+    --c-focus: #6fb9a6;
+
+    --c-heat-0: #23272a;
+    --c-heat-1: #2c4540;
+    --c-heat-2: #3d6b60;
+    --c-heat-3: #579486;
+    --c-heat-4: #8ecdb9;
+
+    --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.4);
+    --shadow-md: 0 4px 12px rgba(0, 0, 0, 0.5);
+    --shadow-lg: 0 12px 32px rgba(0, 0, 0, 0.6);
+  }
+}
+
+/* ============================================================
+   性能铁律（计划书 5.4，必须写进代码而不是只写在文档里）
+
+   只动画 transform 与 opacity。
+   永不动画 width / height / top / left / margin / box-shadow / filter。
+
+   原因：只有 transform 与 opacity 能在合成线程完成，
+   其余属性每个关键帧都要走「样式重算 → 布局 → 绘制」，
+   一旦同时有多个元素参与就会掉帧（指标 P2：任意 1 秒掉帧 ≤ 2）。
+
+   推论：
+   - 折叠类动效改动画 transform: scaleY()，不用 height 过渡
+   - 位移类动效改动画 transform: translateX/Y()，不用 top/left
+   - 阴影变化不做过渡，直接切换 class
+   - 动效元素临时加 will-change: transform，结束必须移除（见 motion/primitives.ts）
+   ============================================================ */
+
+/* ============================================================
+   无障碍降级（计划书 5.6）
+   开启减弱动效后，所有动效降为 ≤ 100ms 的纯透明度变化：
+   位移与缩放一律归零，只保留「出现/消失」这一层信息。
+   焦点环等非动效的无障碍要求不受影响。
+   ============================================================ */
+@media (prefers-reduced-motion: reduce) {
+  :root {
+    --motion-enabled: 0;
+
+    /* 时长统一压到 100ms 以内 */
+    --d-instant: 60ms;
+    --d-fast: 80ms;
+    --d-base: 100ms;
+    --d-slow: 100ms;
+    --d-page: 100ms;
+
+    /* 曲线改为线性：短时长下缓动曲线几乎不可感知，
+       统一线性反而避免出现「慢起」的迟滞感。 */
+    --e-standard: linear;
+    --e-decelerate: linear;
+    --e-accelerate: linear;
+  }
+
+  /* 全局兜底：第三方样式或遗漏的过渡也不会产生位移动画 */
+  *,
+  *::before,
+  *::after {
+    animation-duration: 100ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 100ms !important;
+    scroll-behavior: auto !important;
+  }
+}
+
+/* ============================================================
+   基础重置与全局默认
+   只做必要的几项，不做完整 normalize，避免与组件层互相打架。
+   ============================================================ */
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  margin: 0;
+  padding: 0;
+  height: 100%;
+  background: var(--c-bg);
+  color: var(--c-text);
+  font-family: var(--font-ui);
+  font-size: var(--fs-base);
+  line-height: var(--lh-base);
+  /* 暗色主题切换时颜色过渡，只作用在颜色上，不引发布局 */
+  transition: background-color var(--d-slow) var(--e-standard),
+    color var(--d-slow) var(--e-standard);
+}
+
+/* 正文与标题的作用域类：切换字体只改变量，不叠加任何位移动效 */
+.yh-body {
+  font-family: var(--font-body);
+  line-height: var(--lh-read);
+  max-width: var(--measure-body);
+}
+
+.yh-heading {
+  font-family: var(--font-heading);
+  line-height: var(--lh-tight);
+}
+
+/* 数字等宽：字数、时长、统计数字变化时不会左右跳动（计划书 10.5） */
+.yh-num {
+  font-variant-numeric: tabular-nums;
+  font-feature-settings: "tnum" 1;
+}
+
+/* 焦点环：必须可见且高对比，因此不跟随圆角做圆角化处理 */
+:focus-visible {
+  outline: 2px solid var(--c-focus);
+  outline-offset: 2px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  :focus-visible {
+    outline-width: 3px;
+  }
+}

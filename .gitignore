@@ -28,6 +28,11 @@ src-tauri/icons/
 Thumbs.db
 *.swp
 
+# ---------- 构建工具临时文件 ----------
+# vite / vitest 会在配置目录旁生成 config 的时间戳副本
+vitest.config.ts.timestamp-*
+vite.config.ts.timestamp-*
+
 # ---------- 日志与临时 ----------
 *.log
 npm-debug.log*

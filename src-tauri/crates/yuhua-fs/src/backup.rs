@@ -244,7 +244,7 @@ fn parse_timestamp_from_name(path: &Path) -> Option<DateTime<FixedOffset>> {
     let idx = without_suffix.rfind(SEP)?;
     let ts = &without_suffix[idx + SEP.len()..];
     let parsed = chrono::NaiveDateTime::parse_from_str(ts, "%Y%m%d-%H%M%S").ok()?;
-    Some(parsed.and_local_timezone(local_offset()).single()?)
+    parsed.and_local_timezone(local_offset()).single()
 }
 
 /// 取本地时区偏移。

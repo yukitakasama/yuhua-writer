@@ -242,29 +242,32 @@ impl Workspace {
     ///
     /// 打开工作区后立刻调用。返回清理统计，供 UI 决定是否提示用户。
     pub fn recover(&self) -> RecoveryReport {
-        let mut report = RecoveryReport::default();
-
         // 1. 清理原子写残留的临时文件（递归整棵正文树）
-        report.swept_temp_files = sweep_recursive(&self.layout.manuscript_dir());
+        let swept_temp_files = sweep_recursive(&self.layout.manuscript_dir());
 
         // 2. 汇报未完成的 journal 记录
         let journal = crate::journal::Journal::new(self.layout.journal_dir());
         let pending = journal.pending();
-        report.interrupted_operations = pending
-            .iter()
-            .map(|e| format!("{}：{}", e.kind.label(), e.description))
-            .collect();
-        report.pending_paths = pending.iter().flat_map(|e| e.paths.clone()).collect();
 
         // 3. 清理过期回收站条目
         let trash = crate::trash::TrashManager::new(self.layout.clone());
-        report.purged_trash_items = trash.purge_expired().unwrap_or(0);
+        let purged_trash_items = trash.purge_expired().unwrap_or(0);
 
         // 4. 识别云盘冲突副本（只识别，绝不删除）
-        report.conflicts =
+        let conflicts =
             crate::conflict::detect_conflicts(&self.layout.manuscript_dir(), self.layout.root());
 
-        report
+        // 一次构造完成，避免 default() 之后再逐字段赋值
+        RecoveryReport {
+            swept_temp_files,
+            interrupted_operations: pending
+                .iter()
+                .map(|e| format!("{}：{}", e.kind.label(), e.description))
+                .collect(),
+            pending_paths: pending.iter().flat_map(|e| e.paths.clone()).collect(),
+            purged_trash_items,
+            conflicts,
+        }
     }
 
     /// 索引库路径（工作区之外）。
