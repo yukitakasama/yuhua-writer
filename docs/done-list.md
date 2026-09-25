@@ -28,6 +28,11 @@
 | M10 | 跨端构建与开源发布 | `[~]` | CI 与打包配置就绪，未实际出包 |
 | M11 | 性能与内存达标验收 | `[ ]` | P5 已自动化验证，其余需真实窗口环境 |
 
+> **当前工程质量状态**：`cargo test --workspace` 821 通过、
+> `cargo clippy --workspace --all-targets -- -D warnings` 零警告、
+> `cargo fmt --check` 合规、`cargo build -p yuhua-writer` 桌面应用可构建、
+> 前端 `tsc` 零错误、1336 个测试通过、`pnpm build` 成功。
+
 ---
 
 ## M0 立项与工程骨架
