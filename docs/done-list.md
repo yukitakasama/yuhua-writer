@@ -22,13 +22,13 @@
 | M4 | 编辑器内核 | `[~]` | 编辑器依赖已就位，即时渲染 / IME 专项未实现 |
 | M5 | 书架与章节管理 | `[~]` | 应用壳 / 书架 / 卷章树完成；字数面板与命令面板待补 |
 | M6 | 检索与大纲 | `[~]` | Rust 侧检索完成，前端面板与大纲视图待补 |
-| M7 | 导出引擎 | `[~]` | 五格式渲染器完成（234 测试）；**PDF 未接**，图片内嵌与 Word/WPS 实开未做 |
+| M7 | 导出引擎 | `[~]` | 五格式渲染器完成（235 测试）；**PDF 未接**，图片内嵌与 Word/WPS 实开未做；转义与 URL 白名单已加固 |
 | M8 | 写作统计 | `[~]` | 数据层（含 CRDT 式合并）完成；前端视图待补 |
 | M9 | 外观 / 设置 / 字体选择 | `[~]` | 主题与字体令牌就位，设置页待补 |
 | M10 | 跨端构建与开源发布 | `[~]` | CI 与打包配置就绪，未实际出包 |
 | M11 | 性能与内存达标验收 | `[ ]` | P5 已自动化验证，其余需真实窗口环境 |
 
-> **当前工程质量状态**：`cargo test --workspace` 821 通过、
+> **当前工程质量状态**：`cargo test --workspace` **825** 通过、
 > `cargo clippy --workspace --all-targets -- -D warnings` 零警告、
 > `cargo fmt --check` 合规、`cargo build -p yuhua-writer` 桌面应用可构建、
 > 前端 `tsc` 零错误、1336 个测试通过、`pnpm build` 成功。
@@ -86,7 +86,7 @@
 | `[x]` | T2.4 | 章节读写：UTF-8 / BOM / CRLF / Front Matter | `yuhua-fs/src/chapter_io.rs`，含自制 YAML 子集 |
 | `[x]` | T2.5 | 原子写 | `yuhua-fs/src/atomic.rs`：临时文件 + fsync + rename + 回滚 |
 | `[x]` | T2.6 | 轮转备份与崩溃日志 | `backup.rs`（5 分钟 / 保留 20 份）+ `journal.rs` |
-| `[x]` | T2.7 | 回收站 | `trash.rs`：软删除 / 恢复 / 30 天清理，恢复时拒绝覆盖 |
+| `[x]` | T2.7 | 回收站 | `trash.rs`：软删除 / 恢复 / 30 天清理，恢复时拒绝覆盖；**路径守卫已加固**：拒保留目录与自嵌套（代码审查修复） |
 | `[x]` | T2.8 | 文件监听 + 外部改动策略 | `watch.rs`：notify + 防抖聚合 + 事件语义合并 |
 | `[x]` | T2.9 | Tauri 命令层与统一错误类型 | `src-tauri/src/commands.rs`（30 个命令）+ `error.rs` |
 | `[x]` | T2.10 | 单元与集成测试 | 读写 / 原子写 / 备份轮转 / 回收站 / 路径安全均有覆盖 |
@@ -227,6 +227,32 @@
 | `[ ]` | A14 | 码字日历与热力图 | 数据层完成，视图未做 |
 | `[x]` | A15 | 统计合并正确性 | 幂等性测试覆盖乱序 / 重复 / 冲突副本合并 |
 | `[x]` | A16 | WebView2 缺失兜底 | 探测与原生对话框已实现 |
+
+---
+
+## 代码审查修复记录（本轮新增）
+
+对全仓做了一次独立代码审查：读代码 + 实际探针验证，而非仅确认测试为绿。
+审查确认 **3 个未被现有测试覆盖的真实缺陷**，已全部修复并补上回归测试。
+
+| 完成 | 级别 | 缺陷 | 修复 | 回归测试 |
+| --- | --- | --- | --- | --- |
+| `[x]` | P1 | `escape_html` 不过滤 XML 非法控制字符，EPUB / HTML 产物不合法 | 采用与 `escape_xml` 相同的丢弃规则，保留 Tab / LF / CR | `control_characters_are_stripped_from_output` |
+| `[x]` | P1 | `is_safe_url` 放行 `data:image/svg+xml`，构成 XSS 通道 | 改为位图 MIME 精确前缀白名单 | `svg_data_urls_are_rejected` |
+| `[x]` | P2 | `move_to_trash` 未拒保留目录，可把回收站移入自身导致无限递归栈溢出 | 入口拒保留目录 / 回收站自身；`copy_recursive` 拒绝目标为源的后代 | `reserved_paths_cannot_be_trashed`、`copy_recursive_rejects_self_nesting` |
+
+落地位置：`src-tauri/crates/yuhua-export/src/render/html.rs`、
+`src-tauri/crates/yuhua-fs/src/trash.rs`。
+
+**验证结果（全部实际运行）**：`cargo test --workspace` **825 通过 0 失败**、
+`cargo clippy --workspace --all-targets` 零警告、`cargo fmt --all -- --check` 合规、
+前端 1336 个测试全绿。
+
+**P2 的触发边界需说明**：当前命令层只传入来自内存 `Document` 的 `manuscript/...` 路径，
+该缺陷**无法从 UI 触发**，属于对外 API 的健壮性缺口，故定 P2 而非 P1。
+
+审查同时确认以下部分**无缺陷**：原子写、路径逃逸防护、备份轮转上限、
+SQL 绑定参数、CRDT 合并幂等性、冲突副本只读不删、命令层错误处理。
 
 ---
 

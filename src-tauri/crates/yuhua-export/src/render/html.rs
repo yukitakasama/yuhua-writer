@@ -404,6 +404,12 @@ impl<'a> Renderer<'a> for HtmlRenderer {
 ///
 /// 转义 `& < > " '` 五个字符。`'` 也转是因为属性值可能用单引号包裹，
 /// 少转一个就多一条注入路径。
+///
+/// 与 `docx::escape_xml` 一样，还要**丢弃 XML 1.0 不允许的控制字符**
+/// （例如用户从 PDF / 网页粘贴进来的 `\u{0}`、`\u{0b}`）。
+/// EPUB 的 XHTML 部件复用本函数，裸控制字符会让 epubcheck 与阅读器
+/// 直接判定「文件损坏」；HTML 产物同样不应该带上这些字符。
+/// 保留 Tab / LF / CR —— 它们是合法的空白。
 pub fn escape_html(text: &str) -> String {
     let mut out = String::with_capacity(text.len());
     for ch in text.chars() {
@@ -413,6 +419,8 @@ pub fn escape_html(text: &str) -> String {
             '>' => out.push_str("&gt;"),
             '"' => out.push_str("&quot;"),
             '\'' => out.push_str("&#39;"),
+            // XML 1.0 允许 Tab / LF / CR，其余 C0 控制字符一律丢弃
+            ch if ch < '\u{20}' && ch != '\t' && ch != '\n' && ch != '\r' => {}
             _ => out.push(ch),
         }
     }
@@ -424,7 +432,11 @@ pub fn escape_html(text: &str) -> String {
 /// 拦掉 `javascript:` / `data:`（非图片）这类伪协议。允许的数据：
 /// - 相对路径（章节里的图片大多是相对工作区的路径）
 /// - `http` / `https` / `mailto` / `tel`
-/// - `data:image/...`（内嵌图片）
+/// - `data:image/...` 中**位图** MIME（内嵌图片）
+///
+/// `data:image/svg+xml` 必须排除：SVG 可以内嵌脚本，浏览器在解析 URI 前
+/// 会先做实体解码，因此 `escape_html` 把 `<` 转成 `&lt;` **并不能**
+/// 阻止执行，等于给单文件 HTML 产物留了一条 XSS 通道。
 pub fn is_safe_url(url: &str) -> bool {
     let trimmed = url.trim();
     if trimmed.is_empty() {
@@ -443,9 +455,29 @@ pub fn is_safe_url(url: &str) -> bool {
     let scheme = scheme.to_ascii_lowercase();
     match scheme.as_str() {
         "http" | "https" | "mailto" | "tel" => true,
-        "data" => trimmed.to_ascii_lowercase().starts_with("data:image/"),
+        "data" => is_safe_data_image(&trimmed.to_ascii_lowercase()),
         _ => false,
     }
+}
+
+/// `data:` 图片白名单：只放行位图 MIME。
+///
+/// 用精确前缀匹配而不是 `starts_with("data:image/")`，否则
+/// `data:image/svg+xml` 会跟着放行（见 [`is_safe_url`] 的说明）。
+fn is_safe_data_image(lowered: &str) -> bool {
+    const ALLOWED: [&str; 6] = [
+        "data:image/png",
+        "data:image/jpeg",
+        "data:image/jpg",
+        "data:image/gif",
+        "data:image/webp",
+        "data:image/avif",
+    ];
+    ALLOWED.iter().any(|prefix| {
+        lowered
+            .strip_prefix(prefix)
+            .is_some_and(|rest| rest.starts_with(';') || rest.starts_with(','))
+    })
 }
 
 /// 由标题生成锚点 id。
@@ -585,6 +617,30 @@ mod tests {
         assert!(is_safe_url("mailto:a@b.c"));
         assert!(!is_safe_url("javascript:void(0)"));
         assert!(!is_safe_url(""));
+    }
+
+    #[test]
+    fn svg_data_urls_are_rejected() {
+        // 回归：SVG 可以内嵌脚本，data:image/svg+xml 不能进 href / src，
+        // 否则单文件 HTML 产物会带上可执行的 XSS 载荷。
+        assert!(!is_safe_url(
+            "data:image/svg+xml,<svg onload=alert(1)></svg>"
+        ));
+        assert!(!is_safe_url("data:image/svg+xml;base64,PHN2Zz4="));
+        assert!(!is_safe_url("DATA:IMAGE/SVG+XML;base64,PHN2Zz4="));
+        // 位图仍然放行
+        assert!(is_safe_url("data:image/png;base64,AAAA"));
+        assert!(is_safe_url("data:image/webp,AAAA"));
+    }
+
+    #[test]
+    fn control_characters_are_stripped_from_output() {
+        // 回归：XML 1.0 不允许的 C0 控制字符会让 EPUB / HTML 产物被判为损坏。
+        assert_eq!(escape_html("a\u{0}b"), "ab");
+        assert_eq!(escape_html("a\u{0b}b"), "ab");
+        // Tab / LF / CR 是合法空白，必须保留
+        assert_eq!(escape_html("a\tb\nc\rd"), "a\tb\nc\rd");
+        assert_eq!(escape_html("<x>&"), "&lt;x&gt;&amp;");
     }
 
     #[test]

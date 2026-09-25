@@ -107,6 +107,26 @@ impl TrashManager {
                 id: relative_path.to_string(),
             });
         }
+        // 拒绝保留目录（.trash / .yuhua / .git ...）与工作区根本身。
+        // 否则把 `.trash` 移入回收站会让目标目录建在源目录**内部**，
+        // rename 必然失败并走进下面的 copy_recursive 降级分支，
+        // 复制过程无限递归直到栈溢出。
+        for component in relative_path
+            .split('/')
+            .filter(|c| !c.is_empty() && *c != ".")
+        {
+            if WorkspaceLayout::is_reserved_name(component) {
+                return Err(YuhuaError::Invariant(format!(
+                    "不允许删除工作区保留路径：{relative_path}",
+                )));
+            }
+        }
+        let trash_root = self.dir();
+        if source == trash_root || source.starts_with(&trash_root) {
+            return Err(YuhuaError::Invariant(format!(
+                "不允许把回收站自身移入回收站：{relative_path}",
+            )));
+        }
 
         let now = now_local();
         // 目录名带上原始 ID，避免同一秒内删除多个同名条目时碰撞
@@ -292,7 +312,17 @@ impl TrashManager {
 }
 
 /// 递归复制文件或目录。
+///
+/// 目标是源的后代时直接拒绝：那会退化成「把目录复制进它自己的子目录」，
+/// 递归没有终止条件，最终以栈溢出结束（而不是一个可诊断的错误）。
 fn copy_recursive(from: &Path, to: &Path) -> Result<()> {
+    if to.starts_with(from) {
+        return Err(YuhuaError::Invariant(format!(
+            "复制目标位于源目录内部，会无限递归：{} -> {}",
+            from.display(),
+            to.display(),
+        )));
+    }
     if from.is_dir() {
         std::fs::create_dir_all(to).map_err(|e| YuhuaError::io(to, e))?;
         let entries = std::fs::read_dir(from).map_err(|e| YuhuaError::io(from, e))?;
@@ -648,5 +678,28 @@ mod tests {
     fn find_returns_none_for_unknown_name() {
         let (_dir, tm) = setup();
         assert!(tm.find("不存在").is_none());
+    }
+
+    #[test]
+    fn reserved_paths_cannot_be_trashed() {
+        // 回归：把 `.trash` 移入回收站会让目标目录建在源目录内部，
+        // rename 失败后退化为 copy_recursive 无限递归，最终栈溢出。
+        let (_dir, tm) = setup();
+        assert!(tm.move_to_trash(".trash", "回收站", "x", "book").is_err());
+        assert!(tm.move_to_trash(".yuhua", "引擎", "x", "book").is_err());
+        assert!(tm
+            .move_to_trash(".trash/子目录", "回收站", "x", "book")
+            .is_err());
+    }
+
+    #[test]
+    fn copy_recursive_rejects_self_nesting() {
+        // 回归：目标是源的后代时必须报错，而不是一直递归到栈溢出。
+        let dir = tempfile::tempdir().unwrap();
+        let from = dir.path().join("src");
+        std::fs::create_dir_all(&from).unwrap();
+        std::fs::write(from.join("a.md"), "内容").unwrap();
+        let err = copy_recursive(&from, &from.join("inner"));
+        assert!(err.is_err(), "复制到自身子目录必须被拒绝");
     }
 }
