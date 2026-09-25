@@ -241,16 +241,7 @@ export function moveChapter(snapshot: TreeSnapshot, chapterId: string, target: M
   // 直接写整数会在向下拖动时与旧序号冲突，导致排序不稳定。
   const anchor = targetSiblings[index];
   const previous = index > 0 ? targetSiblings[index - 1] : undefined;
-  let provisional: number;
-  if (anchor !== undefined && previous !== undefined) {
-    provisional = (anchor.sort + previous.sort) / 2;
-  } else if (anchor !== undefined) {
-    provisional = anchor.sort - 0.5;
-  } else if (previous !== undefined) {
-    provisional = previous.sort + 0.5;
-  } else {
-    provisional = 0;
-  }
+  const provisional = provisionalSort(anchor?.sort, previous?.sort);
 
   const moved: ChapterSummary = { ...moving, volumeId: target.volumeId, sort: provisional };
   let chapters = snapshot.chapters.map((c) => (c.id === chapterId ? moved : c));

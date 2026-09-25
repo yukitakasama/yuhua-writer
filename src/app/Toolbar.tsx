@@ -63,7 +63,7 @@ export function Toolbar(props: ToolbarProps): JSX.Element {
           <IconBack size={17} />
         </IconButton>
         <IconButton
-          label={layout.leftCollapsed ? t("toolbar.toggleLeft") : t("toolbar.toggleLeft")}
+          label={t("toolbar.toggleLeft")}
           active={!layout.leftCollapsed}
           onClick={toggleLeft}
         >
@@ -94,7 +94,7 @@ export function Toolbar(props: ToolbarProps): JSX.Element {
           <IconSearch size={17} />
         </IconButton>
         <IconButton
-          label={layout.rightCollapsed ? t("toolbar.toggleRight") : t("toolbar.toggleRight")}
+          label={t("toolbar.toggleRight")}
           active={!layout.rightCollapsed}
           onClick={toggleRight}
         >
