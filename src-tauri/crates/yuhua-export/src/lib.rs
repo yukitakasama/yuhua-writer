@@ -200,3 +200,32 @@ mod tests {
         }
     }
 }
+
+#[cfg(test)]
+mod artifact_dump {
+    use super::*;
+
+    #[test]
+    fn dump_artifacts_for_external_verification() {
+        let vid = yuhua_core::VolumeId::new();
+        let mut doc = Document::new(BookMeta::new("羽化笔记", "张三"));
+        doc.book.id = Some(yuhua_core::BookId::new());
+        doc.book.description = "一本用于核验的书".into();
+        doc.volumes.push(VolumeMeta { id: vid.clone(), title: "第一卷".into() });
+        doc.chapters.push(ChapterContent::new(
+            yuhua_core::ChapterId::new(),
+            vid,
+            "第一章 羽化",
+            vec![
+                Block::Paragraph(vec![Inline::text("正文里有 </w:t> 与 & <script> 等危险字符。")]),
+                Block::List { ordered: false, start: 1, items: vec![vec![Block::Paragraph(vec![Inline::text("甲")])]] },
+            ],
+        ));
+        let dir = std::path::Path::new(env!("CARGO_TARGET_TMPDIR"));
+        for fmt in [ExportFormat::Epub, ExportFormat::Docx, ExportFormat::Html, ExportFormat::Txt, ExportFormat::Markdown] {
+            let bytes = render(fmt, &doc).unwrap();
+            std::fs::write(dir.join(format!("verify.{}", fmt.extension())), bytes).unwrap();
+        }
+        println!("ARTIFACT_DIR={}", dir.display());
+    }
+}

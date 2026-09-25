@@ -20,6 +20,14 @@ import { ERROR_CODES, type IpcError } from "./types";
 export function normalizeError(raw: unknown): IpcError {
   if (isIpcError(raw)) return raw;
 
+  // 带结构化 error 字段的 Error 子类（例如 mock 后端的 MockError）：
+  // 它跨越了"抛出"这个边界，因此和 Tauri 的 reject 值一样需要被识别。
+  // 如果不先检查这里，mock 的错误码就会全部退化成 INTERNAL，
+  // 界面上就无法按 code 分支给出针对性的提示。
+  if (raw instanceof Error && "error" in raw && isIpcError((raw as { error: unknown }).error)) {
+    return (raw as unknown as { error: IpcError }).error;
+  }
+
   // Tauri 桥接层自己抛的错误是 Error 实例
   if (raw instanceof Error) {
     return {

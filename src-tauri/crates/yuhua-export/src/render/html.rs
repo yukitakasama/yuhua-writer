@@ -93,12 +93,11 @@ impl HtmlRenderer {
             if self.options.section_per_chapter {
                 let _ = writeln!(
                     out,
-                    "<section class=\"chapter\" id=\"{}\" data-chapter=\"{}\" data-volume=\"{}\" data-title=\"{}\" data-ends-after-pagebreak=\"{}\">",
+                    "<section class=\"chapter\" id=\"{}\" data-chapter=\"{}\" data-volume=\"{}\" data-title=\"{}\">",
                     escape_html(&slugify(&chapter.title)),
                     escape_html(&chapter.title),
                     escape_html(&chapter.volume_id.to_string()),
                     escape_html(&chapter.title),
-                    "",
                 );
             }
             let _ = writeln!(

@@ -249,9 +249,9 @@ impl TxtRenderer {
                         out.push_str(&label);
                     } else {
                         out.push_str(&label);
-                        out.push_str("（");
+                        out.push('（');
                         out.push_str(url);
-                        out.push_str("）");
+                        out.push('）');
                     }
                 }
                 Inline::Image { url, alt } => {

@@ -195,3 +195,220 @@ pub fn require_chapter_id(chapter: &str) -> Result<()> {
     Ok(())
 }
 
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::model::tests::{day, ts};
+    use crate::store::StatsStore;
+
+    fn store() -> (tempfile::TempDir, StatsStore) {
+        let dir = tempfile::tempdir().unwrap();
+        let store = StatsStore::at(dir.path());
+        (dir, store)
+    }
+
+    #[test]
+    fn positive_delta_only_counts_growth() {
+        assert_eq!(positive_delta(100, 300), 200);
+        assert_eq!(positive_delta(300, 100), 0, "减字必须记 0，不能是负数");
+        assert_eq!(positive_delta(100, 100), 0);
+        assert_eq!(positive_delta(0, 1520), 1520);
+    }
+
+    #[test]
+    fn positive_delta_does_not_underflow() {
+        // u32 相减若用裸减法会 panic（debug）或回绕（release），
+        // 这里必须用 saturating_sub 保住 0
+        assert_eq!(positive_delta(0, 0), 0);
+        assert_eq!(positive_delta(u32::MAX, 0), 0);
+    }
+
+    #[test]
+    fn collect_records_growth() {
+        let (_tmp, store) = store();
+        let out = collect_delta(&store, "ch_1", 100, 1600, ts(2026, 1, 15, 9, 12)).unwrap();
+        assert_eq!(out.recorded, 1500);
+        assert_eq!(out.day, day(2026, 1, 15));
+        assert!(out.is_productive());
+        assert_eq!(out.day_total, 1500);
+
+        let stats = store.load(&MonthKey::of(day(2026, 1, 15))).unwrap();
+        assert_eq!(stats.day(day(2026, 1, 15)).unwrap().words(), 1500);
+    }
+
+    #[test]
+    fn collect_ignores_shrinkage() {
+        let (_tmp, store) = store();
+        collect_delta(&store, "ch_1", 100, 2000, ts(2026, 1, 15, 9, 0)).unwrap();
+        // 作者删掉了 1500 字：当日产量不应减少
+        let out = collect_delta(&store, "ch_1", 2000, 500, ts(2026, 1, 15, 10, 0)).unwrap();
+        assert_eq!(out.recorded, 0);
+        assert!(!out.is_productive());
+
+        let stats = store.load(&MonthKey::of(day(2026, 1, 15))).unwrap();
+        assert_eq!(
+            stats.day(day(2026, 1, 15)).unwrap().words(),
+            1900,
+            "删字不抵扣，当日产量保持为正差"
+        );
+    }
+
+    #[test]
+    fn shrink_does_not_write_to_disk() {
+        let (_tmp, store) = store();
+        collect_delta(&store, "ch_1", 0, 500, ts(2026, 1, 15, 9, 0)).unwrap();
+        let path = store.path_for(&MonthKey::of(day(2026, 1, 15)));
+        let before = std::fs::read_to_string(&path).unwrap();
+        let modified_before = std::fs::metadata(&path).unwrap().modified().unwrap();
+
+        collect_delta(&store, "ch_1", 500, 10, ts(2026, 1, 15, 11, 0)).unwrap();
+        let after = std::fs::read_to_string(&path).unwrap();
+        let modified_after = std::fs::metadata(&path).unwrap().modified().unwrap();
+        assert_eq!(before, after, "无产出时不应改动文件内容");
+        assert_eq!(modified_before, modified_after, "无产出时不应触碰 mtime");
+    }
+
+    #[test]
+    fn repeated_saves_take_max_not_sum() {
+        // 作者在同一天里分三次把同一章越写越长（每次保存都是正差），
+        // 当日该章的产量应当是「净增长」而不是三段正差之和
+        let (_tmp, store) = store();
+        collect_delta(&store, "ch_1", 0, 500, ts(2026, 1, 15, 9, 0)).unwrap();
+        collect_delta(&store, "ch_1", 500, 900, ts(2026, 1, 15, 10, 0)).unwrap();
+        collect_delta(&store, "ch_1", 900, 1500, ts(2026, 1, 15, 11, 0)).unwrap();
+
+        let stats = store.load(&MonthKey::of(day(2026, 1, 15))).unwrap();
+        assert_eq!(stats.day(day(2026, 1, 15)).unwrap().words(), 1500);
+    }
+
+    #[test]
+    fn different_chapters_accumulate() {
+        let (_tmp, store) = store();
+        collect_delta(&store, "ch_1", 0, 1520, ts(2026, 1, 15, 9, 0)).unwrap();
+        let out = collect_delta(&store, "ch_2", 0, 980, ts(2026, 1, 15, 20, 0)).unwrap();
+        assert_eq!(out.day_total, 2500, "不同章的产出应当累加");
+    }
+
+    #[test]
+    fn day_boundary_splits_across_months() {
+        let (_tmp, store) = store();
+        collect_delta(&store, "ch_1", 0, 100, ts(2026, 1, 31, 23, 50)).unwrap();
+        collect_delta(&store, "ch_1", 100, 300, ts(2026, 2, 1, 0, 10)).unwrap();
+
+        let jan = store.load(&MonthKey::new(2026, 1).unwrap()).unwrap();
+        let feb = store.load(&MonthKey::new(2026, 2).unwrap()).unwrap();
+        assert_eq!(jan.total_words(), 100);
+        assert_eq!(feb.total_words(), 200);
+    }
+
+    #[test]
+    fn collect_rejects_empty_chapter_id() {
+        let (_tmp, store) = store();
+        // 空 ID 会被 ChapterKey 拒绝；collect 依赖 store.update 传播这个错误
+        let out = collect_delta(&store, "", 0, 100, ts(2026, 1, 15, 9, 0)).unwrap();
+        assert_eq!(out.recorded, 100);
+        assert_eq!(
+            out.day_total, 0,
+            "空 ID 不该被写入统计，因此当日总计仍为 0"
+        );
+    }
+
+    #[test]
+    fn require_chapter_id_guards_blank() {
+        assert!(require_chapter_id("ch_1").is_ok());
+        assert!(require_chapter_id("").is_err());
+        assert!(require_chapter_id("   ").is_err());
+    }
+
+    #[test]
+    fn zero_delta_on_missing_file_is_not_an_error() {
+        // 首次运行时文件还不存在，一次「没有内容变化」的保存不应报错
+        let (_tmp, store) = store();
+        let out = collect_delta(&store, "ch_1", 0, 0, ts(2026, 1, 15, 9, 0)).unwrap();
+        assert_eq!(out.recorded, 0);
+        assert_eq!(out.day_total, 0);
+    }
+
+    #[test]
+    fn batch_collects_all_growth_in_one_write() {
+        let (_tmp, store) = store();
+        let deltas = vec![
+            ("ch_1".to_string(), 0u32, 1000u32),
+            ("ch_2".to_string(), 500, 800),
+            ("ch_3".to_string(), 900, 400),
+        ];
+        let written = collect_batch(&store, &deltas, ts(2026, 1, 15, 12, 0)).unwrap();
+        assert_eq!(written, 2, "只有两章是正差");
+
+        let stats = store.load(&MonthKey::of(day(2026, 1, 15))).unwrap();
+        assert_eq!(stats.day(day(2026, 1, 15)).unwrap().words(), 1300);
+    }
+
+    #[test]
+    fn batch_with_no_growth_touches_nothing() {
+        let (_tmp, store) = store();
+        let deltas = vec![("ch_1".to_string(), 900u32, 100u32)];
+        assert_eq!(collect_batch(&store, &deltas, ts(2026, 1, 15, 12, 0)).unwrap(), 0);
+        assert!(!store.path_for(&MonthKey::of(day(2026, 1, 15))).exists());
+    }
+
+    #[test]
+    fn batch_of_empty_input_is_noop() {
+        let (_tmp, store) = store();
+        assert_eq!(collect_batch(&store, &[], ts(2026, 1, 15, 12, 0)).unwrap(), 0);
+    }
+
+    #[test]
+    fn batch_skips_dirty_ids_without_losing_the_rest() {
+        let (_tmp, store) = store();
+        let deltas = vec![
+            ("".to_string(), 0u32, 500u32),
+            ("ch_2".to_string(), 0, 300),
+        ];
+        collect_batch(&store, &deltas, ts(2026, 1, 15, 12, 0)).unwrap();
+
+        let stats = store.load(&MonthKey::of(day(2026, 1, 15))).unwrap();
+        assert_eq!(
+            stats.day(day(2026, 1, 15)).unwrap().words(),
+            300,
+            "脏 ID 被跳过，合法章节的统计仍在"
+        );
+    }
+
+    #[test]
+    fn observe_shrink_reports_removed_words() {
+        assert_eq!(observe_shrink(500, 200), Some(300));
+        assert_eq!(observe_shrink(200, 500), None);
+        assert_eq!(observe_shrink(200, 200), None);
+    }
+
+    #[test]
+    fn chinese_chapter_id_is_collected() {
+        // 中文多字节 ID（用户手改过 Front Matter 的情形）也要能记
+        let (_tmp, store) = store();
+        collect_delta(&store, "第一章 落羽", 0, 800, ts(2026, 1, 15, 9, 0)).unwrap();
+        let stats = store.load(&MonthKey::of(day(2026, 1, 15))).unwrap();
+        assert_eq!(stats.day(day(2026, 1, 15)).unwrap().words(), 800);
+    }
+
+    #[test]
+    fn collect_is_idempotent_for_the_same_save() {
+        // 保存流程因重试被调用两次，结果必须与一次相同
+        let (_tmp, store) = store();
+        collect_delta(&store, "ch_1", 0, 1200, ts(2026, 1, 15, 9, 0)).unwrap();
+        collect_delta(&store, "ch_1", 0, 1200, ts(2026, 1, 15, 9, 0)).unwrap();
+        let stats = store.load(&MonthKey::of(day(2026, 1, 15))).unwrap();
+        assert_eq!(stats.day(day(2026, 1, 15)).unwrap().words(), 1200);
+    }
+
+    #[test]
+    fn growth_then_shrink_then_growth_keeps_max() {
+        // 一场典型的写作：写 1500、删到 900、再写到 2100
+        let (_tmp, store) = store();
+        collect_delta(&store, "ch_1", 0, 1500, ts(2026, 1, 15, 9, 0)).unwrap();
+        collect_delta(&store, "ch_1", 1500, 900, ts(2026, 1, 15, 10, 0)).unwrap();
+        let out = collect_delta(&store, "ch_1", 900, 2100, ts(2026, 1, 15, 11, 0)).unwrap();
+        assert_eq!(out.recorded, 1200, "最后一次保存的正差是 2100 减 900");
+        assert_eq!(out.day_total, 1500, "当日取历史最大值 1500");
+    }
+}

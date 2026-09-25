@@ -107,7 +107,7 @@ impl MarkdownRenderer {
                         let _ = writeln!(out, "> {line}");
                     }
                 }
-                out.push_str("\n");
+                out.push('\n');
             }
             Block::List {
                 ordered,
@@ -216,7 +216,7 @@ impl<'a> Renderer<'a> for MarkdownRenderer {
             if volume_title != current_volume {
                 if let Some(title) = volume_title {
                     if current_volume.is_some() {
-                        out.push_str("\n");
+                        out.push('\n');
                     }
                     out.push_str(&self.heading(self.options.volume_level, title));
                     current_volume = volume_title;
@@ -315,11 +315,10 @@ pub fn strip_front_matter(text: &str) -> &str {
         let _ = index;
         let content = line.trim_end_matches(['\n', '\r']);
         if content == "---" {
-            // 找到结束标记，返回其后的内容
-            let consumed = rest.len() - (rest.len() - 0);
-            let _ = consumed;
-            let end = line.as_ptr() as usize - rest.as_ptr() as usize + line.len();
-            return &rest[end..];
+            // 找到结束标记，返回其后的内容。用指针差值算出这一行在 `rest` 里的
+            // 偏移，再整行跳过 —— 不必为了拿偏移而重新扫描前面的行。
+            let offset = line.as_ptr() as usize - rest.as_ptr() as usize;
+            return &rest[offset + line.len()..];
         }
     }
     // 没有结束标记：这说明第一个 `---` 就是分割线而不是 Front Matter，
