@@ -1,0 +1,21 @@
+[package]
+name = "yuhua-store"
+description = "羽化写作 · 索引层：SQLite + FTS5 中文二元组分词、增量索引、全文检索"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+
+[dependencies]
+yuhua-core = { workspace = true }
+serde = { workspace = true }
+serde_json = { workspace = true }
+chrono = { workspace = true }
+thiserror = { workspace = true }
+
+[dev-dependencies]
+tempfile = { workspace = true }
+
+[lints]
+workspace = true

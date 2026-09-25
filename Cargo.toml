@@ -1,0 +1,98 @@
+# ============================================================================
+#  羽化写作 · Cargo 工作区根配置
+#
+#  设计约定（对应开发计划 3.1 / 3.3 节）：
+#  - 根目录只放 workspace 定义与共享依赖版本，不放 [package]；
+#    Tauri 应用本身位于 src-tauri/Cargo.toml，它也是本工作区的一个成员。
+#  - 依赖版本集中在此处声明（workspace.dependencies），各 crate 用
+#    { workspace = true } 引用，保证全仓版本一致、升级只需改一处。
+#  - 领域 crate（yuhua-core / fs / store / export / stats）是纯 Rust 库，
+#    不含任何 Tauri 依赖，因此可以被单元测试、基准脚本甚至未来的 CLI 直接复用。
+#    这正是「命令层是薄壳，业务逻辑在领域层」这条架构约束的落地方式。
+# ============================================================================
+[workspace]
+resolver = "2"
+members = [
+    "src-tauri",
+    "src-tauri/crates/yuhua-core",
+    "src-tauri/crates/yuhua-fs",
+    "src-tauri/crates/yuhua-store",
+    "src-tauri/crates/yuhua-export",
+    "src-tauri/crates/yuhua-stats",
+]
+
+[workspace.package]
+version = "0.1.0-alpha.0"
+edition = "2021"
+rust-version = "1.77"
+license = "MIT"
+repository = "https://github.com/yuhua-writer/yuhua-writer"
+authors = ["Yuhua Writer Contributors"]
+
+[workspace.dependencies]
+# ---- 内部 crate ----
+yuhua-core = { path = "src-tauri/crates/yuhua-core" }
+yuhua-fs = { path = "src-tauri/crates/yuhua-fs" }
+yuhua-store = { path = "src-tauri/crates/yuhua-store" }
+yuhua-export = { path = "src-tauri/crates/yuhua-export" }
+yuhua-stats = { path = "src-tauri/crates/yuhua-stats" }
+
+# ---- 序列化 ----
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+toml = "0.8"
+
+# ---- 错误处理 ----
+thiserror = "2"
+
+# ---- 时间 ----
+# 使用 chrono 而非 time：需要带时区的 RFC3339 与本地日历运算（码字日历依赖）
+chrono = { version = "0.4", features = ["serde"] }
+
+# ---- 文件与目录 ----
+notify = "8"
+dirs = "6"
+walkdir = "2"
+tempfile = "3"
+
+# ---- 哈希与 ID ----
+blake3 = "1"
+uuid = { version = "1", features = ["v4", "v7", "serde"] }
+
+# ---- 数据库 ----
+# bundled: 静态编译 SQLite，零系统依赖，且保证 FTS5 可用
+rusqlite = { version = "0.37", features = ["bundled", "blob", "functions", "limits"] }
+
+# ---- Markdown 解析（导出用，M7）----
+pulldown-cmark = { version = "0.12", default-features = false, features = ["html"] }
+zip = { version = "2", default-features = false, features = ["deflate"] }
+
+# ---- 压缩（工作区 zip 备份，T2.14）----
+
+# ---- 测试 ----
+[workspace.lints.rust]
+unsafe_code = "forbid"
+missing_debug_implementations = "warn"
+
+[workspace.lints.clippy]
+all = { level = "deny", priority = -1 }
+# 允许在文档注释里使用 Markdown 而不触发 pedantic 噪音
+doc_markdown = "allow"
+# 领域模型里大量使用 &str/String 组合，避免过度借用检查噪音
+needless_pass_by_value = "allow"
+
+# 开发档也打开优化：编辑/检索路径的性能在 debug 下不具备参考价值，
+# 但完整 opt-level=3 会让增量编译过慢，故折中为 opt-level=1。
+[profile.dev]
+opt-level = 1
+
+[profile.dev.package."*"]
+opt-level = 2
+
+# 发布档：体积优先（对应安装包 ≤ 25 MB 的目标 P6）
+[profile.release]
+opt-level = "z"
+lto = true
+codegen-units = 1
+panic = "abort"
+strip = true

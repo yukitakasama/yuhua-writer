@@ -1,0 +1,37 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024" width="1024" height="1024" role="img" aria-label="羽化写作">
+  <title>羽化写作 · 应用图标</title>
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#2B6B5F"/><stop offset="1" stop-color="#17423B"/>
+    </linearGradient>
+  </defs>
+  <rect width="1024" height="1024" rx="224" fill="url(#bg)"/>
+  <g transform="rotate(6 512 512)" fill="none" stroke="#EAF4F0" stroke-linecap="round" stroke-linejoin="round">
+    <path d="M512 142 C614 262 656 414 638 522 C622 616 570 682 512 706 C454 682 402 616 386 522 C368 414 410 262 512 142 Z" stroke-width="22"/>
+    <path d="M512 142 C514 400 512 640 506 896" stroke-width="20"/>
+    <g stroke-width="13" opacity="0.92">
+      <path d="M512 216 L470 280"/>
+      <path d="M512 216 L554 280"/>
+      <path d="M512 254 L450 318"/>
+      <path d="M512 254 L574 318"/>
+      <path d="M512 292 L433 356"/>
+      <path d="M512 292 L591 356"/>
+      <path d="M512 330 L419 394"/>
+      <path d="M512 330 L605 394"/>
+      <path d="M512 368 L409 432"/>
+      <path d="M512 368 L615 432"/>
+      <path d="M512 406 L401 470"/>
+      <path d="M512 406 L623 470"/>
+      <path d="M512 444 L396 508"/>
+      <path d="M512 444 L628 508"/>
+      <path d="M512 482 L395 546"/>
+      <path d="M512 482 L629 546"/>
+      <path d="M512 520 L397 584"/>
+      <path d="M512 520 L627 584"/>
+      <path d="M512 558 L402 622"/>
+      <path d="M512 558 L622 622"/>
+      <path d="M512 596 L409 660"/>
+      <path d="M512 596 L615 660"/>
+    </g>
+  </g>
+</svg>

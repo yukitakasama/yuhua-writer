@@ -1,0 +1,23 @@
+[package]
+name = "yuhua-writer"
+description = "羽化写作 — 桌面应用入口（Tauri 命令层薄壳）"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+
+[dependencies]
+yuhua-core = { workspace = true }
+yuhua-fs = { workspace = true }
+yuhua-store = { workspace = true }
+yuhua-export = { workspace = true }
+yuhua-stats = { workspace = true }
+serde = { workspace = true }
+serde_json = { workspace = true }
+thiserror = { workspace = true }
+chrono = { workspace = true }
+tokio = { version = "1", features = ["rt-multi-thread", "macros", "sync"] }
+tauri = { version = "2", features = [] }
+
+[lints]
+workspace = true

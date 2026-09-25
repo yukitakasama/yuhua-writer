@@ -1,0 +1,18 @@
+[package]
+name = "yuhua-core"
+description = "羽化写作 · 领域层：Book / Volume / Chapter 模型、不变量与共享错误类型"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+
+[dependencies]
+serde = { workspace = true }
+serde_json = { workspace = true }
+chrono = { workspace = true }
+thiserror = { workspace = true }
+uuid = { workspace = true }
+
+[lints]
+workspace = true

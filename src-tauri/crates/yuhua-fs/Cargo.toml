@@ -1,0 +1,24 @@
+[package]
+name = "yuhua-fs"
+description = "羽化写作 · 文件系统层：原子写、轮转备份、崩溃日志、回收站、文件监听、冲突副本识别"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+
+[dependencies]
+yuhua-core = { workspace = true }
+serde = { workspace = true }
+serde_json = { workspace = true }
+chrono = { workspace = true }
+thiserror = { workspace = true }
+uuid = { workspace = true }
+blake3 = { workspace = true }
+notify = { workspace = true }
+
+[dev-dependencies]
+tempfile = { workspace = true }
+
+[lints]
+workspace = true

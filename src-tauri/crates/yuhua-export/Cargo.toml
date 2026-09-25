@@ -1,0 +1,21 @@
+[package]
+name = "yuhua-export"
+description = "羽化写作 · 导出引擎：Document IR + TXT/MD/HTML/DOCX/PDF/EPUB 六渲染器"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+
+[dependencies]
+yuhua-core = { workspace = true }
+serde = { workspace = true }
+serde_json = { workspace = true }
+chrono = { workspace = true }
+thiserror = { workspace = true }
+
+[dev-dependencies]
+tempfile = { workspace = true }
+
+[lints]
+workspace = true

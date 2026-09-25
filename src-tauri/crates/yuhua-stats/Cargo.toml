@@ -1,0 +1,21 @@
+[package]
+name = "yuhua-stats"
+description = "羽化写作 · 写作统计：码字日历、写作记录、年热力图数据与单调合并"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+
+[dependencies]
+yuhua-core = { workspace = true }
+serde = { workspace = true }
+serde_json = { workspace = true }
+chrono = { workspace = true }
+thiserror = { workspace = true }
+
+[dev-dependencies]
+tempfile = { workspace = true }
+
+[lints]
+workspace = true
