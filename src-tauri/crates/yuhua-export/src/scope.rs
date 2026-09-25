@@ -442,8 +442,7 @@ mod tests {
 
     #[test]
     fn scope_descriptions_are_human_readable() {
-        let (doc, volumes, chapters) = sample();
-        let _ = doc;
+        let (_, volumes, chapters) = sample();
         assert_eq!(ExportScope::Whole.describe(), "整书");
         assert_eq!(
             ExportScope::Single(chapters[0].clone()).describe(),

@@ -173,7 +173,7 @@ impl MarkdownRenderer {
                 Inline::Text(t) => out.push_str(&escape_inline_text(t)),
                 Inline::Code(t) => {
                     // 行内代码用反引号包裹；内容里含反引号时加长围栏。
-                    let fence = "\u{60}".repeat(backtick_run(t) + 1);
+                    let fence = "\u{60}".repeat(longest_backtick_run(t) + 1);
                     let _ = write!(out, "{fence}{t}{fence}");
                 }
                 Inline::Emph(children) => {
@@ -239,26 +239,11 @@ impl<'a> Renderer<'a> for MarkdownRenderer {
     }
 }
 
-/// 计算代码块需要多长的围栏。
+/// 正文里最长的一段连续反引号长度。
 ///
-/// 比正文里最长的一段连续反引号再长 1 —— 这是 CommonMark 规定的做法，
-/// 否则代码块会被内部的反引号提前截断。
-fn fence_length(text: &str) -> usize {
-    let mut longest = 0usize;
-    let mut current = 0usize;
-    for ch in text.chars() {
-        if ch == '\u{60}' {
-            current += 1;
-            longest = longest.max(current);
-        } else {
-            current = 0;
-        }
-    }
-    (longest + 1).max(3)
-}
-
-/// 行内代码里最长连续反引号的长度。
-fn backtick_run(text: &str) -> usize {
+/// 代码块围栏与行内代码围栏都依赖这个长度：围栏必须比正文里最长的
+/// 连续反引号更长，否则内容会被内部的反引号提前截断。
+fn longest_backtick_run(text: &str) -> usize {
     let mut longest = 0usize;
     let mut current = 0usize;
     for ch in text.chars() {
@@ -270,6 +255,14 @@ fn backtick_run(text: &str) -> usize {
         }
     }
     longest
+}
+
+/// 计算代码块需要多长的围栏。
+///
+/// 比正文里最长的一段连续反引号再长 1 —— 这是 CommonMark 规定的做法，
+/// 否则代码块会被内部的反引号提前截断。下限为 3。
+fn fence_length(text: &str) -> usize {
+    (longest_backtick_run(text) + 1).max(3)
 }
 
 /// 转义纯文本里的 Markdown 元字符。
@@ -318,8 +311,7 @@ pub fn strip_front_matter(text: &str) -> &str {
     else {
         return text;
     };
-    for (index, line) in rest.split_inclusive('\n').enumerate() {
-        let _ = index;
+    for line in rest.split_inclusive('\n') {
         let content = line.trim_end_matches(['\n', '\r']);
         if content == "---" {
             // 找到结束标记，返回其后的内容。用指针差值算出这一行在 `rest` 里的

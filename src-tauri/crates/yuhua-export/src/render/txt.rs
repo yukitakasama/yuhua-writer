@@ -242,18 +242,16 @@ impl TxtRenderer {
                 }
                 Inline::Link { url, text } => {
                     let label = self.render_inlines(text);
+                    out.push_str(&label);
                     // 文字与 URL 相同时不重复输出，否则 `[https://a](https://a)`
                     // 会变成「https://a（https://a）」这种啰嗦样子。
-                    if label == *url {
-                        out.push_str(&label);
-                    } else {
-                        out.push_str(&label);
+                    if label != *url {
                         out.push('（');
                         out.push_str(url);
                         out.push('）');
                     }
                 }
-                Inline::Image { url, alt } => {
+                Inline::Image { alt, .. } => {
                     // 计划书 9.1：TXT 丢弃图片。但不能连占位都没有 ——
                     // 作者需要知道这里原本有张图，排版时才知道漏了什么。
                     out.push_str("［图片");
@@ -262,7 +260,6 @@ impl TxtRenderer {
                         out.push_str(alt);
                     }
                     out.push('］');
-                    let _ = url;
                 }
             }
         }
