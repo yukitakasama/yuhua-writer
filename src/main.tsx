@@ -15,6 +15,11 @@
 
 import { render } from "solid-js/web";
 
+// 设计令牌必须**先于** app.css 导入。
+// app.css 里的令牌定义包在 @layer fallback 中（未分层样式优先级更高），
+// 因此这一行会让 tokens.css 的真值自动覆盖那些兜底值 ——
+// 不需要删掉 app.css 里的兜底定义，它们只在令牌缺失时才有意义。
+import "./design/tokens.css";
 import "./styles/app.css";
 import { App } from "./App";
 

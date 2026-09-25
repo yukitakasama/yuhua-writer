@@ -155,7 +155,89 @@ function main() {
     log("  生成 128x128@2x 失败：" + e.message);
   }
 
+  buildIco();
+
   log("图标派生完成。替换 assets/icon.svg 后重跑本脚本即可整体换肤。");
+}
+
+/**
+ * 把已生成的 PNG 打包成 Windows 的 .ico。
+ *
+ * ## 为什么要自己拼 ICO
+ *
+ * Tauri 在 Windows 上需要 `icons/icon.ico` 生成资源文件，缺失会直接
+ * 让构建失败。而 ICO 只是一个很简单的容器格式，自己拼比再引入一个
+ * 图像库（sharp / png-to-ico 等带原生二进制的包）代价低得多，
+ * 也符合本项目「构建期依赖最小化」的取向。
+ *
+ * ## ICO 结构
+ *
+ * ```text
+ * ICONDIR (6 字节)
+ *   u16 reserved = 0
+ *   u16 type     = 1   (1 = 图标)
+ *   u16 count    = N
+ * ICONDIRENTRY * N (每个 16 字节)
+ *   u8  width     (0 表示 256)
+ *   u8  height    (0 表示 256)
+ *   u8  调色板数  (0 = 无调色板)
+ *   u8  reserved  = 0
+ *   u16 色彩平面 = 1
+ *   u16 位深     = 32
+ *   u32 数据字节数
+ *   u32 数据偏移
+ * 各图像数据（直接用 PNG 字节即可，Vista 以后支持 PNG 压缩的 ICO）
+ * ```
+ */
+function buildIco() {
+  // ICO 里放 16/32/48/64/128/256 六个尺寸是常见做法；
+  // 我们已有的 PNG 尺寸是 32/128/256，再加上由 512 缩出的 48/64 不划算，
+  // 因此就用现有的三档 —— 覆盖任务栏（32）、资源管理器（128/256）足够。
+  const wanted = [
+    { size: 256, file: "256x256.png" },
+    { size: 128, file: "128x128.png" },
+    { size: 32, file: "32x32.png" },
+  ];
+
+  const images = [];
+  for (const w of wanted) {
+    const p = join(OUT, w.file);
+    if (!existsSync(p)) continue;
+    images.push({ size: w.size, data: readFileSync(p) });
+  }
+
+  if (images.length === 0) {
+    log("没有可用的 PNG，跳过 .ico 生成");
+    return;
+  }
+
+  const header = Buffer.alloc(6);
+  header.writeUInt16LE(0, 0); // reserved
+  header.writeUInt16LE(1, 2); // type = icon
+  header.writeUInt16LE(images.length, 4);
+
+  const entries = [];
+  let offset = 6 + images.length * 16;
+
+  for (const img of images) {
+    const e = Buffer.alloc(16);
+    // 256 在 ICO 里用 0 表示
+    e.writeUInt8(img.size >= 256 ? 0 : img.size, 0);
+    e.writeUInt8(img.size >= 256 ? 0 : img.size, 1);
+    e.writeUInt8(0, 2); // 调色板数
+    e.writeUInt8(0, 3); // reserved
+    e.writeUInt16LE(1, 4); // 色彩平面
+    e.writeUInt16LE(32, 6); // 位深
+    e.writeUInt32LE(img.data.length, 8);
+    e.writeUInt32LE(offset, 12);
+    entries.push(e);
+    offset += img.data.length;
+  }
+
+  const ico = Buffer.concat([header, ...entries, ...images.map((i) => i.data)]);
+  const dest = join(OUT, "icon.ico");
+  writeFileSync(dest, ico);
+  log("  -> " + dest.replace(ROOT, ".") + "（含 " + images.map((i) => i.size).join("/") + " 三档尺寸）");
 }
 
 main();
