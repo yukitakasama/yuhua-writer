@@ -8,8 +8,7 @@
  * 它们必须长得一样、动效一样（SVG 插画淡入 + 极低频呼吸），
  * 否则界面会显得拼凑。
  *
- * `illustration` 由调用方传入自绘 SVG —— 本组件不持有任何图标资产，
- * 因为 `src/icons/` 由另一个代理负责。
+ * `illustration` 由调用方传入自绘 SVG —— 本组件不持有任何图标资产。
  */
 
 import type { JSX } from "solid-js";
