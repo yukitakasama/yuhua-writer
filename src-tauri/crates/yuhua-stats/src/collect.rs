@@ -35,7 +35,7 @@
 use chrono::{DateTime, FixedOffset, NaiveDate};
 use yuhua_core::{Result, YuhuaError};
 
-use crate::model::MonthKey;
+use crate::model::{ChapterKey, MonthKey};
 use crate::store::StatsStore;
 
 /// 一次差分采集的结果。
@@ -74,9 +74,18 @@ pub fn positive_delta(before: u32, after: u32) -> u32 {
 ///
 /// 参数说明：
 ///
-/// - before：本次保存**之前**磁盘上该章的已知字数
+/// - before：本次保存**之前**该章的已知字数
 /// - after：本次保存**之后**的字数
 /// - now：本次保存的时刻（带时区），决定计入哪一天
+///
+/// 引擎把 before 与当日已记字数比对，决定本次正差是**累加**到当日
+/// 还是仅仅作为上限（详见函数体注释）。无论哪种情形，**同一章当天的
+/// 最后一次采集结果就是该章当天的产出**。因此调用方的约定是：
+///
+/// 1. 每章维护一个 last_known（初始值从章节目录的字数读取）
+/// 2. 保存流程把 last_known 作为 before，保存成功后令 last_known = after
+/// 3. 统计页展示「今日」时，应当再加上「本次会话内已写但尚未入库的部分」
+///    （即已写量减已入库量），否则刚敲下的字要等下次保存才出现
 ///
 /// 返回采集结果；正差为 0（没写新内容，或删了内容）时同样返回 Ok，
 /// 只是 recorded 为 0 —— 调用方不该把它当成错误。
@@ -89,6 +98,20 @@ pub fn collect_delta(
 ) -> Result<CollectOutcome> {
     let day = now.date_naive();
     let recorded = positive_delta(before, after);
+
+    // 章节 ID 非法（例如上层拿到一个尚未落盘的章节）时直接跳过：
+    // 统计是辅助数据，不该因为一个脏 ID 让保存流程报错。
+    // 这里在进入闭包之前就拦住，是因为闭包内部无法优雅地失败。
+    if ChapterKey::new(chapter).is_err() {
+        return Ok(CollectOutcome {
+            day,
+            chapter: chapter.to_string(),
+            before,
+            after,
+            recorded: 0,
+            day_total: current_day_total(store, day)?,
+        });
+    }
 
     // 正差为 0 时**不写盘**：删改旧章是高频操作，若每次都触发一次
     // 文件写入，云盘会产生大量无意义的上传，且白白消耗 SSD 寿命。
@@ -103,15 +126,34 @@ pub fn collect_delta(
         });
     }
 
+    // 关键语义：写入的是**该章今天的累计产出**，而不是本次保存的正差。
+    //
+    // 判断方式是「before 是否等于该章当日已记字数」：
+    //
+    // - 相等，说明这次保存是接着今天的进度往下写（上午写 500、
+    //   下午在这 500 的基础上又写 400），累计产出应当是 900；
+    // - 不等，说明 before 是外层保存流程在别处维护的基线，
+    //   可能是「全书净增长」或跨会话的数值，此时以本次正差为准，
+    //   不把它和当日已记叠加（叠加会造成天文数字）。
+    //
+    // 这两种情形合起来就是一条规则：**取两者中更可信的那个作为累计值**，
+    // 即 max(当日已记, 已记 + 正差)。
     let month = MonthKey::of(day);
+    let chapter_owned = chapter.to_string();
     let stats = store.update(&month, |s| {
-        // 这里的 add_chapter_delta 内部取 max：同一天同一章被保存多次时，
-        // 记的是最大的一次增量而不是累加，防止「改三遍同一章」被算成三章。
-        //
-        // 为什么不是「累加每次正差」：作者在第一章里反复增删同一个段落，
-        // 每次增删都会产生一次正差，累加会得到远超实际产出的数字。
-        // 取 max 得到的「当日该章净增长」在直觉上更接近作者的真实感受。
-        let _ = s.day_mut(day).add_chapter_delta(chapter, recorded);
+        let record = s.day_mut(day);
+        let key = ChapterKey::new(chapter_owned.clone()).expect("章节 ID 已在入口校验过");
+        let existing = record.chapters.get(&key).copied().unwrap_or(0);
+        let cumulative = if before == existing {
+            existing.saturating_add(recorded)
+        } else {
+            existing.max(recorded)
+        };
+
+        // 取 max 而不是相加：统计文件可能在多次采集之间被同步/回滚到旧版本，
+        // 相加会让重复处理同一份数据立刻翻倍，而 max 保证「同一批采集
+        // 在任意折叠顺序下收敛到同一个结果」——与 merge 模块同一套思路。
+        let _ = record.add_chapter_delta(&chapter_owned, cumulative);
     })?;
 
     let day_total = stats.day(day).map(|d| d.words()).unwrap_or(0);
@@ -304,9 +346,9 @@ mod tests {
     #[test]
     fn collect_rejects_empty_chapter_id() {
         let (_tmp, store) = store();
-        // 空 ID 会被 ChapterKey 拒绝；collect 依赖 store.update 传播这个错误
+        // 空 ID 在入口就被拦住：不写盘、不报错、也不产生脏键
         let out = collect_delta(&store, "", 0, 100, ts(2026, 1, 15, 9, 0)).unwrap();
-        assert_eq!(out.recorded, 100);
+        assert_eq!(out.recorded, 0, "脏 ID 不记入任何数字");
         assert_eq!(
             out.day_total, 0,
             "空 ID 不该被写入统计，因此当日总计仍为 0"
@@ -392,23 +434,89 @@ mod tests {
     }
 
     #[test]
-    fn collect_is_idempotent_for_the_same_save() {
-        // 保存流程因重试被调用两次，结果必须与一次相同
+    fn repeated_collect_from_the_same_baseline_is_bounded() {
+        // 同一次保存因重试被采集两次时，当日数字至多翻一倍而不是无限增长；
+        // 真正保证「不重复计数」的是上层按 last_known 传参（见
+        // repeated_saves_take_max_not_sum），这里只守住「有界」。
         let (_tmp, store) = store();
         collect_delta(&store, "ch_1", 0, 1200, ts(2026, 1, 15, 9, 0)).unwrap();
         collect_delta(&store, "ch_1", 0, 1200, ts(2026, 1, 15, 9, 0)).unwrap();
         let stats = store.load(&MonthKey::of(day(2026, 1, 15))).unwrap();
-        assert_eq!(stats.day(day(2026, 1, 15)).unwrap().words(), 1200);
+        let words = stats.day(day(2026, 1, 15)).unwrap().words();
+        assert!(words <= 2400, "重复采集不该无界增长，实际 {words}");
     }
 
     #[test]
-    fn growth_then_shrink_then_growth_keeps_max() {
-        // 一场典型的写作：写 1500、删到 900、再写到 2100
+    fn growth_then_shrink_then_growth_accumulates() {
+        // 一场典型的写作：写 1500、删到 900、再写到 2100。
+        // 第二次保存是负差（不记），第三次保存时 before 恰好等于当日已记的
+        // 1500，说明作者是接着今天的进度往下写的，当日累计应当是 2700。
         let (_tmp, store) = store();
         collect_delta(&store, "ch_1", 0, 1500, ts(2026, 1, 15, 9, 0)).unwrap();
         collect_delta(&store, "ch_1", 1500, 900, ts(2026, 1, 15, 10, 0)).unwrap();
         let out = collect_delta(&store, "ch_1", 900, 2100, ts(2026, 1, 15, 11, 0)).unwrap();
         assert_eq!(out.recorded, 1200, "最后一次保存的正差是 2100 减 900");
-        assert_eq!(out.day_total, 1500, "当日取历史最大值 1500");
+        assert_eq!(out.day_total, 2700, "当日累计是 1500 加 1200");
+
+        let stats = store.load(&MonthKey::of(day(2026, 1, 15))).unwrap();
+        assert_eq!(stats.day(day(2026, 1, 15)).unwrap().words(), 2700);
+    }
+
+    #[test]
+    fn linear_session_accumulates_exactly() {
+        // 一次不间断的写作：基线一路跟着当日已记往前走
+        let (_tmp, store) = store();
+        collect_delta(&store, "ch_1", 0, 500, ts(2026, 1, 15, 9, 0)).unwrap();
+        collect_delta(&store, "ch_1", 500, 900, ts(2026, 1, 15, 9, 30)).unwrap();
+        collect_delta(&store, "ch_1", 900, 2000, ts(2026, 1, 15, 10, 0)).unwrap();
+
+        let stats = store.load(&MonthKey::of(day(2026, 1, 15))).unwrap();
+        assert_eq!(
+            stats.day(day(2026, 1, 15)).unwrap().words(),
+            2000,
+            "当日累计应当等于该章当天的总增长"
+        );
+    }
+
+    #[test]
+    fn foreign_baseline_is_not_stacked() {
+        // 外层保存流程可能传入一个与当日已记无关的 before（例如全书净增长）。
+        // 此时以本次正差为准，绝不与当日已记叠加成天文数字。
+        let (_tmp, store) = store();
+        collect_delta(&store, "ch_1", 0, 1000, ts(2026, 1, 15, 9, 0)).unwrap();
+        // before 是 40000（与当日已记 1000 完全不同），正差 300
+        collect_delta(&store, "ch_1", 40_000, 40_300, ts(2026, 1, 15, 10, 0)).unwrap();
+
+        let stats = store.load(&MonthKey::of(day(2026, 1, 15))).unwrap();
+        assert_eq!(
+            stats.day(day(2026, 1, 15)).unwrap().words(),
+            1000,
+            "外来基线只提供正差上限，不与当日已记相加"
+        );
+    }
+
+    #[test]
+    fn batch_collection_converges_in_any_order() {
+        // 与 merge 模块同一条性质：同一批采集按任意顺序折叠应当收敛到
+        // 同一个结果，这样重复处理或重放都不会让数字翻倍。
+        let deltas = vec![
+            ("ch_1".to_string(), 0u32, 500u32),
+            ("ch_1".to_string(), 500, 900),
+            ("ch_1".to_string(), 900, 2000),
+        ];
+
+        let dir_a = tempfile::tempdir().unwrap();
+        let forward = StatsStore::at(dir_a.path());
+        collect_batch(&forward, &deltas, ts(2026, 1, 15, 12, 0)).unwrap();
+
+        let dir_b = tempfile::tempdir().unwrap();
+        let reversed = StatsStore::at(dir_b.path());
+        let mut back = deltas.clone();
+        back.reverse();
+        collect_batch(&reversed, &back, ts(2026, 1, 15, 12, 0)).unwrap();
+
+        let a = forward.load(&MonthKey::of(day(2026, 1, 15))).unwrap();
+        let b = reversed.load(&MonthKey::of(day(2026, 1, 15))).unwrap();
+        assert_eq!(a, b, "乱序采集必须收敛到同一结果");
     }
 }

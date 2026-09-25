@@ -639,7 +639,24 @@ export function findOccurrences(text: string, keyword: string): number[] {
   return out;
 }
 
-/** 围绕命中位置截取上下文片段。 */
+
+
+/**
+ * 围绕命中位置截取上下文片段。
+ *
+ * ## 两个容易错的细节
+ *
+ * **一、区间必须是字节偏移。** Rust 侧 `HighlightSnippet::ranges` 用的是
+ * `str` 的字节下标，而 IPC 层会把它转成 JS 的字符下标
+ * （见 ipc/types.ts 的 `byteRangesToCharRanges`）。mock 作为"行为镜像"
+ * 必须与其一致，否则同样一个 `[0,1]` 会被解释成「第 0 字节到第 1 字节」——
+ * 那落在汉字"雨"的中间，转换后得到 `[0,0]`，界面上什么都高亮不出来。
+ *
+ * **二、换行被压平后位置会漂移。** 片段里的换行要换成空格（否则一条
+ * 结果占三行）。但替换后关键词下标就变了，如果此时用 `indexOf` 重新
+ * 定位，遇到关键词跨换行会返回 -1，高亮直接丢失。因此这里一边压平
+ * 一边记录"关键词起点之前被替换掉多少字符"，直接算出正确偏移。
+ */
 function buildSnippets(body: string, keyword: string, occurrences: number[], max = 3): Array<{ text: string; ranges: Array<[number, number]> }> {
   const context = 24;
   const snippets: Array<{ text: string; ranges: Array<[number, number]> }> = [];
@@ -653,17 +670,62 @@ function buildSnippets(body: string, keyword: string, occurrences: number[], max
     if (used.some(([s, e]) => at >= s && at < e)) continue;
     used.push([start, end]);
 
-    const slice = body.slice(start, end).replace(/\n+/g, " ");
-    // 重新定位关键词在片段中的位置：换行被压成空格后偏移会变
-    const rel = slice.indexOf(keyword);
-    snippets.push({
-      text: slice,
-      ranges: rel >= 0 ? [[rel, rel + keyword.length]] : [],
-    });
+    const raw = body.slice(start, end);
+    // 压平换行的同时累计「关键词起点之前」被改写掉的字符数。
+    // 换行 1 字符 -> 空格 1 字符，长度不变，因此只需要修正起点。
+    let flat = "";
+    let shiftBeforeStart = 0;
+    for (let i = 0; i < raw.length; i += 1) {
+      const ch = raw[i] ?? "";
+      if (ch === "\n") {
+        flat += " ";
+        if (i < at - start) shiftBeforeStart += 1;
+      } else {
+        flat += ch;
+      }
+    }
+
+    const charBegin = at - start - shiftBeforeStart;
+    const charFinish = charBegin + keyword.length;
+    const ranges: Array<[number, number]> =
+      charBegin >= 0 && charFinish <= flat.length && flat.slice(charBegin, charFinish).replace(/\s/g, "") === keyword.replace(/\s/g, "")
+        ? [[charOffsetToByte(flat, charBegin), charOffsetToByte(flat, charFinish)]]
+        : [];
+
+    snippets.push({ text: flat, ranges });
   }
 
+  // 兜底：正文里确实有这个词，但命中位置都在片段之外（理论上不会发生，
+  // 但保留这条路径可以避免"搜到了却没有片段"的空结果）
   if (snippets.length === 0 && occurrences.length === 0 && body.includes(keyword)) {
-    snippets.push({ text: body.slice(0, 60), ranges: [[0, keyword.length]] });
+    const head = body.slice(0, 60).replace(/\n+/g, " ");
+    const rel = head.indexOf(keyword);
+    // 定位不到关键词就不给高亮区间，绝不假定它从 0 开始
+    snippets.push({
+      text: head,
+      ranges: rel >= 0 ? [[charOffsetToByte(head, rel), charOffsetToByte(head, rel + keyword.length)]] : [],
+    });
   }
   return snippets;
 }
+
+
+/**
+ * 把片段内的字符下标换成 UTF-8 字节下标。
+ *
+ * 存在的唯一理由：Rust 的字符串索引是字节，而 JS 是 UTF-16 码元。
+ * 中文一个字占 3 字节，因此这个映射不能省 —— 直接把字符下标当字节
+ * 用，IPC 层反向转换时就会得到错位的结果（区间会塌缩成空）。
+ */
+function charOffsetToByte(text: string, charOffset: number): number {
+  let bytes = 0;
+  let chars = 0;
+  for (const ch of text) {
+    if (chars >= charOffset) break;
+    const cp = ch.codePointAt(0) ?? 0;
+    bytes += cp < 0x80 ? 1 : cp < 0x800 ? 2 : cp < 0x10000 ? 3 : 4;
+    chars += 1;
+  }
+  return bytes;
+}
+

@@ -510,6 +510,31 @@ describe("检索", () => {
     }
   });
 
+  it("高亮区间是**字节**偏移，与 Rust 侧契约一致", () => {
+    // 这条用例固定住一个踩过的坑：mock 曾经输出字符下标，
+    // 而 IPC 层会把它当字节再转一次，于是中文区间塌缩成 [0,0]，
+    // 界面上什么都高亮不出来。汉字的字节长度是 3，因此区间
+    // 必须明显大于字符长度。
+    const result = backend.search({ keyword: "雨" });
+    const hit = result.hits[0];
+    expect(hit).toBeDefined();
+    const snippet = hit?.snippets[0];
+    expect(snippet).toBeDefined();
+    const range = snippet?.ranges[0];
+    expect(range).toBeDefined();
+    const [start, end] = range ?? [0, 0];
+    expect(end - start).toBe(3); // 「雨」的 UTF-8 字节长度
+  });
+
+  it("高亮区间转换后能切出关键词所在的字节", () => {
+    const result = backend.search({ keyword: "雨" });
+    const snippet = result.hits[0]?.snippets[0];
+    const [start, end] = snippet?.ranges[0] ?? [0, 0];
+    // 把片段编码成字节后按区间切，得到的就是「雨」
+    const bytes = new TextEncoder().encode(snippet?.text ?? "");
+    expect(new TextDecoder().decode(bytes.slice(start, end))).toBe("雨");
+  });
+
   it("高亮区间落在片段文本范围内", () => {
     const result = backend.search({ keyword: "雨" });
     for (const hit of result.hits) {

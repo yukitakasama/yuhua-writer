@@ -577,8 +577,10 @@ mod tests {
 
     #[test]
     fn estimate_crosses_month_and_year_boundaries() {
-        let (date, _) = estimate_completion(0, Some(3100), 100, d(2026, 12, 25));
-        assert_eq!(date, Some(d(2027, 1, 24)), "跨年也要算对");
+        // 3100 字、日更 100：需要 31 天，2026-12-25 加 31 天是 2027-01-25
+        let (date, days_left) = estimate_completion(0, Some(3100), 100, d(2026, 12, 25));
+        assert_eq!(days_left, Some(31));
+        assert_eq!(date, Some(d(2027, 1, 25)), "跨年也要算对");
     }
 
     #[test]

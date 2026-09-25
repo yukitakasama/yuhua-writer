@@ -214,16 +214,25 @@ describe("降级到 mock 后端", () => {
     }
   });
 
-  it("search 返回的区间已经是字符区间", async () => {
+  it("search 返回的区间是合法的字符区间且能切出关键词", async () => {
     const ipc = await import("./index");
     const result = await ipc.search({ keyword: "雨" });
+    let checked = 0;
     for (const hit of result.hits) {
       for (const snippet of hit.snippets) {
         for (const [start, end] of snippet.ranges) {
+          // 区间必须落在片段范围内，且起点不能超过终点
+          expect(start).toBeGreaterThanOrEqual(0);
+          expect(start).toBeLessThan(end);
           expect(end).toBeLessThanOrEqual(snippet.text.length);
+          // 区间切出来的必须真的是关键词 —— 这是高亮的正确性底线
+          expect(snippet.text.slice(start, end)).toBe("雨");
+          checked++;
         }
       }
     }
+    // 防止「循环一次都没进」让整个测试变成空跑
+    expect(checked).toBeGreaterThan(0);
   });
 
   it("createWorkspace 走通并返回可用的文档", async () => {

@@ -312,11 +312,18 @@ impl DayRecord {
 #[serde(rename_all = "camelCase")]
 pub struct MonthlyStats {
     /// 结构版本，见 STATS_SCHEMA。
+    ///
+    /// 字段缺失时默认 0，由读取方补上当前版本：统计文件是自描述的，
+    /// 一个连 schema 都没有的文件只可能是「同步到一半」或用户手搓的，
+    /// 直接报错会让用户的数据读不出来，而它本来是可以抢救的。
+    #[serde(default)]
     pub schema: u32,
     /// 所属月份，形如 2026-01。
     ///
     /// 冗余存一份月份与文件名重复，是为了让文件**自描述**：
     /// 用户把文件改名或复制到别处后，仍能知道它属于哪个月。
+    /// 缺失时同样给默认值 —— 真实月份由文件名决定（见 store::parse_month）。
+    #[serde(default)]
     pub month: String,
     /// 日期到当日记录的映射。键是 YYYY-MM-DD。
     #[serde(default)]
@@ -475,7 +482,7 @@ pub fn new_session_token() -> String {
 }
 
 #[cfg(test)]
-mod tests {
+pub(crate) mod tests {
     use super::*;
     use chrono::TimeZone;
 

@@ -160,17 +160,24 @@ impl SessionTracker {
     /// 没有进行中的会话时会**自动开启**一段（作者可能直接开始打字，
     /// 没有经过任何显式的「开始写作」动作）。
     pub fn add_words(&mut self, chapter: &str, words: u32, now: DateTime<FixedOffset>) {
-        let (session, _) = self.begin(now);
-        let mut session = session;
-        session.words = session.words.saturating_add(words);
-        session.last_activity = now;
-        if !chapter.trim().is_empty()
-            && !session.chapters.iter().any(|c| c == chapter)
-        {
-            session.chapters.push(chapter.to_string());
-            session.chapters.sort();
+        // 没有进行中的会话时自动开一段（作者可能直接开始打字）。
+        //
+        // 注意这里**不能**无条件调用 begin：begin 在会话被判为超长时会把
+        // start 重置到 now，那样一次连续的写作会被记成一串零时长会话。
+        // 追加字数只应该发生在「还没有会话」这一个时机。
+        if self.active.is_none() {
+            let (session, _) = self.begin(now);
+            self.active = Some(session);
         }
-        self.active = Some(session);
+
+        if let Some(session) = self.active.as_mut() {
+            session.words = session.words.saturating_add(words);
+            session.last_activity = now;
+            if !chapter.trim().is_empty() && !session.chapters.iter().any(|c| c == chapter) {
+                session.chapters.push(chapter.to_string());
+                session.chapters.sort();
+            }
+        }
     }
 
     /// 记录一次活动（不增加字数，例如敲了退格键）。

@@ -256,6 +256,13 @@ fn parse_month(raw: &str, month: &MonthKey, path: &Path) -> Result<MonthlyStats>
     // 月份不符时以调用方给出的月份为准
     stats.month = month.to_string();
 
+    // schema 缺失（手写或截断的文件）时补上当前版本：统计文件是自描述的，
+    // 一个连 schema 都没有的文件只可能是「同步到一半」或用户手搓的，
+    // 按当前版本对待比留在 0 更不容易让上层误判为需要降级迁移。
+    if stats.schema == 0 {
+        stats.schema = STATS_SCHEMA;
+    }
+
     // 越界的日期键（例如手改成 2026-02-30 的非法值）在 serde 阶段就会失败；
     // 这里不再按月份过滤日期，因为合并规则是并集，丢弃数据比多留一条更危险。
     Ok(stats)
@@ -414,9 +421,9 @@ mod tests {
         fs::create_dir_all(store.dir()).unwrap();
         fs::write(store.path_for(&jan()), "{}").unwrap();
 
-        // schema 与 month 缺失都不应崩：给默认值即可
+        // schema 与 month 缺失都不应崩：给可用的兜底值即可
         let stats = store.load(&jan()).unwrap();
-        assert_eq!(stats.schema, 0);
+        assert_eq!(stats.schema, STATS_SCHEMA);
         assert_eq!(stats.month, "2026-01");
         assert!(stats.days.is_empty());
     }
