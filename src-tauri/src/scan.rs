@@ -75,7 +75,8 @@ pub fn scan_workspace(workspace: &Workspace) -> Result<Document> {
     }
 
     volume_dirs.sort_by(|a, b| natural_cmp(&a.0, &b.0));
-    for (i, (dir_name, path)) in volume_dirs.iter().enumerate() {
+    // 只用目录名建卷，绝对路径在这里用不上（章节挂载时才需要）
+    for (i, (dir_name, _path)) in volume_dirs.iter().enumerate() {
         let vol_title = strip_sort_prefix(dir_name);
         volumes.push(Volume::new(&book.id, &vol_title, i as i32, now));
     }
@@ -114,6 +115,16 @@ pub fn scan_workspace(workspace: &Workspace) -> Result<Document> {
                 chapters.push(ch);
             }
         }
+    }
+
+    // 一卷都没有时补一个默认卷。
+    //
+    // 为什么必须有：领域模型规定「章不能没有卷」（见 yuhua-core::model 的
+    // 模块文档），新建章节时需要一个可挂载的卷。一个刚创建的、或者用户
+    // 手工清空过 manuscript/ 的工作区，扫描结果就是零卷 —— 此时若不补，
+    // 界面上就无处可以「新建章节」。
+    if volumes.is_empty() {
+        volumes.push(Volume::new(&book.id, "第一卷", 0, now));
     }
 
     Ok(Document {
@@ -296,7 +307,7 @@ impl LayoutExt for WorkspaceLayout {
 /// 装配一个空文稿（供「新建工作区」使用）。
 pub fn empty_document(title: &str) -> Result<Document> {
     let now = now_local();
-    let mut doc = Document::new(title, now);
+    let doc = Document::new(title, now);
     doc.validate()?;
     Ok(doc)
 }

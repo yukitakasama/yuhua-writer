@@ -17,13 +17,12 @@
 
 use std::path::PathBuf;
 
-use chrono::{DateTime, FixedOffset, Utc};
+use chrono::{FixedOffset, Utc};
 use serde::{Deserialize, Serialize};
+use yuhua_core::Result;
 use yuhua_fs::workspace::RecentWorkspace;
-use yuhua_fs::Result;
 
 use crate::error::CommandError;
-use crate::state::AppState;
 
 /// 最多保留的最近记录条数。
 pub const MAX_RECENT: usize = 20;
@@ -65,7 +64,10 @@ pub fn storage_path() -> Option<PathBuf> {
 ///
 /// 读不到或解析失败一律返回空列表：最近列表是可抛的便利功能，
 /// 不该因为它的文件损坏而让应用启动失败。
-pub fn load(_state: &AppState) -> Vec<RecentWorkspace> {
+///
+/// 不接收 \`AppState\`：列表存于系统应用数据目录，与当前会话无关，
+/// 早期版本为了「签名统一」多传了一个用不到的参数，是多余的耦合。
+pub fn load() -> Vec<RecentWorkspace> {
     let Some(path) = storage_path() else {
         return Vec::new();
     };
@@ -104,12 +106,11 @@ pub fn record(root: &std::path::Path, title: &str) -> Result<()> {
     if let Some(parent) = path.parent() {
         let _ = std::fs::create_dir_all(parent);
     }
-    match serde_json::to_string_pretty(&RecentFile { items }) {
-        Ok(json) => {
-            // 复用原子写，避免半截 JSON
-            let _ = yuhua_fs::atomic_write(&path, &json);
-        }
-        Err(_) => {}
+    // 序列化失败只可能是 RecentWorkspace 里出现了非法字符这类极端情况；
+    // 最近列表是可抛的便利功能，写不进去就不写，不影响「已经打开了工作区」这个事实。
+    if let Ok(json) = serde_json::to_string_pretty(&RecentFile { items }) {
+        // 复用原子写，避免半截 JSON
+        let _ = yuhua_fs::atomic_write(&path, &json);
     }
     Ok(())
 }
@@ -179,7 +180,7 @@ fn to_domain(e: CommandError) -> yuhua_core::YuhuaError {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use chrono::TimeZone;
+    use chrono::{DateTime, TimeZone};
 
     fn ts(n: i64) -> DateTime<FixedOffset> {
         FixedOffset::east_opt(8 * 3600)

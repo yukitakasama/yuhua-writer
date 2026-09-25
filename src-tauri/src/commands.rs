@@ -12,23 +12,37 @@
 //! 2. 调用领域 crate 里的一个函数
 //! 3. 把结果或错误翻译成 IPC 形状
 //!
+//! ## 访问会话的统一姿势
+//!
+//! 会话（\`WorkspaceSession\`）里的索引与监听器都不是 \`Sync\` 的
+//! （见 \`state\` 模块文档），因此它被 \`Arc<Mutex<..>>\` 包着。命令里
+//! 访问它的写法固定为两步：
+//!
+//! \`\`\`text
+//! let s = session(&state)?;      // Arc：把所有权带出来，不持有外层读锁
+//! let guard = lock_session(&s)?; // 只在真正要用时才加锁
+//! let index = guard.index();
+//! \`\`\`
+//!
+//! **先取 \`Arc\`、后加锁**，是因为中间往往夹着路径解析与文件读写
+//! 这类慢操作；把它们放在锁外，并发命令才不会互相拖住。
+//!
 //! ## 返回类型约定
 //!
-//! 所有命令返回 `Result<T, CommandError>`。前端拿到的错误形如
-//! `{ code, message, recoverable, detail }`，按 `code` 分支处理。
+//! 所有命令返回 \`Result<T, CommandError>\`。前端拿到的错误形如
+//! \`{ code, message, recoverable, detail }\`，按 \`code\` 分支处理。
 //!
 //! ## 命名约定
 //!
-//! 计划书附录 A：命令名小写下划线、动词开头（`create_chapter`）。
-//! 由 tauri-specta 或前端手写的 `invoke("create_chapter")` 直接对应。
+//! 计划书附录 A：命令名小写下划线、动词开头（\`create_chapter\`）。
+//! 由 tauri-specta 或前端手写的 \`invoke("create_chapter")\` 直接对应。
 
 use std::path::PathBuf;
-use std::sync::Arc;
 
 use serde::{Deserialize, Serialize};
 use tauri::State;
 
-use yuhua_core::model::{ChapterSummary, OutlineNode};
+use yuhua_core::model::{ChapterSummary, Document, OutlineNode};
 use yuhua_core::{ChapterId, CountMode, VolumeId};
 use yuhua_fs::conflict::DetectedConflict;
 use yuhua_fs::workspace::WorkspaceSummary;
@@ -36,19 +50,25 @@ use yuhua_store::search::{SearchQuery, SearchResults};
 use yuhua_store::stats::WordStats;
 
 use crate::error::CommandError;
-use crate::state::{AppState, WorkspaceSession};
+use crate::state::{poisoned, AppState, SessionHandle, WorkspaceSession};
 
 /// 命令层统一的 Result。
 type CmdResult<T> = std::result::Result<T, CommandError>;
 
-/// 取当前会话，未打开时报错。
-fn session(state: &AppState) -> CmdResult<Arc<WorkspaceSession>> {
+/// 取当前会话句柄，未打开时报错。
+///
+/// 只返回 \`Arc\`，不加锁：加锁的时机由调用方决定，
+/// 这样慢操作可以留在锁外。
+fn session(state: &AppState) -> CmdResult<SessionHandle> {
     state.current()
 }
 
-/// 把相对路径解析成绝对路径（带安全校验）。
-fn resolve(s: &WorkspaceSession, relative: &str) -> CmdResult<PathBuf> {
-    Ok(s.layout().resolve(relative)?)
+/// 对被 \`Mutex\` 包住的会话加锁。
+///
+/// 抽成函数是因为这个 \`map_err\` 在命令里出现频率很高，
+/// 而中毒错误的文案必须**处处一致**（前端按文案做过展示兜底）。
+fn lock_session(s: &SessionHandle) -> CmdResult<std::sync::MutexGuard<'_, WorkspaceSession>> {
+    s.lock().map_err(|_| poisoned())
 }
 
 // ============================================================================
@@ -122,38 +142,44 @@ pub fn create_workspace(
             "书名不能为空".into(),
         )));
     }
-    let session = state.create(PathBuf::from(path), title)?;
+    let handle = state.create(PathBuf::from(path), title)?;
     let doc = state.document()?;
-    build_open_result(&session, &doc)
+    build_open_result(&handle, &doc)
 }
 
 /// 打开已有工作区。
 #[tauri::command]
 pub fn open_workspace(state: State<'_, AppState>, path: String) -> CmdResult<OpenResult> {
-    let session = state.open(PathBuf::from(path))?;
+    let handle = state.open(PathBuf::from(path))?;
     let doc = state.document()?;
-    build_open_result(&session, &doc)
+    build_open_result(&handle, &doc)
 }
 
 /// 组装打开工作区的返回值。
-fn build_open_result(s: &WorkspaceSession, doc: &yuhua_core::model::Document) -> CmdResult<OpenResult> {
+///
+/// 需要同时看会话（索引、恢复报告）与文稿，因此在这里加一次锁，
+/// 把该取的都取完就立刻释放。
+fn build_open_result(s: &SessionHandle, doc: &Document) -> CmdResult<OpenResult> {
+    let guard = lock_session(s)?;
+
     let words = yuhua_store::stats::word_stats(
-        s.index.connection(),
+        guard.index().connection(),
         doc.book.id.as_str(),
         None,
         None,
     )?;
 
+    let recovery = guard.recovery();
     Ok(OpenResult {
-        workspace: yuhua_fs::workspace::Workspace::summarize(s.root()),
+        workspace: yuhua_fs::workspace::Workspace::summarize(guard.root()),
         outline: doc.outline(),
         words,
         recovery: RecoveryReportDto {
-            swept_temp_files: s.recovery.swept_temp_files,
-            interrupted_operations: s.recovery.interrupted_operations.clone(),
-            pending_paths: s.recovery.pending_paths.clone(),
-            purged_trash_items: s.recovery.purged_trash_items,
-            conflicts: s.recovery.conflicts.iter().cloned().map(Into::into).collect(),
+            swept_temp_files: recovery.swept_temp_files,
+            interrupted_operations: recovery.interrupted_operations.clone(),
+            pending_paths: recovery.pending_paths.clone(),
+            purged_trash_items: recovery.purged_trash_items,
+            conflicts: recovery.conflicts.iter().cloned().map(Into::into).collect(),
         },
     })
 }
@@ -171,6 +197,8 @@ pub fn has_workspace(state: State<'_, AppState>) -> bool {
 }
 
 /// 读取指定目录中的工作区信息（用于「打开」对话框的即时校验）。
+///
+/// 不需要 \`State\`：这是纯磁盘检查，未打开工作区时也要能用。
 #[tauri::command]
 pub fn inspect_workspace(path: String) -> WorkspaceSummary {
     yuhua_fs::workspace::Workspace::summarize(std::path::Path::new(&path))
@@ -195,8 +223,9 @@ pub fn get_word_stats(
 ) -> CmdResult<WordStats> {
     let s = session(&state)?;
     let doc = state.document()?;
+    let guard = lock_session(&s)?;
     Ok(yuhua_store::stats::word_stats(
-        s.index.connection(),
+        guard.index().connection(),
         doc.book.id.as_str(),
         volume_id.as_deref(),
         chapter_id.as_deref(),
@@ -219,10 +248,14 @@ pub fn create_volume(state: State<'_, AppState>, title: String) -> CmdResult<Vec
     let next_sort = doc_before.volumes.iter().map(|v| v.sort).max().unwrap_or(-1) + 1;
     let volume = yuhua_core::model::Volume::new(&doc_before.book.id, &title, next_sort, now);
 
-    // 建目录 + 持久化
+    // 建目录 + 持久化。锁的作用域只覆盖「取布局」这一步。
     let dir_name = yuhua_fs::layout::WorkspaceLayout::volume_dir_name(next_sort, &title);
-    let dir = s.layout().manuscript_dir().join(&dir_name);
-    std::fs::create_dir_all(&dir).map_err(|e| CommandError::Domain(yuhua_core::YuhuaError::io(&dir, e)))?;
+    let dir = {
+        let guard = lock_session(&s)?;
+        guard.layout().manuscript_dir().join(&dir_name)
+    };
+    std::fs::create_dir_all(&dir)
+        .map_err(|e| CommandError::Domain(yuhua_core::YuhuaError::io(&dir, e)))?;
 
     state.with_document_mut(|doc| {
         doc.volumes.push(volume.clone());
@@ -252,16 +285,12 @@ pub fn rename_volume(
         .map_err(|e| CommandError::Domain(yuhua_core::YuhuaError::InvalidInput(e)))?;
 
     state.with_document_mut(|doc| {
-        let vol = doc
-            .volumes
-            .iter_mut()
-            .find(|v| v.id == vid)
-            .ok_or_else(|| {
-                CommandError::Domain(yuhua_core::YuhuaError::NotFound {
-                    kind: "volume",
-                    id: vid.to_string(),
-                })
-            })?;
+        let vol = doc.volumes.iter_mut().find(|v| v.id == vid).ok_or_else(|| {
+            CommandError::Domain(yuhua_core::YuhuaError::NotFound {
+                kind: "volume",
+                id: vid.to_string(),
+            })
+        })?;
         vol.title = title.clone();
         Ok(())
     })?;
@@ -292,9 +321,10 @@ pub fn delete_volume(state: State<'_, AppState>, volume_id: String) -> CmdResult
     let dir_name = yuhua_fs::layout::WorkspaceLayout::volume_dir_name(vol.sort, &vol.title);
     let rel = format!("manuscript/{dir_name}");
 
-    let trash = yuhua_fs::trash::TrashManager::new(s.layout().clone());
+    let layout = lock_session(&s)?.layout().clone();
+    let trash = yuhua_fs::trash::TrashManager::new(layout.clone());
     // 目录不存在时跳过回收站（例如空卷还没建目录）
-    if s.layout().manuscript_dir().join(&dir_name).exists() {
+    if layout.manuscript_dir().join(&dir_name).exists() {
         trash.move_to_trash(&rel, &vol.title, vid.as_str(), "volume")?;
     }
 
@@ -352,8 +382,15 @@ pub fn create_chapter(
 
     // 先写文件（真源），再更新内存与索引
     let now = now_local();
-    let chapter = yuhua_core::model::Chapter::new(&doc_before.book.id, &vid, &title, &rel, next_sort, now);
-    let abs = s.layout().resolve(&rel)?;
+    let chapter = yuhua_core::model::Chapter::new(
+        &doc_before.book.id,
+        &vid,
+        &title,
+        &rel,
+        next_sort,
+        now,
+    );
+    let abs = lock_session(&s)?.layout().resolve(&rel)?;
     let cf = yuhua_fs::chapter_io::ChapterFile {
         meta: chapter.meta.clone(),
         body: String::new(),
@@ -393,7 +430,7 @@ pub fn rename_chapter(
     // 只改 Front Matter 里的标题，**不重命名文件**。
     // 理由：重命名文件会让用户的云盘同步产生「删除 + 新增」，
     // 也会让正在别处打开这个文件的编辑器失效。标题与文件名解耦更安全。
-    let abs = s.layout().resolve(&chapter.path)?;
+    let abs = lock_session(&s)?.layout().resolve(&chapter.path)?;
     let mut cf = yuhua_fs::chapter_io::read_chapter(&abs)?;
     cf.meta.title = title;
     cf.meta.updated = now_local();
@@ -418,13 +455,9 @@ pub fn delete_chapter(state: State<'_, AppState>, chapter_id: String) -> CmdResu
         })
     })?;
 
-    let trash = yuhua_fs::trash::TrashManager::new(s.layout().clone());
-    trash.move_to_trash(
-        &chapter.path,
-        &chapter.meta.title,
-        cid.as_str(),
-        "chapter",
-    )?;
+    let layout = lock_session(&s)?.layout().clone();
+    let trash = yuhua_fs::trash::TrashManager::new(layout);
+    trash.move_to_trash(&chapter.path, &chapter.meta.title, cid.as_str(), "chapter")?;
 
     reload_and_sync(&state)?;
     Ok(state.document()?.outline())
@@ -432,7 +465,7 @@ pub fn delete_chapter(state: State<'_, AppState>, chapter_id: String) -> CmdResu
 
 /// 调整章节顺序（拖拽排序后调用）。
 ///
-/// `ordered_ids` 是该卷内章节的新顺序。
+/// \`ordered_ids\` 是该卷内章节的新顺序。
 #[tauri::command]
 pub fn reorder_chapters(
     state: State<'_, AppState>,
@@ -447,7 +480,11 @@ pub fn reorder_chapters(
             let Ok(cid) = ChapterId::parse(id.clone()) else {
                 continue;
             };
-            if let Some(ch) = doc.chapters.iter_mut().find(|c| c.meta.id == cid && c.volume_id == vid) {
+            if let Some(ch) = doc
+                .chapters
+                .iter_mut()
+                .find(|c| c.meta.id == cid && c.volume_id == vid)
+            {
                 ch.sort = i as i32;
             }
         }
@@ -507,20 +544,24 @@ pub struct ChapterContent {
 }
 
 /// 读取章节正文。
+///
+/// 正文取自**磁盘文件**而非内存文稿：内存里的 \`Chapter.body\` 已被扫描
+/// 流程刻意丢弃（见 \`scan\` 模块），磁盘才是真源。
 #[tauri::command]
 pub fn read_chapter(state: State<'_, AppState>, chapter_id: String) -> CmdResult<ChapterContent> {
     let s = session(&state)?;
     let cid = ChapterId::parse(chapter_id)
         .map_err(|e| CommandError::Domain(yuhua_core::YuhuaError::InvalidInput(e)))?;
 
-    let chapter = s.document.find_chapter(&cid).ok_or_else(|| {
+    let doc = state.document()?;
+    let chapter = doc.find_chapter(&cid).ok_or_else(|| {
         CommandError::Domain(yuhua_core::YuhuaError::NotFound {
             kind: "chapter",
             id: cid.to_string(),
         })
     })?;
 
-    let abs = s.layout().resolve(&chapter.path)?;
+    let abs = lock_session(&s)?.layout().resolve(&chapter.path)?;
     let cf = yuhua_fs::chapter_io::read_chapter(&abs)?;
     let words = yuhua_core::count_words(&cf.body);
 
@@ -546,7 +587,7 @@ pub fn read_chapter(state: State<'_, AppState>, chapter_id: String) -> CmdResult
 ///
 /// ## 乐观并发检查
 ///
-/// `expected_hash` 非空时，若磁盘上的当前内容哈希与它不符，
+/// \`expected_hash\` 非空时，若磁盘上的当前内容哈希与它不符，
 /// 说明文件被外部（云盘 / 别的编辑器）改过。此时**拒绝覆盖**并报错，
 /// 由前端提示用户处理 —— 这正是不变量「绝不静默覆盖」的落地。
 #[tauri::command]
@@ -560,14 +601,20 @@ pub fn save_chapter(
     let cid = ChapterId::parse(chapter_id)
         .map_err(|e| CommandError::Domain(yuhua_core::YuhuaError::InvalidInput(e)))?;
 
-    let chapter = s.document.find_chapter(&cid).ok_or_else(|| {
+    let doc = state.document()?;
+    let chapter = doc.find_chapter(&cid).ok_or_else(|| {
         CommandError::Domain(yuhua_core::YuhuaError::NotFound {
             kind: "chapter",
             id: cid.to_string(),
         })
     })?;
     let rel = chapter.path.clone();
-    let abs = s.layout().resolve(&rel)?;
+
+    // 一次加锁把需要的会话数据复制出来，之后所有慢操作都在锁外进行。
+    // 这正是「绝不跨慢操作持锁」这条纪律的落地：保存路径按设计要跑
+    // 备份轮转与原子写，可能耗时数十毫秒，不应阻塞其它命令。
+    let layout = lock_session(&s)?.layout().clone();
+    let abs = layout.resolve(&rel)?;
 
     // ---- 乐观并发检查 ----
     if let Some(expected) = expected_hash.as_deref() {
@@ -585,7 +632,7 @@ pub fn save_chapter(
     }
 
     // ---- 崩溃日志：begin ----
-    let journal = yuhua_fs::journal::Journal::new(s.layout().journal_dir());
+    let journal = yuhua_fs::journal::Journal::new(layout.journal_dir());
     let entry_id = journal
         .begin(
             yuhua_fs::journal::JournalKind::ChapterSave,
@@ -595,7 +642,7 @@ pub fn save_chapter(
         .ok();
 
     // ---- 轮转备份 ----
-    let backup = yuhua_fs::backup::BackupManager::new(s.layout().backup_dir());
+    let backup = yuhua_fs::backup::BackupManager::new(layout.backup_dir());
     let _ = backup.snapshot_if_due(&abs, &rel, now_local());
 
     // ---- 原子写 ----
@@ -630,7 +677,8 @@ pub fn save_chapter(
         updated.meta.updated = cf.meta.updated;
         updated.mtime = mtime;
         updated.content_hash = hash.clone();
-        s.index.upsert_chapter(&updated)?;
+        let guard = lock_session(&s)?;
+        guard.index().upsert_chapter(&updated)?;
     }
 
     let new_title = cf.meta.title.clone();
@@ -668,13 +716,14 @@ pub fn update_chapter_meta(
     let cid = ChapterId::parse(chapter_id)
         .map_err(|e| CommandError::Domain(yuhua_core::YuhuaError::InvalidInput(e)))?;
 
-    let chapter = s.document.find_chapter(&cid).ok_or_else(|| {
+    let doc = state.document()?;
+    let chapter = doc.find_chapter(&cid).ok_or_else(|| {
         CommandError::Domain(yuhua_core::YuhuaError::NotFound {
             kind: "chapter",
             id: cid.to_string(),
         })
     })?;
-    let abs = s.layout().resolve(&chapter.path)?;
+    let abs = lock_session(&s)?.layout().resolve(&chapter.path)?;
 
     let mut cf = yuhua_fs::chapter_io::read_chapter(&abs)?;
     if let Some(v) = summary {
@@ -696,11 +745,12 @@ pub fn update_chapter_meta(
     cf.meta.updated = now_local();
     yuhua_fs::chapter_io::write_chapter(&abs, &cf)?;
 
-    // 同步索引与内存
+    // 同步索引
     let mut updated = chapter.clone();
     updated.meta = cf.meta.clone();
-    s.index.upsert_chapter(&updated)?;
+    lock_session(&s)?.index().upsert_chapter(&updated)?;
 
+    // 同步内存
     state.with_document_mut(|doc| {
         if let Some(ch) = doc.find_chapter_mut(&cid) {
             ch.meta = cf.meta.clone();
@@ -708,9 +758,10 @@ pub fn update_chapter_meta(
         Ok(())
     })?;
 
-    let s2 = session(&state)?;
-    Ok(s2
-        .document
+    // 摘要从内存文稿取：那里是「刚写完磁盘后的」状态。
+    // 取不到时（理论上不会发生）退回用索引里那一份。
+    let fresh = state.document()?;
+    Ok(fresh
         .find_chapter(&cid)
         .map(|c| c.to_summary())
         .unwrap_or_else(|| updated.to_summary()))
@@ -738,7 +789,11 @@ pub fn search_chapters(
         title_only: title_only.unwrap_or(false),
         volume_id,
     };
-    Ok(yuhua_store::search::search(s.index.connection(), &query)?)
+    let guard = lock_session(&s)?;
+    Ok(yuhua_store::search::search(
+        guard.index().connection(),
+        &query,
+    )?)
 }
 
 // ============================================================================
@@ -760,8 +815,11 @@ pub struct RepairResult {
 pub fn rebuild_index(state: State<'_, AppState>) -> CmdResult<RepairResult> {
     let s = session(&state)?;
     let doc = state.document()?;
-    let root = s.root_str();
-    let out = s.index.rebuild(&doc.book, &root, &doc.volumes, &doc.chapters)?;
+    let guard = lock_session(&s)?;
+    let root = guard.root_str();
+    let out = guard
+        .index()
+        .rebuild(&doc.book, &root, &doc.volumes, &doc.chapters)?;
     Ok(RepairResult {
         message: format!(
             "索引已重建：新增 {} 章，更新 {} 章，移除 {} 章",
@@ -775,7 +833,7 @@ pub fn rebuild_index(state: State<'_, AppState>) -> CmdResult<RepairResult> {
 #[tauri::command]
 pub fn list_trash(state: State<'_, AppState>) -> CmdResult<Vec<yuhua_core::TrashEntry>> {
     let s = session(&state)?;
-    let tm = yuhua_fs::trash::TrashManager::new(s.layout().clone());
+    let tm = yuhua_fs::trash::TrashManager::new(lock_session(&s)?.layout().clone());
     Ok(tm.list().into_iter().map(|i| i.entry).collect())
 }
 
@@ -783,7 +841,7 @@ pub fn list_trash(state: State<'_, AppState>) -> CmdResult<Vec<yuhua_core::Trash
 #[tauri::command]
 pub fn restore_trash(state: State<'_, AppState>, trash_dir_name: String) -> CmdResult<RepairResult> {
     let s = session(&state)?;
-    let tm = yuhua_fs::trash::TrashManager::new(s.layout().clone());
+    let tm = yuhua_fs::trash::TrashManager::new(lock_session(&s)?.layout().clone());
     let path = tm.restore(&trash_dir_name)?;
     reload_and_sync(&state)?;
     Ok(RepairResult {
@@ -796,7 +854,7 @@ pub fn restore_trash(state: State<'_, AppState>, trash_dir_name: String) -> CmdR
 #[tauri::command]
 pub fn purge_trash(state: State<'_, AppState>, trash_dir_name: String) -> CmdResult<()> {
     let s = session(&state)?;
-    let tm = yuhua_fs::trash::TrashManager::new(s.layout().clone());
+    let tm = yuhua_fs::trash::TrashManager::new(lock_session(&s)?.layout().clone());
     tm.purge(&trash_dir_name)?;
     Ok(())
 }
@@ -805,7 +863,7 @@ pub fn purge_trash(state: State<'_, AppState>, trash_dir_name: String) -> CmdRes
 #[tauri::command]
 pub fn empty_trash(state: State<'_, AppState>) -> CmdResult<RepairResult> {
     let s = session(&state)?;
-    let tm = yuhua_fs::trash::TrashManager::new(s.layout().clone());
+    let tm = yuhua_fs::trash::TrashManager::new(lock_session(&s)?.layout().clone());
     let n = tm.empty()?;
     Ok(RepairResult {
         message: format!("已永久删除 {n} 个条目"),
@@ -824,17 +882,25 @@ pub fn rescan_workspace(state: State<'_, AppState>) -> CmdResult<Vec<OutlineNode
 #[tauri::command]
 pub fn list_conflicts(state: State<'_, AppState>) -> CmdResult<Vec<ConflictDto>> {
     let s = session(&state)?;
-    // 冲突识别是纯扫描，不依赖内存文稿
-    let found = yuhua_fs::conflict::detect_conflicts(s.layout().manuscript_dir().as_path(), s.root());
+    // 冲突识别是纯扫描，不依赖内存文稿，也不依赖索引
+    let guard = lock_session(&s)?;
+    let found = yuhua_fs::conflict::detect_conflicts(
+        guard.layout().manuscript_dir().as_path(),
+        guard.root(),
+    );
     Ok(found.into_iter().map(Into::into).collect())
 }
 
 /// 列出最近打开的工作区。
+///
+/// 「最近列表」存在系统应用数据目录，与当前会话无关；这里的 \`State\` 参数
+/// 只为保持「所有命令签名一致」的调用惯例（前端统一 invoke 带上下文）。
 #[tauri::command]
-pub fn list_recent_workspaces(state: State<'_, AppState>) -> Vec<WorkspaceSummary> {
-    crate::recent::load(&state).into_iter().map(|r| {
-        yuhua_fs::workspace::Workspace::summarize(&r.root)
-    }).collect()
+pub fn list_recent_workspaces(_state: State<'_, AppState>) -> Vec<WorkspaceSummary> {
+    crate::recent::load()
+        .into_iter()
+        .map(|r| yuhua_fs::workspace::Workspace::summarize(&r.root))
+        .collect()
 }
 
 // ============================================================================
@@ -847,15 +913,30 @@ pub fn list_recent_workspaces(state: State<'_, AppState>) -> Vec<WorkspaceSummar
 /// 都调用它一次。这样做而不是做增量更新，是因为结构变更的频率很低
 /// （用户不会每秒建一章），而重新扫描能保证内存、索引、磁盘三者
 /// **在任何时候都强一致** —— 这是数据安全场景下值得的开销。
+///
+/// 扫描本身要读全部章节文件，是这里唯一的慢操作；因此把它放在
+/// **锁外**执行（先克隆出布局，扫完再加锁写索引）。
 fn reload_and_sync(state: &AppState) -> CmdResult<()> {
     let s = session(state)?;
-    let fresh = crate::scan::scan_workspace(&s.workspace)?;
+    let fresh = {
+        let guard = lock_session(&s)?;
+        // 扫描全程持锁：scan_workspace 只读工作区与磁盘，不回调命令层，
+        // 不会自我加锁；而它读的正是当前会话的工作区，
+        // 中途换工作区会让扫描结果张冠李戴。
+        let fresh = crate::scan::scan_workspace(guard.workspace())?;
+        fresh
+    };
     fresh.validate()?;
 
-    let root = s.root_str();
-    s.index.upsert_book(&fresh.book, &root)?;
-    s.index.sync_volumes(&fresh.volumes)?;
-    s.index.sync_document(&fresh.book, &root, &fresh.chapters)?;
+    {
+        let guard = lock_session(&s)?;
+        let root = guard.root_str();
+        guard.index().upsert_book(&fresh.book, &root)?;
+        guard.index().sync_volumes(&fresh.volumes)?;
+        guard
+            .index()
+            .sync_document(&fresh.book, &root, &fresh.chapters)?;
+    }
 
     state.replace_document(fresh)
 }
@@ -896,4 +977,35 @@ pub struct CountModeDto {
     pub id: String,
     /// 用户可读名称。
     pub label: String,
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn count_modes_cover_all_three() {
+        let modes = get_count_modes();
+        assert_eq!(modes.len(), 3);
+        assert!(modes.iter().any(|m| m.id == "withPunctuation"));
+        assert!(modes.iter().any(|m| m.id == "withoutPunctuation"));
+        assert!(modes.iter().any(|m| m.id == "wordsForEnglish"));
+        assert!(modes.iter().all(|m| !m.label.is_empty()));
+    }
+
+    #[test]
+    fn conflict_dto_carries_label_text() {
+        // 直接从领域结构构造，验证字段翻译一一对应
+        let c = yuhua_fs::conflict::DetectedConflict {
+            path: std::path::PathBuf::from("D:/ws/manuscript/第一章 落羽 的冲突副本.md"),
+            relative_path: "manuscript/第一章 落羽 的冲突副本.md".into(),
+            file_name: "第一章 落羽 的冲突副本.md".into(),
+            original_file_name: "第一章 落羽.md".into(),
+            pattern: yuhua_fs::conflict::ConflictPattern::ChineseConflictCopy,
+        };
+        let dto: ConflictDto = c.into();
+        assert_eq!(dto.file_name, "第一章 落羽 的冲突副本.md");
+        assert_eq!(dto.original_file_name, "第一章 落羽.md");
+        assert_eq!(dto.pattern_label, "云盘冲突副本");
+    }
 }
