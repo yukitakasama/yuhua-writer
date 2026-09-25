@@ -81,10 +81,22 @@ pub fn merge_day(left: &DayRecord, right: &DayRecord) -> DayRecord {
             .or_insert_with(|| session.clone());
     }
 
+    // 峰值基线：与章节增量同理逐键取最大值。
+    //
+    // 峰值是**单调量**（只升不降），因此两台设备各写一部分时取 max
+    // 恰好等于「两台设备里写过的最长版本」，既不会互相覆盖，
+    // 也不会因此重复记账。
+    let mut peaks: BTreeMap<_, _> = left.peaks.clone();
+    for (key, value) in &right.peaks {
+        let entry = peaks.entry(key.clone()).or_insert(0);
+        *entry = (*entry).max(*value);
+    }
+
     let (goal, goal_updated_at) = merge_goal(left, right);
 
     DayRecord {
         chapters,
+        peaks,
         sessions: by_identity.into_values().collect(),
         goal,
         goal_updated_at,
@@ -499,7 +511,7 @@ mod tests {
             "没有文件时不能凭空造出一个空月份"
         );
         let a = sample();
-        assert_eq!(merge_all(&[a.clone()]), Some(a.clone()));
+        assert_eq!(merge_all(std::slice::from_ref(&a)), Some(a.clone()));
         assert_eq!(merge_all(&[a.clone(), a.clone()]), Some(a));
     }
 

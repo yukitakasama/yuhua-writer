@@ -108,20 +108,24 @@ pub fn build_scale(samples: &[u32]) -> LevelScale {
     let count = nonzero.len();
 
     // 第 0 档下界恒为 0；第 1 到 4 档取分位数
-    let mut thresholds = vec![0u32; usize::from(HEATMAP_LEVELS)];
-    for level in 1..usize::from(HEATMAP_LEVELS) {
+    let level_count = usize::from(HEATMAP_LEVELS);
+    let mut thresholds = vec![0u32; level_count];
+    // 第 0 档已经由 vec 的初值 0 填好，这里从第 1 档开始逐档取分位数
+    for (level, slot) in thresholds.iter_mut().enumerate().skip(1) {
         // 分位位置：level / 5 处，例如 5 档时分位是 20%、40%、60%、80%
-        let position = (count * level) / usize::from(HEATMAP_LEVELS);
+        let position = (count * level) / level_count;
         let index = position.min(count - 1);
-        thresholds[level] = nonzero[index];
+        *slot = nonzero[index];
     }
 
     // 保证各档下界严格递增：样本里大量重复值时（例如所有天都是 100 字），
     // 分位数会算出相同的下界，导致某些档位永远取不到。
     // 逐档向上抬一，让 5 档都能出现，图形才有层次。
     for level in 1..thresholds.len() {
-        if thresholds[level] <= thresholds[level - 1] {
-            thresholds[level] = thresholds[level - 1].saturating_add(1);
+        let previous = thresholds[level - 1];
+        let current = &mut thresholds[level];
+        if *current <= previous {
+            *current = previous.saturating_add(1);
         }
     }
 

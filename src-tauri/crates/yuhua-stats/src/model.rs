@@ -206,6 +206,17 @@ pub struct DayRecord {
     /// 版本控制也会产生无意义的 diff。
     #[serde(default)]
     pub chapters: BTreeMap<ChapterKey, u32>,
+    /// 章节 ID 到该章**当日峰值字数**的映射。
+    ///
+    /// 与 chapters 的区别：chapters 存的是**产出**（当日新增了多少字，
+    /// 喂给日历与热力图），peaks 存的是**基线**（该章今天写到过多少字，
+    /// 用于判断下一次保存增长了多少）。
+    ///
+    /// 没有它就无法正确处理「涨、跌、再涨」：作者把第三章从 1500 删到 900
+    /// 再写回 2100 时，只有知道「今天最高写到过 1500」才能算出本轮新增
+    /// 600 而不是 1200 或不记。
+    #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
+    pub peaks: BTreeMap<ChapterKey, u32>,
     /// 当日会话列表（已按开始时间排序，同样是为了确定性）。
     #[serde(default)]
     pub sessions: Vec<Session>,
@@ -258,6 +269,25 @@ impl DayRecord {
         Ok(before != Some(delta))
     }
 
+    /// 记录某章当日的峰值字数。
+    ///
+    /// **只升不降**：这是「负差不抵扣」在数据层的落点。峰值一旦被
+    /// 调到更低的值，作者删字再写回原字数就会被重复记账。
+    /// 返回写入后的峰值。
+    pub fn set_peak(&mut self, chapter: &str, peak: u32) -> Result<u32, String> {
+        let key = ChapterKey::new(chapter)?;
+        let slot = self.peaks.entry(key).or_insert(0);
+        *slot = (*slot).max(peak);
+        Ok(*slot)
+    }
+
+    /// 某章当日的峰值字数（没有记录时为 0）。
+    pub fn peak_of(&self, chapter: &str) -> u32 {
+        ChapterKey::new(chapter)
+            .ok()
+            .and_then(|key| self.peaks.get(&key).copied())
+            .unwrap_or(0)
+    }
     /// 追加一个会话。
     ///
     /// 与既有会话 start 相同时走 Session::merge_with，
@@ -292,7 +322,10 @@ impl DayRecord {
 
     /// 当天是否没有任何记录。
     pub fn is_empty(&self) -> bool {
-        self.chapters.is_empty() && self.sessions.is_empty() && self.goal.is_none()
+        self.chapters.is_empty()
+            && self.peaks.is_empty()
+            && self.sessions.is_empty()
+            && self.goal.is_none()
     }
 
     /// 目标完成进度（0.0 起，可超过 1.0）。

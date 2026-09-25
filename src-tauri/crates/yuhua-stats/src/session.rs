@@ -514,7 +514,7 @@ mod tests {
         tracker.begin(ts(2026, 1, 15, 8, 0));
         tracker.touch(ts(2026, 1, 15, 8, 30));
         let session = tracker.current().unwrap().clone();
-        assert!(session.is_overlong() == false, "半小时还不算超长");
+        assert!(!session.is_overlong(), "半小时还不算超长");
 
         tracker.touch(ts(2026, 1, 15, 21, 0));
         let session = tracker.current().unwrap().clone();

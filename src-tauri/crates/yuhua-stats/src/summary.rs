@@ -268,7 +268,7 @@ pub fn estimate_completion(
 
     // 天数过大时（例如目标一亿字、日更 1 字）日期会溢出 chrono 的范围，
     // 此时宁可返回 None 也不要给出一个荒谬的年份
-    let offset = i64::try_from(days).ok().and_then(|d| Duration::try_days(d));
+    let offset = i64::try_from(days).ok().and_then(Duration::try_days);
     let Some(offset) = offset else {
         return (None, Some(days));
     };
