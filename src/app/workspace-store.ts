@@ -394,3 +394,21 @@ export async function saveChapterBody(chapterId: string, body: string): Promise<
     return false;
   }
 }
+
+// ---------------------------------------------------------------------------
+// 快捷入口
+// ---------------------------------------------------------------------------
+
+/**
+ * 在第一卷新建一章并选中它。
+ *
+ * 工具栏的「新建章」与编辑器空状态的按钮都调它。
+ * 放在 store 而不是组件里：它需要同时改「章节列表」与「当前选中」，
+ * 而这两份状态都在 store 里，让组件去编排会漏掉一半。
+ */
+export async function createFirstChapter(): Promise<void> {
+  const first = volumes()[0];
+  if (!first) return;
+  const created = await addChapter(first.id);
+  if (created) selectChapter(created.id);
+}

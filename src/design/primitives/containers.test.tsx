@@ -9,6 +9,7 @@
  */
 
 import { cleanup, fireEvent, render, screen } from "@solidjs/testing-library";
+import { createSignal } from "solid-js";
 import { describe, expect, it, vi } from "vitest";
 import {
   Button,
@@ -524,21 +525,23 @@ describe("reduced-motion 降级", () => {
     expect(dialog.getAttribute("data-state")).toBe("open");
   });
 
-  it("降级后弹层关闭延迟不超过 100ms（不影响功能）", async () => {
+  it("降级后弹层关闭延迟不超过 100ms（功能不受影响）", async () => {
     vi.useFakeTimers();
     mockReducedMotion(true);
-    const onClose = vi.fn();
-    const { rerender } = render(() => (
-      <Dialog open onClose={onClose} title="确认">
+    // 用 signal 驱动 open 而不是「重新 render」：
+    // Solid 是细粒度响应式，@solidjs/testing-library 的 render 不提供 rerender
+    // （没有虚拟树可重渲染）。改 signal 也更贴近真实用法——
+    // 真实调用方本来就是持有 open 状态的那一方。
+    const [open, setOpen] = createSignal(true);
+    render(() => (
+      <Dialog open={open()} onClose={() => setOpen(false)} title="确认">
         <p>内容</p>
       </Dialog>
     ));
-    rerender(() => (
-      <Dialog open={false} onClose={onClose} title="确认">
-        <p>内容</p>
-      </Dialog>
-    ));
+    expect(screen.queryByRole("dialog")).not.toBeNull();
 
+    setOpen(false);
+    // 降级环境下退场动画被压到 <=100ms，超过这个时间仍未卸载即为回归。
     await vi.advanceTimersByTimeAsync(100);
     expect(screen.queryByRole("dialog")).toBeNull();
     vi.useRealTimers();

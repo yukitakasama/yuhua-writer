@@ -70,6 +70,7 @@ pub trait ChapterSource {
 ///
 /// 用于测试与「书不大」的场景。生产路径应当优先使用
 /// [`crate::scope::assemble_with`] 配合一个按需读取的实现。
+#[derive(Debug)]
 pub struct InMemorySource<'a> {
     document: &'a CoreDocument,
 }

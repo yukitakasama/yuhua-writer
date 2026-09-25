@@ -372,9 +372,11 @@ impl DocxRenderer {
             "Normal",
             "<w:jc w:val=\"center\"/><w:spacing w:before=\"240\" w:after=\"240\"/><w:ind w:firstLineChars=\"0\" w:firstLine=\"0\"/>",
         ));
-        out.push_str(&self.heading_style(1, "标题 1", "Heading1", 36, 320, 160));
-        out.push_str(&self.heading_style(2, "标题 2", "Heading2", 32, 280, 140));
-        out.push_str(&self.heading_style(3, "标题 3", "Heading 3", 28, 240, 120));
+        // styleId 由 id 生成，与 `document.xml` 里 `<w:pStyle w:val="HeadingN"/>` 严格对应。
+        // 早先这里传的是显示名（"Heading 3" 带空格），导致三级标题静默退化成 Normal。
+        out.push_str(&self.heading_style(1, "标题 1", 36, 320, 160));
+        out.push_str(&self.heading_style(2, "标题 2", 32, 280, 140));
+        out.push_str(&self.heading_style(3, "标题 3", 28, 240, 120));
         out.push_str(&self.style_paragraph(
             "Quote",
             "引用",
@@ -411,15 +413,7 @@ impl DocxRenderer {
     }
 
     /// 构造标题样式（自带字号与中文字体）。
-    fn heading_style(
-        &self,
-        id: u8,
-        name: &str,
-        style_id: &str,
-        size: u32,
-        before: u32,
-        after: u32,
-    ) -> String {
+    fn heading_style(&self, id: u8, name: &str, size: u32, before: u32, after: u32) -> String {
         let rpr = self.xml_lang_attrs(
             &self.options.body_font_latin,
             &self.options.heading_font_east_asian,
@@ -427,9 +421,10 @@ impl DocxRenderer {
             "<w:b/>",
         );
         format!(
-            "<w:style w:type=\"paragraph\" w:styleId=\"{style_id}\"><w:name w:val=\"{name}\"/>             <w:basedOn w:val=\"Normal\"/><w:next w:val=\"Normal\"/><w:qFormat/>             <w:pPr><w:keepNext/><w:spacing w:before=\"{before}\" w:after=\"{after}\"/>             <w:ind w:firstLineChars=\"0\" w:firstLine=\"0\"/></w:pPr><w:rPr>{rpr}</w:rPr></w:style>             ",
+            "<w:style w:type=\"paragraph\" w:styleId=\"Heading{id}\"><w:name w:val=\"{name}\"/><w:basedOn w:val=\"Normal\"/><w:next w:val=\"Normal\"/><w:qFormat/>\
+<w:pPr><w:keepNext/><w:spacing w:before=\"{before}\" w:after=\"{after}\"/><w:ind w:firstLineChars=\"0\" w:firstLine=\"0\"/></w:pPr><w:rPr>{rpr}</w:rPr></w:style>\
+            "
         )
-        .replace("Heading1", &format!("Heading{id}"))
     }
 
     /// 生成带 `w:eastAsia` 的字体声明。
@@ -439,7 +434,8 @@ impl DocxRenderer {
     /// 自己挑一个字体」，这正是 R18 描述的中文字体兼容问题。
     fn xml_lang_attrs(&self, latin: &str, east_asian: &str, size: u32, extra: &str) -> String {
         format!(
-            "<w:rFonts w:ascii=\"{}\" w:hAnsi=\"{}\" w:eastAsia=\"{}\" w:cs=\"{}"/>             {extra}<w:sz w:val=\"{size}\"/><w:szCs w:val=\"{size}\"/>",
+            "<w:rFonts w:ascii=\"{}\" w:hAnsi=\"{}\" w:eastAsia=\"{}\" w:cs=\"{}\"/>\
+{extra}<w:sz w:val=\"{size}\"/><w:szCs w:val=\"{size}\"/>",
             escape_xml(latin),
             escape_xml(latin),
             escape_xml(east_asian),
@@ -617,7 +613,7 @@ mod tests {
     fn zip_entry_names_use_forward_slashes() {
         // 用反斜杠会让 Word 认为包非法
         let bytes = DocxRenderer::default().render(&doc_with(vec![])).unwrap();
-        let archive = zip::ZipArchive::new(Cursor::new(bytes)).unwrap();
+        let mut archive = zip::ZipArchive::new(Cursor::new(bytes)).unwrap();
         for index in 0..archive.len() {
             let entry = archive.by_index(index).unwrap();
             assert!(
@@ -745,7 +741,7 @@ mod tests {
 
     #[test]
     fn illegal_control_characters_are_dropped() {
-        // XML 1.0 不允许  ，留着会让 Word 报「文件已损坏」
+        // XML 1.0 不允许 \u{0}，留着会让 Word 报「文件已损坏」
         let doc = doc_with(vec![Block::Paragraph(vec![Inline::text(
             "前\u{0}后",
         )])]);

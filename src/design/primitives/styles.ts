@@ -296,7 +296,7 @@ export const PRIMITIVES_CSS = String.raw`
   border: 1px solid var(--c-border);
   border-radius: var(--r-lg, 10px);
   box-shadow: 0 12px 40px rgb(0 0 0 / 18%);
-  /* 计划书 5.5：打开 scale(0.96→1) + opacity 180ms；关闭 120ms 反向。 */
+  /* 计划书 5.5：打开时由 scale(0.96) 放大到 1 并伴随 opacity，用 180ms；关闭时 120ms 反向。 */
   transform: scale(1);
   transition:
     transform var(--d-base, 180ms) var(--e-decelerate, cubic-bezier(0, 0, 0, 1)),
