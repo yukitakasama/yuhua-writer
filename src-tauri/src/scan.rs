@@ -37,7 +37,7 @@
 use std::path::Path;
 
 use yuhua_core::model::{Book, Chapter, Document, Volume};
-use yuhua_core::{Result, YuhuaError};
+use yuhua_core::{now_local, Result, YuhuaError};
 use yuhua_fs::chapter_io::read_chapter;
 use yuhua_fs::layout::WorkspaceLayout;
 use yuhua_fs::workspace::Workspace;
@@ -284,17 +284,6 @@ fn take_number(it: &mut std::iter::Peekable<std::str::Chars<'_>>) -> u64 {
         }
     }
     s.parse().unwrap_or(0)
-}
-
-/// 取本地时区偏移。
-fn local_offset() -> chrono::FixedOffset {
-    *chrono::Local::now().offset()
-}
-
-/// 当前本地时间。
-fn now_local() -> chrono::DateTime<chrono::FixedOffset> {
-    use chrono::Utc;
-    Utc::now().with_timezone(&local_offset())
 }
 
 /// 扩展 [`WorkspaceLayout`]：把绝对路径转成相对字符串。

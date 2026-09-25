@@ -19,11 +19,13 @@
 //! | meta  | 章节 Front Matter 元数据与状态 |
 //! | model | Book / Volume / Chapter 领域模型与不变量校验 |
 //! | count | 字数统计三套口径 |
+//! | clock | 本机时钟（本地时区偏移 / 当前本地时间） |
 //! | trash | 回收站条目模型 |
 
 #![forbid(unsafe_code)]
 #![warn(missing_docs)]
 
+pub mod clock;
 pub mod count;
 pub mod error;
 pub mod ids;
@@ -31,6 +33,7 @@ pub mod meta;
 pub mod model;
 pub mod trash;
 
+pub use clock::{local_offset, now_local};
 pub use count::{count_words, count_words_all_modes, CountMode, WordCount};
 pub use error::{Result, YuhuaError};
 pub use ids::{BookId, ChapterId, TypedId, VolumeId};

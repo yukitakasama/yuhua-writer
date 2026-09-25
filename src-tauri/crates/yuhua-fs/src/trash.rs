@@ -29,9 +29,8 @@
 
 use std::path::{Path, PathBuf};
 
-use chrono::{DateTime, FixedOffset, Utc};
 use yuhua_core::trash::TrashEntry;
-use yuhua_core::{Result, YuhuaError};
+use yuhua_core::{now_local, Result, YuhuaError};
 
 use crate::layout::WorkspaceLayout;
 
@@ -383,16 +382,6 @@ fn sanitize_component(s: &str) -> String {
         .filter(|c| c.is_alphanumeric() || *c == '_' || *c == '-')
         .take(40)
         .collect()
-}
-
-/// 取本地时区偏移。
-fn local_offset() -> FixedOffset {
-    *chrono::Local::now().offset()
-}
-
-/// 当前本地时间。
-fn now_local() -> DateTime<FixedOffset> {
-    Utc::now().with_timezone(&local_offset())
 }
 
 #[cfg(test)]

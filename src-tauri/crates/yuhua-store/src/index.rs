@@ -24,7 +24,6 @@
 
 use std::collections::HashMap;
 
-use chrono::{DateTime, FixedOffset, Utc};
 use rusqlite::{params, Connection, OptionalExtension};
 use yuhua_core::model::{Book, Chapter};
 use yuhua_core::{Result, YuhuaError};
@@ -433,11 +432,6 @@ pub fn mtime_millis(meta: &std::fs::Metadata) -> i64 {
         .unwrap_or(0)
 }
 
-/// 当前本地时间（供测试与调用方使用）。
-pub fn now() -> DateTime<FixedOffset> {
-    Utc::now().with_timezone(chrono::Local::now().offset())
-}
-
 /// 便捷：从键值对构造一个 path → hash 的映射（调试用）。
 pub fn hash_map_of(chapters: &[Chapter]) -> HashMap<String, String> {
     chapters
@@ -456,7 +450,7 @@ pub fn make_error(msg: &str) -> YuhuaError {
 mod tests {
     use super::*;
     use crate::schema::open_in_memory;
-    use chrono::TimeZone;
+    use chrono::{DateTime, FixedOffset, TimeZone};
     use yuhua_core::model::{Chapter, Document, Volume};
 
     fn ts() -> DateTime<FixedOffset> {
@@ -959,7 +953,7 @@ mod tests {
 
     #[test]
     fn now_returns_local_time() {
-        let t = now();
+        let t = yuhua_core::now_local();
         assert!(t.timestamp() > 0);
     }
 

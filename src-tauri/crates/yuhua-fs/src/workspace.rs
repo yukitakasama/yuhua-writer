@@ -26,9 +26,9 @@
 
 use std::path::{Path, PathBuf};
 
-use chrono::{DateTime, FixedOffset, Utc};
+use chrono::{DateTime, FixedOffset};
 use serde::{Deserialize, Serialize};
-use yuhua_core::{Result, YuhuaError};
+use yuhua_core::{now_local, Result, YuhuaError};
 
 use crate::layout::{WorkspaceLayout, CONFIG_FILE, FORMAT_VERSION};
 
@@ -53,7 +53,7 @@ pub struct WorkspaceConfig {
 impl WorkspaceConfig {
     /// 为新工作区生成默认配置。
     pub fn new(workspace_id: impl Into<String>, title: impl Into<String>) -> Self {
-        let now = Utc::now().with_timezone(&local_offset());
+        let now = now_local();
         Self {
             format_version: FORMAT_VERSION,
             workspace_id: workspace_id.into(),
@@ -193,7 +193,7 @@ impl Workspace {
         layout.ensure_structure()?;
 
         // 更新最近打开时间
-        config.last_opened = Some(Utc::now().with_timezone(&local_offset()));
+        config.last_opened = Some(now_local());
         // 写回失败不阻断打开：只影响「最近打开时间」这一个展示字段
         let _ = write_config(&layout, &config);
 
@@ -340,16 +340,6 @@ fn sweep_recursive(dir: &Path) -> usize {
         }
     }
     n
-}
-
-/// 取本地时区偏移。
-fn local_offset() -> FixedOffset {
-    *chrono::Local::now().offset()
-}
-
-/// 当前本地时间。
-fn now_local() -> DateTime<FixedOffset> {
-    Utc::now().with_timezone(&local_offset())
 }
 
 #[cfg(test)]

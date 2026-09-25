@@ -43,7 +43,7 @@ use serde::{Deserialize, Serialize};
 use tauri::State;
 
 use yuhua_core::model::{ChapterSummary, Document, OutlineNode};
-use yuhua_core::{ChapterId, CountMode, VolumeId};
+use yuhua_core::{now_local, ChapterId, CountMode, VolumeId};
 use yuhua_fs::conflict::DetectedConflict;
 use yuhua_fs::workspace::WorkspaceSummary;
 use yuhua_store::search::{SearchQuery, SearchResults};
@@ -949,17 +949,6 @@ fn reload_and_sync(state: &AppState) -> CmdResult<()> {
     }
 
     state.replace_document(fresh)
-}
-
-/// 取本地时区偏移。
-fn local_offset() -> chrono::FixedOffset {
-    *chrono::Local::now().offset()
-}
-
-/// 当前本地时间。
-fn now_local() -> chrono::DateTime<chrono::FixedOffset> {
-    use chrono::Utc;
-    Utc::now().with_timezone(&local_offset())
 }
 
 /// 统计三口径（供前端字数面板使用）。

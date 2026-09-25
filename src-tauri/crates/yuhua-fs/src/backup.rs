@@ -24,8 +24,8 @@
 
 use std::path::{Path, PathBuf};
 
-use chrono::{DateTime, FixedOffset, Utc};
-use yuhua_core::{Result, YuhuaError};
+use chrono::{DateTime, FixedOffset};
+use yuhua_core::{local_offset, Result, YuhuaError};
 
 /// 相邻两次快照的最小间隔（秒）。对应计划书「> 5 分钟」。
 pub const MIN_SNAPSHOT_INTERVAL_SECS: i64 = 5 * 60;
@@ -247,16 +247,6 @@ fn parse_timestamp_from_name(path: &Path) -> Option<DateTime<FixedOffset>> {
     let ts = &without_suffix[idx + SEP.len()..];
     let parsed = chrono::NaiveDateTime::parse_from_str(ts, "%Y%m%d-%H%M%S").ok()?;
     parsed.and_local_timezone(local_offset()).single()
-}
-
-/// 取本地时区偏移。
-fn local_offset() -> FixedOffset {
-    *chrono::Local::now().offset()
-}
-
-/// 当前时间（带本地时区）。
-pub fn now_local() -> DateTime<FixedOffset> {
-    Utc::now().with_timezone(&local_offset())
 }
 
 #[cfg(test)]
