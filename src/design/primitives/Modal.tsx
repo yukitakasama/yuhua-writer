@@ -84,26 +84,42 @@ export const ModalShell: Component<ModalShellProps> = (props) => {
   });
 
   // 焦点陷阱：只在打开期间创建，关闭即解除并归还焦点。
+  //
+  // 面板节点通过 ModalShell 自己持有的模块级 ref 取得，而不是
+  // document.querySelector("[data-yh-modal-panel]")。原因有两层：
+  // 1. 选择器会命中页面上任意一个弹层，同时开两个弹窗时陷阱会绑错面板；
+  // 2. 它依赖「DOM 已经插入」这一时序假设，用微任务去等是不牢靠的——
+  //    Portal 的插入时机由调度器决定，微任务可能先于插入运行，
+  //    此时 panel 为 null，陷阱就静默地从未建立（表现为 Tab 可以跑出弹层）。
+  // 用 ref 直接拿到节点，只依赖渲染顺序，是唯一可靠的绑定方式。
+  let panelElement: HTMLElement | undefined;
   createEffect(() => {
     if (!props.open) return undefined;
-    let cleanup: (() => void) | undefined;
-    // 等面板真正挂载后再建陷阱；用微任务同步到本次渲染之后。
-    queueMicrotask(() => {
-      const panel = document.querySelector<HTMLElement>("[data-yh-modal-panel]");
-      if (!panel) return;
-      cleanup = focusTrap(panel, { initialFocus: props.initialFocus, autoFocus: true });
-    });
-    return () => cleanup?.();
+    const panel = panelElement;
+    if (!panel) return undefined;
+    return focusTrap(panel, { initialFocus: props.initialFocus, autoFocus: true });
   });
 
   const onKeyDown = (event: KeyboardEvent): void => {
     if (event.key !== "Escape") return;
     if (props.closeOnEscape === false) return;
-    // 只处理最外层弹层：嵌套弹层（例如弹窗里再开一个菜单）里按 Esc
-    // 应该先关内层，由内层的处理器 stopPropagation 后这里就不会收到。
-    event.stopPropagation();
     props.onClose();
   };
+
+  /**
+   * Esc 监听挂在 document 而不是遮罩元素上。
+   *
+   * 原因：焦点在陷阱建立或切换的瞬间可能短暂落在 body 上，
+   * 挂在遮罩上的 keydown 收不到这类按键，表现为「有时 Esc 关不掉」。
+   * 嵌套弹层的先后顺序由「后挂的监听在内层、内层先关闭并把自己卸载」
+   * 这一自然时序保证，不需要额外维护栈。
+   */
+  createEffect(() => {
+    if (!props.open) return undefined;
+    const handler = (event: KeyboardEvent): void => onKeyDown(event);
+    document.addEventListener("keydown", handler);
+    return () => document.removeEventListener("keydown", handler);
+  });
 
   const onOverlayPointerDown = (event: MouseEvent): void => {
     if (props.closeOnOverlayClick === false) return;
@@ -123,7 +139,10 @@ export const ModalShell: Component<ModalShellProps> = (props) => {
           onKeyDown={onKeyDown}
         >
           <div
-            ref={(element) => props.panelRef?.(element)}
+            ref={(element) => {
+              panelElement = element;
+              props.panelRef?.(element);
+            }}
             data-yh-modal-panel=""
             data-state={state()}
             role={props.role}

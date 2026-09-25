@@ -18,7 +18,9 @@ export type { MotionPolicy, MatchMediaLike } from "./reducedMotion";
 export {
   FOCUSABLE_SELECTOR,
   isFocusable,
+  isProgrammaticallyFocusable,
   getFocusableElements,
+  focusableCandidates,
   focusTrap,
 } from "./focusTrap";
 export type { FocusTrapOptions, FocusTrapCleanup } from "./focusTrap";

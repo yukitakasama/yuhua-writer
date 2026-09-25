@@ -23,7 +23,7 @@ import {
   type Component,
   type JSX,
 } from "solid-js";
-import { getFocusableElements } from "./focusTrap";
+import { focusableCandidates } from "./focusTrap";
 import { handleListNavigation } from "./keyboardNav";
 import { cx, usePrimitivesStyle } from "./styles";
 
@@ -121,7 +121,9 @@ export const Menu: Component<MenuProps> = (props) => {
   /** 取当前可导航的菜单项（跳过禁用项，因为键盘用户无法激活它们）。 */
   const items = (): HTMLElement[] => {
     if (!list) return [];
-    return getFocusableElements(list).filter((element) => element.getAttribute("aria-disabled") !== "true");
+    // 用 focusableCandidates 而非 getFocusableElements：roving tabindex 下
+    // 只有一项的 tabindex 是 0，其余为 -1，但方向键必须能在全部项之间移动。
+    return focusableCandidates(list).filter((element) => element.getAttribute("aria-disabled") !== "true");
   };
 
   /** 当前高亮项。用 data-active 而不是 :hover，因为键盘移动也要能看到位置。 */
@@ -138,12 +140,14 @@ export const Menu: Component<MenuProps> = (props) => {
 
   createEffect(() => {
     if (!local.open) return undefined;
-    // 等子项挂载完成再排布 roving tabindex。
-    queueMicrotask(() => {
-      const index = Math.min(local.initialFocusIndex ?? 0, Math.max(items().length - 1, 0));
-      applyActive(index);
-      items()[index]?.focus();
-    });
+    // 直接同步排布，不用 queueMicrotask 延后。
+    // 原因：List 用 <Show> 渲染，createEffect 在子节点插入 DOM 之后才跑，
+    // 此刻 $items()$ 已经能取到全部菜单项；延后到微任务反而让
+    // 「打开后按方向键」这种紧接着发生的事件先于排布到达，出现首项未聚焦。
+    const list = items();
+    const index = Math.min(local.initialFocusIndex ?? 0, Math.max(list.length - 1, 0));
+    applyActive(index);
+    list[index]?.focus();
     return undefined;
   });
 

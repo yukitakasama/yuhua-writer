@@ -81,10 +81,46 @@ function isNaturallyFocusable(element: HTMLElement): boolean {
   return element.isContentEditable;
 }
 
+/**
+ * 判断元素能否被「脚本」聚焦（element.focus() 生效）。
+ *
+ * 它与 {@link isFocusable} 的区别是「能否被 Tab 到达」：
+ * tabindex="-1" 的元素 Tab 到不了，但焦点可以编程地送进去。
+ * 菜单、树、标签栏需要的正是这一层——roving tabindex 会把非当前项
+ * 设成 -1，它们仍然要能接收焦点。把两者混为一谈会让键盘导航整段失效，
+ * 所以这里显式分成两个函数，调用方按意图选择。
+ */
+export function isProgrammaticallyFocusable(element: Element | null | undefined): element is HTMLElement {
+  if (!element || !(element instanceof HTMLElement)) return false;
+  if ((element as HTMLInputElement).disabled) return false;
+  if (element.closest("[inert]")) return false;
+  if (element.closest("[hidden]")) return false;
+
+  const tabindexAttr = element.getAttribute("tabindex");
+  if (tabindexAttr !== null) {
+    // 任意合法 tabindex（含负数）都允许编程聚焦。
+    const parsed = Number.parseInt(tabindexAttr, 10);
+    if (!Number.isNaN(parsed)) return true;
+  }
+  return isNaturallyFocusable(element);
+}
+
 /** 取容器内按 DOM 顺序排列的所有可 Tab 聚焦元素。 */
 export function getFocusableElements(container: HTMLElement): HTMLElement[] {
   const candidates = Array.from(container.querySelectorAll<HTMLElement>(FOCUSABLE_SELECTOR));
   return candidates.filter((element) => isFocusable(element));
+}
+
+/**
+ * 取容器内所有可编程聚焦的元素。
+ *
+ * 用于「方向键在其中移动」的复合控件（菜单、树、标签栏）：
+ * 这些控件里只有一项的 tabindex 为 0，其余为 -1，
+ * 但导航时必须把它们全部视作候选。
+ */
+export function focusableCandidates(container: HTMLElement): HTMLElement[] {
+  const candidates = Array.from(container.querySelectorAll<HTMLElement>(FOCUSABLE_SELECTOR));
+  return candidates.filter((element) => isProgrammaticallyFocusable(element));
 }
 
 /** 焦点陷阱的清理函数。 */

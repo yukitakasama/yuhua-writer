@@ -6,6 +6,9 @@
  */
 
 import { describe, expect, it, vi } from "vitest";
+import { readFileSync } from "node:fs";
+import { fileURLToPath } from "node:url";
+import { dirname, resolve } from "node:path";
 import {
   CALENDAR_CELLS,
   CALENDAR_COLUMNS,
@@ -42,6 +45,8 @@ import {
   yearHeatmapGrid,
 } from "./index";
 
+const here = dirname(fileURLToPath(import.meta.url));
+
 describe("色阶映射", () => {
   it("提供 5 档预计算颜色", () => {
     expect(HEAT_LEVELS).toBe(5);
@@ -62,6 +67,28 @@ describe("色阶映射", () => {
 
   it("亮暗主题给出不同色板", () => {
     expect(heatColors("light")).not.toEqual(heatColors("dark"));
+  });
+
+  it("色值与 tokens.css 的 --c-heat-* 完全一致", () => {
+    // 这是最容易静默漂移的地方：TS 数组改了、CSS 变量没改，
+    // 日历格子与图例就会显示成两种颜色。因此在这里钉死。
+    const css = readFileSync(resolve(here, "..", "tokens.css"), "utf8");
+
+    /** 从 CSS 的某个作用域块里取 5 档热力色。 */
+    function heatFromCss(startMarker: string, endMarker: string): string[] {
+      const start = css.indexOf(startMarker);
+      const block = css.slice(start, css.indexOf(endMarker, start));
+      return [0, 1, 2, 3, 4].map((i) => {
+        const m = block.match(new RegExp(`--c-heat-${i}:\\s*(#[0-9a-f]{6})`, "i"));
+        return m?.[1] ?? "";
+      });
+    }
+
+    const light = heatFromCss(":root {", '[data-theme="dark"]');
+    const dark = heatFromCss('[data-theme="dark"]', "@media (prefers-color-scheme");
+
+    expect(light).toEqual([...heatColors("light")]);
+    expect(dark).toEqual([...heatColors("dark")]);
   });
 
   describe("levelForWords", () => {

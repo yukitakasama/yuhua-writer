@@ -13,7 +13,7 @@
  */
 
 import { createEffect, createSignal, onCleanup, Show, splitProps, type Component, type JSX } from "solid-js";
-import { getFocusableElements } from "./focusTrap";
+import { focusableCandidates, getFocusableElements } from "./focusTrap";
 import { motionPolicy } from "./reducedMotion";
 import { cx, usePrimitivesStyle } from "./styles";
 
@@ -84,7 +84,9 @@ export const Popover: Component<PopoverProps> = (props) => {
     queueMicrotask(() => {
       setVisible(true);
       if (local.autoFocus !== false && panel) {
-        const target = getFocusableElements(panel)[0] ?? panel;
+        // 面板内的元素可能带 tabindex="-1"，用 focusableCandidates 才能在
+        // 没有天然可聚焦元素时仍把焦点送进面板；都没有则聚焦面板本身。
+        const target = focusableCandidates(panel)[0] ?? panel;
         target.focus();
       }
     });
