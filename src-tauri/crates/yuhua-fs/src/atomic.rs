@@ -212,7 +212,11 @@ mod tests {
     fn sweep_removes_only_temp_marked_files() {
         let dir = tempfile::tempdir().unwrap();
         fs::write(dir.path().join("chapter.md"), "用户内容").unwrap();
-        fs::write(dir.path().join(format!("chapter.md{TEMP_MARKER}abc")), "垃圾").unwrap();
+        fs::write(
+            dir.path().join(format!("chapter.md{TEMP_MARKER}abc")),
+            "垃圾",
+        )
+        .unwrap();
         fs::write(dir.path().join(format!("other.md{TEMP_MARKER}def")), "垃圾").unwrap();
 
         let removed = sweep_temp_files(dir.path()).unwrap();

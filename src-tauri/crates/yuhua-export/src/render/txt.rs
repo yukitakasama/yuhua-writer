@@ -159,11 +159,7 @@ impl TxtRenderer {
                                         )?;
                                         first = false;
                                     } else {
-                                        self.write_line(
-                                            out,
-                                            &format!("{indent}   {line}"),
-                                            false,
-                                        )?;
+                                        self.write_line(out, &format!("{indent}   {line}"), false)?;
                                     }
                                 }
                             }
@@ -216,7 +212,10 @@ impl TxtRenderer {
             return Ok(());
         }
         // 硬换行：续行不缩进，避免出现「缩进 + 缩进」的阶梯。
-        for (index, chunk) in wrap_text(text, self.options.wrap_width).into_iter().enumerate() {
+        for (index, chunk) in wrap_text(text, self.options.wrap_width)
+            .into_iter()
+            .enumerate()
+        {
             let line = if index == 0 {
                 format!("{prefix}{chunk}\n")
             } else {
@@ -419,7 +418,10 @@ mod tests {
         let doc = single_chapter_doc(vec![Block::Paragraph(vec![Inline::text(long.clone())])]);
         let text = render_to_string(&doc, TxtOptions::default());
         // 整段应当在同一行里
-        assert!(text.lines().any(|l| l.trim().chars().count() == 200), "默认不该硬换行");
+        assert!(
+            text.lines().any(|l| l.trim().chars().count() == 200),
+            "默认不该硬换行"
+        );
     }
 
     #[test]
@@ -435,10 +437,7 @@ mod tests {
             },
         );
         // 25 个字按 10 折行 → 10 / 10 / 5
-        let body_lines: Vec<&str> = text
-            .lines()
-            .filter(|l| l.starts_with('字'))
-            .collect();
+        let body_lines: Vec<&str> = text.lines().filter(|l| l.starts_with('字')).collect();
         assert_eq!(body_lines.len(), 3, "{text}");
         assert_eq!(body_lines[0].chars().count(), 10);
         assert_eq!(body_lines[2].chars().count(), 5);

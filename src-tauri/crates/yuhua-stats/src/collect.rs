@@ -112,7 +112,6 @@ pub fn collect_delta(
         });
     }
 
-
     // 基准（base）的语义是「该章**当日的峰值字数**」——注意是**字数**，
     // 不是增量。之所以要把峰值也存下来，是为了让「跌了再涨」能被正确记账：
     //
@@ -321,7 +320,9 @@ pub fn observe_shrink(before: u32, after: u32) -> Option<u32> {
 /// 与其写进去一个空键污染统计，不如当场报错。
 pub fn require_chapter_id(chapter: &str) -> Result<()> {
     if chapter.trim().is_empty() {
-        return Err(YuhuaError::InvalidInput("采集统计时章节 ID 不能为空".into()));
+        return Err(YuhuaError::InvalidInput(
+            "采集统计时章节 ID 不能为空".into(),
+        ));
     }
     Ok(())
 }
@@ -502,10 +503,7 @@ mod tests {
         // 空 ID 在入口就被拦住：不写盘、不报错、也不产生脏键
         let out = collect_delta(&store, "", 0, 100, ts(2026, 1, 15, 9, 0)).unwrap();
         assert_eq!(out.recorded, 0, "脏 ID 不记入任何数字");
-        assert_eq!(
-            out.day_total, 0,
-            "空 ID 不该被写入统计，因此当日总计仍为 0"
-        );
+        assert_eq!(out.day_total, 0, "空 ID 不该被写入统计，因此当日总计仍为 0");
     }
 
     #[test]
@@ -543,23 +541,26 @@ mod tests {
     fn batch_with_no_growth_touches_nothing() {
         let (_tmp, store) = store();
         let deltas = vec![("ch_1".to_string(), 900u32, 100u32)];
-        assert_eq!(collect_batch(&store, &deltas, ts(2026, 1, 15, 12, 0)).unwrap(), 0);
+        assert_eq!(
+            collect_batch(&store, &deltas, ts(2026, 1, 15, 12, 0)).unwrap(),
+            0
+        );
         assert!(!store.path_for(&MonthKey::of(day(2026, 1, 15))).exists());
     }
 
     #[test]
     fn batch_of_empty_input_is_noop() {
         let (_tmp, store) = store();
-        assert_eq!(collect_batch(&store, &[], ts(2026, 1, 15, 12, 0)).unwrap(), 0);
+        assert_eq!(
+            collect_batch(&store, &[], ts(2026, 1, 15, 12, 0)).unwrap(),
+            0
+        );
     }
 
     #[test]
     fn batch_skips_dirty_ids_without_losing_the_rest() {
         let (_tmp, store) = store();
-        let deltas = vec![
-            ("".to_string(), 0u32, 500u32),
-            ("ch_2".to_string(), 0, 300),
-        ];
+        let deltas = vec![("".to_string(), 0u32, 500u32), ("ch_2".to_string(), 0, 300)];
         collect_batch(&store, &deltas, ts(2026, 1, 15, 12, 0)).unwrap();
 
         let stats = store.load(&MonthKey::of(day(2026, 1, 15))).unwrap();

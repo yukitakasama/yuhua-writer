@@ -343,7 +343,10 @@ mod tests {
         let target = dir.path().join("book.txt");
         let report = render_to_path(ExportFormat::Txt, &doc, &target).unwrap();
         assert_eq!(report.path, target);
-        assert_eq!(report.bytes, std::fs::metadata(&target).unwrap().len() as usize);
+        assert_eq!(
+            report.bytes,
+            std::fs::metadata(&target).unwrap().len() as usize
+        );
         assert!(report.bytes > 0);
     }
 
@@ -371,10 +374,7 @@ mod tests {
     #[test]
     fn renderer_trait_exposes_format() {
         assert_eq!(txt::TxtRenderer::default().format(), ExportFormat::Txt);
-        assert_eq!(
-            html::HtmlRenderer::default().format(),
-            ExportFormat::Html
-        );
+        assert_eq!(html::HtmlRenderer::default().format(), ExportFormat::Html);
         assert_eq!(
             markdown::MarkdownRenderer::default().format(),
             ExportFormat::Markdown

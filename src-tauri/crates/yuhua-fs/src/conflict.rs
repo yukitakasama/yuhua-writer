@@ -110,7 +110,8 @@ pub fn is_conflict_copy(file_name: &str) -> Option<ConflictPattern> {
 
     // Google Drive：xxx (副本).md — 只认独立的「副本」标记，
     // 避免把标题里正常含有「副本」二字的小说章节误判
-    if lower.contains("(副本)") || lower.contains("（副本）") || lower.contains("的副本)") {
+    if lower.contains("(副本)") || lower.contains("（副本）") || lower.contains("的副本)")
+    {
         return Some(ConflictPattern::GoogleCopy);
     }
 
@@ -280,8 +281,14 @@ mod tests {
 
     #[test]
     fn detects_icloud_numeric_suffix() {
-        assert_eq!(is_conflict_copy("第一章 2.md"), Some(ConflictPattern::NumericSuffix));
-        assert_eq!(is_conflict_copy("第一章 3.md"), Some(ConflictPattern::NumericSuffix));
+        assert_eq!(
+            is_conflict_copy("第一章 2.md"),
+            Some(ConflictPattern::NumericSuffix)
+        );
+        assert_eq!(
+            is_conflict_copy("第一章 3.md"),
+            Some(ConflictPattern::NumericSuffix)
+        );
     }
 
     #[test]
@@ -305,14 +312,20 @@ mod tests {
     #[test]
     fn ignores_non_markdown_files() {
         // 冲突标记只出现在 .md 上；.json 统计文件有自己的合并机制
-        assert_eq!(is_conflict_copy("config (冲突副本).json"), Some(ConflictPattern::ChineseConflictCopy));
+        assert_eq!(
+            is_conflict_copy("config (冲突副本).json"),
+            Some(ConflictPattern::ChineseConflictCopy)
+        );
         // is_conflict_copy 本身只看名字，扩展名过滤由 detect_conflicts 负责
     }
 
     #[test]
     fn guesses_original_name_for_chinese_pattern() {
         assert_eq!(
-            guess_original_file_name("第一章 落羽 (冲突副本 2026-01-01).md", ConflictPattern::ChineseConflictCopy),
+            guess_original_file_name(
+                "第一章 落羽 (冲突副本 2026-01-01).md",
+                ConflictPattern::ChineseConflictCopy
+            ),
             "第一章 落羽.md"
         );
     }
@@ -320,7 +333,10 @@ mod tests {
     #[test]
     fn guesses_original_name_for_syncthing() {
         assert_eq!(
-            guess_original_file_name("第一章.sync-conflict-20260101-120000-ABCDEF.md", ConflictPattern::SyncConflict),
+            guess_original_file_name(
+                "第一章.sync-conflict-20260101-120000-ABCDEF.md",
+                ConflictPattern::SyncConflict
+            ),
             "第一章.md"
         );
     }
@@ -358,7 +374,10 @@ mod tests {
         let found = detect_conflicts(root, root);
         assert_eq!(found.len(), 1, "找到 {found:#?}");
         assert_eq!(found[0].file_name, "001-第一章 (冲突副本 2026-01-01).md");
-        assert_eq!(found[0].relative_path, "manuscript/001-第一卷/001-第一章 (冲突副本 2026-01-01).md");
+        assert_eq!(
+            found[0].relative_path,
+            "manuscript/001-第一卷/001-第一章 (冲突副本 2026-01-01).md"
+        );
         assert_eq!(found[0].original_file_name, "001-第一章.md");
     }
 
@@ -403,6 +422,9 @@ mod tests {
         }
         let found = detect_conflicts(root, root);
         let names: Vec<&str> = found.iter().map(|c| c.file_name.as_str()).collect();
-        assert_eq!(names, vec!["a (冲突副本).md", "b (冲突副本).md", "c (冲突副本).md"]);
+        assert_eq!(
+            names,
+            vec!["a (冲突副本).md", "b (冲突副本).md", "c (冲突副本).md"]
+        );
     }
 }

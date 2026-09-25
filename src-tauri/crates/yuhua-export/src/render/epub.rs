@@ -123,7 +123,9 @@ impl EpubRenderer {
     /// 生成 `META-INF/container.xml`。
     fn container_xml(&self) -> String {
         let mut out = String::from(XML_DECLARATION);
-        out.push_str("<container version=\"1.0\" xmlns=\"urn:oasis:names:tc:opendocument:xmlns:container\">");
+        out.push_str(
+            "<container version=\"1.0\" xmlns=\"urn:oasis:names:tc:opendocument:xmlns:container\">",
+        );
         out.push_str("<rootfiles><rootfile full-path=\"OEBPS/content.opf\" media-type=\"application/oebps-package+xml\"/></rootfiles>");
         out.push_str("</container>");
         out
@@ -159,7 +161,9 @@ impl EpubRenderer {
             escape_html(document.book.author_or_anonymous())
         );
         // role=aut 表示「作者」。EPUB 3 要求 role 走 refines 而不是属性
-        out.push_str("<meta refines=\"#creator\" property=\"role\" scheme=\"marc:relators\">aut</meta>");
+        out.push_str(
+            "<meta refines=\"#creator\" property=\"role\" scheme=\"marc:relators\">aut</meta>",
+        );
         if !document.book.description.trim().is_empty() {
             let _ = write!(
                 out,
@@ -175,10 +179,7 @@ impl EpubRenderer {
             );
         }
         // dcterms:modified 是 EPUB 3 **必填**项，缺少会被 epubcheck 判 error
-        let _ = write!(
-            out,
-            "<meta property=\"dcterms:modified\">{modified}</meta>"
-        );
+        let _ = write!(out, "<meta property=\"dcterms:modified\">{modified}</meta>");
         out.push_str("</metadata>");
 
         // ---- 清单 ----
@@ -212,7 +213,9 @@ impl EpubRenderer {
         out.push_str("<html xmlns=\"http://www.w3.org/1999/xhtml\" xmlns:epub=\"http://www.idpf.org/2007/ops\" xml:lang=\"");
         out.push_str(&escape_html(&self.options.language));
         out.push_str("\"><head><title>目录</title><meta charset=\"utf-8\"/>");
-        out.push_str("<link rel=\"stylesheet\" type=\"text/css\" href=\"style.css\"/></head><body>");
+        out.push_str(
+            "<link rel=\"stylesheet\" type=\"text/css\" href=\"style.css\"/></head><body>",
+        );
         out.push_str("<nav epub:type=\"toc\" id=\"toc\"><h1>目录</h1><ol>");
 
         let mut current_volume: Option<&str> = None;
@@ -257,7 +260,11 @@ impl EpubRenderer {
         } else {
             let _ = write!(body, "<section class=\"chapter\" epub:type=\"chapter\">");
         }
-        let _ = writeln!(body, "<h1 class=\"chapter-title\">{}</h1>", escape_html(&chapter.title));
+        let _ = writeln!(
+            body,
+            "<h1 class=\"chapter-title\">{}</h1>",
+            escape_html(&chapter.title)
+        );
         self.render_blocks(&chapter.blocks, &mut body, 0);
         body.push_str("</section>");
 
@@ -268,7 +275,9 @@ impl EpubRenderer {
         out.push_str("\"><head><title>");
         out.push_str(&escape_html(&chapter.title));
         out.push_str("</title><meta charset=\"utf-8\"/>");
-        out.push_str("<link rel=\"stylesheet\" type=\"text/css\" href=\"style.css\"/></head><body>");
+        out.push_str(
+            "<link rel=\"stylesheet\" type=\"text/css\" href=\"style.css\"/></head><body>",
+        );
         out.push_str(&body);
         out.push_str("</body></html>");
         out
@@ -374,7 +383,9 @@ a { color: inherit; text-decoration: none; }
             Block::Hr => out.push_str("<hr/>"),
             Block::PageBreak => {
                 // EPUB 里章与章本来就是不同文档，文档内的分页用带样式的空 div 表达
-                out.push_str("<div class=\"page-break\" style=\"page-break-after: always;\"></div>");
+                out.push_str(
+                    "<div class=\"page-break\" style=\"page-break-after: always;\"></div>",
+                );
             }
         }
     }
@@ -448,8 +459,8 @@ impl<'a> Renderer<'a> for EpubRenderer {
             let modified = chrono::Utc::now().format("%Y-%m-%dT%H:%M:%SZ").to_string();
 
             let write_part = |zip: &mut zip::ZipWriter<&mut Cursor<Vec<u8>>>,
-                                  name: &str,
-                                  content: String|
+                              name: &str,
+                              content: String|
              -> Result<()> {
                 zip.start_file(name, deflated)
                     .map_err(|e| ExportError::Package(format!("写入 {name} 失败：{e}")))?;
@@ -459,7 +470,11 @@ impl<'a> Renderer<'a> for EpubRenderer {
             };
 
             write_part(&mut zip, "META-INF/container.xml", self.container_xml())?;
-            write_part(&mut zip, "OEBPS/content.opf", self.content_opf(document, &modified))?;
+            write_part(
+                &mut zip,
+                "OEBPS/content.opf",
+                self.content_opf(document, &modified),
+            )?;
             write_part(&mut zip, "OEBPS/nav.xhtml", self.nav_xhtml(document))?;
             write_part(&mut zip, "OEBPS/style.css", self.style_css())?;
             for (index, chapter) in document.iter_chapters().enumerate() {
@@ -601,7 +616,11 @@ mod tests {
             "OEBPS/style.css",
             "OEBPS/chapter-0001.xhtml",
         ] {
-            assert!(parts.contains_key(name), "缺少 {name}，实际有 {:?}", parts.keys());
+            assert!(
+                parts.contains_key(name),
+                "缺少 {name}，实际有 {:?}",
+                parts.keys()
+            );
         }
     }
 
@@ -609,7 +628,10 @@ mod tests {
     fn container_points_at_the_opf() {
         let parts = parts_map(&render_doc(&doc_with(vec![])));
         let container = &parts["META-INF/container.xml"];
-        assert!(container.contains("full-path=\"OEBPS/content.opf\""), "{container}");
+        assert!(
+            container.contains("full-path=\"OEBPS/content.opf\""),
+            "{container}"
+        );
         assert!(
             container.contains("application/oebps-package+xml"),
             "{container}"
@@ -623,8 +645,14 @@ mod tests {
         assert!(opf.contains("version=\"3.0\""), "{opf}");
         assert!(opf.contains("<dc:title>测试书</dc:title>"), "{opf}");
         assert!(opf.contains("<dc:language>zh</dc:language>"), "{opf}");
-        assert!(opf.contains("<dc:creator id=\"creator\">作者</dc:creator>"), "{opf}");
-        assert!(opf.contains("property=\"dcterms:modified\""), "EPUB3 必填项：{opf}");
+        assert!(
+            opf.contains("<dc:creator id=\"creator\">作者</dc:creator>"),
+            "{opf}"
+        );
+        assert!(
+            opf.contains("property=\"dcterms:modified\""),
+            "EPUB3 必填项：{opf}"
+        );
     }
 
     #[test]
@@ -717,7 +745,10 @@ mod tests {
         ])])));
         let chapter = &parts["OEBPS/chapter-0001.xhtml"];
         assert!(chapter.contains("正文内容"), "{chapter}");
-        assert!(chapter.contains("<h1 class=\"chapter-title\">第一章</h1>"), "{chapter}");
+        assert!(
+            chapter.contains("<h1 class=\"chapter-title\">第一章</h1>"),
+            "{chapter}"
+        );
     }
 
     #[test]
@@ -748,7 +779,10 @@ mod tests {
             },
         ])])));
         let chapter = &parts["OEBPS/chapter-0001.xhtml"];
-        assert!(chapter.contains("<img src=\"a.png\" alt=\"图\"/>"), "{chapter}");
+        assert!(
+            chapter.contains("<img src=\"a.png\" alt=\"图\"/>"),
+            "{chapter}"
+        );
     }
 
     #[test]
@@ -794,7 +828,10 @@ mod tests {
         let chapter = &parts["OEBPS/chapter-0001.xhtml"];
         assert!(chapter.contains("<blockquote>"), "{chapter}");
         assert!(chapter.contains("<ol>"), "{chapter}");
-        assert!(chapter.contains("<pre><code>let a = 1;</code></pre>"), "{chapter}");
+        assert!(
+            chapter.contains("<pre><code>let a = 1;</code></pre>"),
+            "{chapter}"
+        );
         assert!(chapter.contains("<strong>粗</strong>"), "{chapter}");
     }
 
@@ -838,10 +875,7 @@ mod tests {
         assert_eq!(&bytes[..4], b"PK\x03\x04");
         let entries = unzip(&bytes);
         assert_eq!(entries[0].0, "mimetype");
-        let parts: HashMap<String, String> = entries
-            .into_iter()
-            .map(|(n, _, c)| (n, c))
-            .collect();
+        let parts: HashMap<String, String> = entries.into_iter().map(|(n, _, c)| (n, c)).collect();
         assert!(parts.contains_key("OEBPS/content.opf"));
     }
 

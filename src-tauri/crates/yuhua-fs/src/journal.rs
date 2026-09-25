@@ -202,7 +202,11 @@ mod tests {
     fn begin_creates_pending_entry() {
         let (_d, j) = journal();
         let id = j
-            .begin(JournalKind::ChapterSave, vec!["manuscript/a.md".into()], "保存第一章")
+            .begin(
+                JournalKind::ChapterSave,
+                vec!["manuscript/a.md".into()],
+                "保存第一章",
+            )
             .unwrap();
         let pending = j.pending();
         assert_eq!(pending.len(), 1);
@@ -244,9 +248,13 @@ mod tests {
     #[test]
     fn multiple_entries_survive_and_sort_by_time() {
         let (_d, j) = journal();
-        let a = j.begin(JournalKind::ChapterSave, vec!["a.md".into()], "第一").unwrap();
+        let a = j
+            .begin(JournalKind::ChapterSave, vec!["a.md".into()], "第一")
+            .unwrap();
         std::thread::sleep(std::time::Duration::from_millis(5));
-        let b = j.begin(JournalKind::ChapterDelete, vec!["b.md".into()], "第二").unwrap();
+        let b = j
+            .begin(JournalKind::ChapterDelete, vec!["b.md".into()], "第二")
+            .unwrap();
 
         let pending = j.pending();
         assert_eq!(pending.len(), 2);
@@ -275,7 +283,8 @@ mod tests {
         let (_d, j) = journal();
         std::fs::create_dir_all(j.dir()).unwrap();
         std::fs::write(j.dir().join("broken.json"), "{ 这不是合法 JSON").unwrap();
-        j.begin(JournalKind::ChapterSave, vec![], "正常记录").unwrap();
+        j.begin(JournalKind::ChapterSave, vec![], "正常记录")
+            .unwrap();
 
         let pending = j.pending();
         assert_eq!(pending.len(), 1);

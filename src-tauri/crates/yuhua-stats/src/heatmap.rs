@@ -183,8 +183,7 @@ pub fn year_heatmap(days: &BTreeMap<NaiveDate, DayRecord>, year: i32) -> Vec<Hea
         .into_iter()
         .enumerate()
         .map(|(offset, words)| {
-            let date = NaiveDate::from_ymd_opt(year, 1, 1)
-                .unwrap_or_default()
+            let date = NaiveDate::from_ymd_opt(year, 1, 1).unwrap_or_default()
                 + Duration::days(offset as i64);
             HeatCell {
                 date,
@@ -221,7 +220,11 @@ pub struct CalendarMonth {
 ///
 /// 补位格子的 in_range 为 false，字数照常给出（用于「上月末那两天也写了」
 /// 这种细节的悬停提示），但前端可以按需淡化。
-pub fn month_calendar(days: &BTreeMap<NaiveDate, DayRecord>, year: i32, month: u32) -> CalendarMonth {
+pub fn month_calendar(
+    days: &BTreeMap<NaiveDate, DayRecord>,
+    year: i32,
+    month: u32,
+) -> CalendarMonth {
     let first = NaiveDate::from_ymd_opt(year, month, 1).unwrap_or_default();
     let next_first = first
         .checked_add_months(chrono::Months::new(1))
@@ -358,7 +361,11 @@ mod tests {
         // 样本全部相同是最坏情况：分位数会算出相同下界
         let scale = build_scale(&[100, 100, 100, 100, 100]);
         for window in scale.thresholds.windows(2) {
-            assert!(window[1] > window[0], "档位下界必须严格递增：{:?}", scale.thresholds);
+            assert!(
+                window[1] > window[0],
+                "档位下界必须严格递增：{:?}",
+                scale.thresholds
+            );
         }
     }
 
@@ -373,10 +380,7 @@ mod tests {
         // 日常量级应当落在中间档，而不是全挤进第 1 档
         let daily = scale.level_of(400);
         assert!(daily >= 1, "400 字不该是 0 档，实际 {daily}");
-        assert!(
-            scale.level_of(10_000) > daily,
-            "爆发日必须比日常日更深色"
-        );
+        assert!(scale.level_of(10_000) > daily, "爆发日必须比日常日更深色");
     }
 
     #[test]
@@ -456,7 +460,11 @@ mod tests {
         assert_eq!(days_in_year(2026), 365);
         assert_eq!(days_in_year(2024), 366);
         assert_eq!(days_in_year(2000), 366, "能被 400 整除的是闰年");
-        assert_eq!(days_in_year(1900), 365, "能被 100 整除但不是 400 的不是闰年");
+        assert_eq!(
+            days_in_year(1900),
+            365,
+            "能被 100 整除但不是 400 的不是闰年"
+        );
     }
 
     #[test]
@@ -508,7 +516,11 @@ mod tests {
         assert_eq!(cal.total_words, 1500);
 
         // 但补位格子里仍然带着真实字数，供悬停提示使用
-        let padding = cal.cells.iter().find(|c| c.date == d(2025, 12, 29)).unwrap();
+        let padding = cal
+            .cells
+            .iter()
+            .find(|c| c.date == d(2025, 12, 29))
+            .unwrap();
         assert_eq!(padding.words, 999);
         assert!(!padding.in_range);
     }

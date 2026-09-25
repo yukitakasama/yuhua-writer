@@ -36,11 +36,11 @@
 //! - 太长（例如 1 小时）会把「上午写一段、下午写一段」合并成一段
 //!   虚假的五小时会话，时长统计直接失真
 
-use chrono::{DateTime, FixedOffset, Duration, NaiveDate};
+use chrono::{DateTime, Duration, FixedOffset, NaiveDate};
 use serde::{Deserialize, Serialize};
 use yuhua_core::{Result, YuhuaError};
 
-use crate::model::{MonthKey, Session, new_session_token};
+use crate::model::{new_session_token, MonthKey, Session};
 use crate::store::StatsStore;
 
 /// 判定会话结束的空闲阈值（秒）。
@@ -132,10 +132,7 @@ impl SessionTracker {
     /// - 已空闲：先结束旧会话并返回它，再由调用方决定是否开新的
     ///
     /// 返回 `(本次活动的会话, 被挤出去的已完成会话)`。
-    pub fn begin(
-        &mut self,
-        now: DateTime<FixedOffset>,
-    ) -> (ActiveSession, Option<Session>) {
+    pub fn begin(&mut self, now: DateTime<FixedOffset>) -> (ActiveSession, Option<Session>) {
         if let Some(current) = self.active.as_ref() {
             if !current.is_idle(now) && !current.is_overlong() {
                 // 会话仍在进行：把它交给调用方，避免同一段写作被切成多段
@@ -243,7 +240,10 @@ pub fn store_session(store: &StatsStore, record: &Session) -> Result<()> {
 /// 取某一天的会话列表（按开始时间升序）。
 pub fn sessions_on(store: &StatsStore, day: NaiveDate) -> Result<Vec<Session>> {
     let stats = store.load(&MonthKey::of(day))?;
-    Ok(stats.day(day).map(|d| d.sessions.clone()).unwrap_or_default())
+    Ok(stats
+        .day(day)
+        .map(|d| d.sessions.clone())
+        .unwrap_or_default())
 }
 
 /// 把一段时长（秒）转成分钟，**向上取整**。
@@ -350,7 +350,10 @@ mod tests {
         tracker.add_words("ch_1", 100, ts(2026, 1, 15, 9, 0));
         tracker.touch(ts(2026, 1, 15, 9, 4));
         assert_eq!(tracker.current().unwrap().words, 100);
-        assert_eq!(tracker.current().unwrap().last_activity, ts(2026, 1, 15, 9, 4));
+        assert_eq!(
+            tracker.current().unwrap().last_activity,
+            ts(2026, 1, 15, 9, 4)
+        );
     }
 
     #[test]
@@ -487,8 +490,14 @@ mod tests {
 
     #[test]
     fn minutes_between_matches_duration() {
-        assert_eq!(minutes_between(ts(2026, 1, 15, 9, 0), ts(2026, 1, 15, 9, 47)), 47);
-        assert_eq!(minutes_between(ts(2026, 1, 15, 9, 0), ts(2026, 1, 15, 9, 0)), 0);
+        assert_eq!(
+            minutes_between(ts(2026, 1, 15, 9, 0), ts(2026, 1, 15, 9, 47)),
+            47
+        );
+        assert_eq!(
+            minutes_between(ts(2026, 1, 15, 9, 0), ts(2026, 1, 15, 9, 0)),
+            0
+        );
     }
 
     #[test]

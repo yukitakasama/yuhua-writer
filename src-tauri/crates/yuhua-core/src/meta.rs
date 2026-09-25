@@ -124,7 +124,10 @@ impl ChapterMeta {
             return Err("章节标题不能为空".to_string());
         }
         if self.title.len() > 200 {
-            return Err(format!("章节标题过长（{} 字符，上限 200）", self.title.len()));
+            return Err(format!(
+                "章节标题过长（{} 字符，上限 200）",
+                self.title.len()
+            ));
         }
         Ok(())
     }
@@ -159,7 +162,10 @@ mod tests {
     fn status_parses_case_insensitively() {
         assert_eq!(ChapterStatus::parse("DRAFT"), Some(ChapterStatus::Draft));
         assert_eq!(ChapterStatus::parse(" Done "), Some(ChapterStatus::Done));
-        assert_eq!(ChapterStatus::parse("revising"), Some(ChapterStatus::Revising));
+        assert_eq!(
+            ChapterStatus::parse("revising"),
+            Some(ChapterStatus::Revising)
+        );
         assert_eq!(ChapterStatus::parse("unknown"), None);
     }
 
@@ -199,7 +205,10 @@ mod tests {
         assert!(m.extra.contains_key("futureFeature"));
 
         let back = serde_json::to_string(&m).unwrap();
-        assert!(back.contains("futureFeature"), "回写时丢失了未知字段：{back}");
+        assert!(
+            back.contains("futureFeature"),
+            "回写时丢失了未知字段：{back}"
+        );
         assert!(back.contains("[1,2,3]"));
     }
 

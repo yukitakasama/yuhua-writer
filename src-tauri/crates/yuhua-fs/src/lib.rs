@@ -41,9 +41,9 @@ pub mod watch;
 pub mod workspace;
 
 pub use atomic::{atomic_write, atomic_write_bytes};
-pub use chapter_io::{ChapterFile, read_chapter, split_front_matter, write_chapter};
-pub use conflict::{DetectedConflict, detect_conflicts, is_conflict_copy};
+pub use chapter_io::{read_chapter, split_front_matter, write_chapter, ChapterFile};
+pub use conflict::{detect_conflicts, is_conflict_copy, DetectedConflict};
 pub use journal::{Journal, JournalEntry};
-pub use layout::{FORMAT_VERSION, WorkspaceLayout};
+pub use layout::{WorkspaceLayout, FORMAT_VERSION};
 pub use trash::{TrashItem, TrashManager};
 pub use workspace::{RecentWorkspace, Workspace, WorkspaceConfig, WorkspaceSummary};

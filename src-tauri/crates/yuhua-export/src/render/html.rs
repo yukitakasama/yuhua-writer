@@ -240,7 +240,11 @@ impl HtmlRenderer {
                     } else {
                         // 不安全或无法解析的图片地址：降级成替代文本，
                         // 至少让读者知道这里原本有图。
-                        let _ = write!(out, "<span class=\"image-fallback\">{}</span>", escape_html(alt));
+                        let _ = write!(
+                            out,
+                            "<span class=\"image-fallback\">{}</span>",
+                            escape_html(alt)
+                        );
                     }
                 }
             }
@@ -384,7 +388,11 @@ impl<'a> Renderer<'a> for HtmlRenderer {
                 escape_html(&document.book.description)
             );
         }
-        let _ = writeln!(out, "<style>\n{}\n</style>\n</head>\n<body>", self.stylesheet());
+        let _ = writeln!(
+            out,
+            "<style>\n{}\n</style>\n</head>\n<body>",
+            self.stylesheet()
+        );
         out.push_str("<main>\n");
         out.push_str(&body);
         out.push_str("</main>\n</body>\n</html>\n");
@@ -435,9 +443,7 @@ pub fn is_safe_url(url: &str) -> bool {
     let scheme = scheme.to_ascii_lowercase();
     match scheme.as_str() {
         "http" | "https" | "mailto" | "tel" => true,
-        "data" => trimmed
-            .to_ascii_lowercase()
-            .starts_with("data:image/"),
+        "data" => trimmed.to_ascii_lowercase().starts_with("data:image/"),
         _ => false,
     }
 }
@@ -706,7 +712,10 @@ mod tests {
         // 计划书要求：正文最大宽度 720px、行高 1.8
         assert!(text.contains("--content-width: 720px"), "{text}");
         assert!(text.contains("line-height: 1.8"), "{text}");
-        assert!(text.contains("@media (max-width: 640px)"), "应含响应式断点：{text}");
+        assert!(
+            text.contains("@media (max-width: 640px)"),
+            "应含响应式断点：{text}"
+        );
         assert!(text.contains("@media print"), "应含打印样式：{text}");
     }
 
@@ -746,11 +755,7 @@ mod tests {
         // 只看 <body> 之后的内容：样式表里本来就有 .volume-title 规则，
         // 拿整份文档数会因为 CSS 而误报。
         let body = text.split("<body>").nth(1).unwrap_or(&text);
-        assert_eq!(
-            body.matches("class=\"volume-title\"").count(),
-            1,
-            "{body}"
-        );
+        assert_eq!(body.matches("class=\"volume-title\"").count(), 1, "{body}");
     }
 
     #[test]

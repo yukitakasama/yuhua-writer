@@ -177,11 +177,7 @@ impl WorkspaceWatcher {
 ///
 /// 特别注意：**不能把 Created 和 Modified 分开报**，
 /// 否则一次同步会给前端发两条重载请求。这里统一用最终事件类型。
-fn debounce_loop(
-    rx: Receiver<notify::Result<Event>>,
-    tx: Sender<FileChange>,
-    root: PathBuf,
-) {
+fn debounce_loop(rx: Receiver<notify::Result<Event>>, tx: Sender<FileChange>, root: PathBuf) {
     // 累积中的改动：路径 → 最终类型
     let mut pending: Vec<(String, ChangeKind)> = Vec::new();
     let mut last_event: Option<Instant> = None;
@@ -274,7 +270,13 @@ fn merge_kind(prev: ChangeKind, next: ChangeKind) -> ChangeKind {
 fn flush(pending: &mut Vec<(String, ChangeKind)>, tx: &Sender<FileChange>) {
     for (relative_path, kind) in pending.drain(..) {
         // 接收端已关闭则停止（应用正在退出）
-        if tx.send(FileChange { relative_path, kind }).is_err() {
+        if tx
+            .send(FileChange {
+                relative_path,
+                kind,
+            })
+            .is_err()
+        {
             return;
         }
     }
@@ -332,7 +334,9 @@ mod tests {
 
     #[test]
     fn relevant_paths_are_markdown_in_manuscript() {
-        assert!(WorkspaceWatcher::is_relevant("manuscript/001/001-第一章.md"));
+        assert!(WorkspaceWatcher::is_relevant(
+            "manuscript/001/001-第一章.md"
+        ));
         assert!(WorkspaceWatcher::is_relevant("manuscript/a.md"));
     }
 
@@ -355,51 +359,86 @@ mod tests {
     #[test]
     fn temp_files_are_ignored() {
         // 原子写自己的临时文件不能触发外部改动提示
-        assert!(!WorkspaceWatcher::is_relevant("manuscript/001.md.tmp-abcdef12"));
-        assert!(!WorkspaceWatcher::is_relevant("manuscript/a.md.tmp-12345678"));
+        assert!(!WorkspaceWatcher::is_relevant(
+            "manuscript/001.md.tmp-abcdef12"
+        ));
+        assert!(!WorkspaceWatcher::is_relevant(
+            "manuscript/a.md.tmp-12345678"
+        ));
     }
 
     #[test]
     fn merge_keeps_created_for_new_file_double_event() {
         // fs::write 新建文件会先 Create 再 Modify，必须仍报 Created
-        assert_eq!(merge_kind(ChangeKind::Created, ChangeKind::Modified), ChangeKind::Created);
+        assert_eq!(
+            merge_kind(ChangeKind::Created, ChangeKind::Modified),
+            ChangeKind::Created
+        );
     }
 
     #[test]
     fn merge_prefers_renamed_over_everything() {
-        assert_eq!(merge_kind(ChangeKind::Created, ChangeKind::Renamed), ChangeKind::Renamed);
-        assert_eq!(merge_kind(ChangeKind::Modified, ChangeKind::Renamed), ChangeKind::Renamed);
+        assert_eq!(
+            merge_kind(ChangeKind::Created, ChangeKind::Renamed),
+            ChangeKind::Renamed
+        );
+        assert_eq!(
+            merge_kind(ChangeKind::Modified, ChangeKind::Renamed),
+            ChangeKind::Renamed
+        );
     }
 
     #[test]
     fn merge_reports_removed_when_file_created_then_deleted() {
-        assert_eq!(merge_kind(ChangeKind::Created, ChangeKind::Removed), ChangeKind::Removed);
+        assert_eq!(
+            merge_kind(ChangeKind::Created, ChangeKind::Removed),
+            ChangeKind::Removed
+        );
     }
 
     #[test]
     fn merge_takes_latest_for_plain_modifications() {
-        assert_eq!(merge_kind(ChangeKind::Modified, ChangeKind::Modified), ChangeKind::Modified);
-        assert_eq!(merge_kind(ChangeKind::Removed, ChangeKind::Modified), ChangeKind::Modified);
+        assert_eq!(
+            merge_kind(ChangeKind::Modified, ChangeKind::Modified),
+            ChangeKind::Modified
+        );
+        assert_eq!(
+            merge_kind(ChangeKind::Removed, ChangeKind::Modified),
+            ChangeKind::Modified
+        );
     }
 
     #[test]
     fn classify_maps_common_event_kinds() {
         use notify::event::{CreateKind, ModifyKind, RemoveKind};
-        assert_eq!(classify(&EventKind::Create(CreateKind::File)), Some(ChangeKind::Created));
         assert_eq!(
-            classify(&EventKind::Modify(ModifyKind::Data(notify::event::DataChange::Content))),
+            classify(&EventKind::Create(CreateKind::File)),
+            Some(ChangeKind::Created)
+        );
+        assert_eq!(
+            classify(&EventKind::Modify(ModifyKind::Data(
+                notify::event::DataChange::Content
+            ))),
             Some(ChangeKind::Modified)
         );
         assert_eq!(
-            classify(&EventKind::Modify(ModifyKind::Name(notify::event::RenameMode::Both))),
+            classify(&EventKind::Modify(ModifyKind::Name(
+                notify::event::RenameMode::Both
+            ))),
             Some(ChangeKind::Renamed)
         );
-        assert_eq!(classify(&EventKind::Remove(RemoveKind::File)), Some(ChangeKind::Removed));
+        assert_eq!(
+            classify(&EventKind::Remove(RemoveKind::File)),
+            Some(ChangeKind::Removed)
+        );
     }
 
     #[test]
     fn classify_ignores_access_events() {
-        assert_eq!(classify(&EventKind::Access(notify::event::AccessKind::Read)), None);
+        assert_eq!(
+            classify(&EventKind::Access(notify::event::AccessKind::Read)),
+            None
+        );
     }
 
     #[test]

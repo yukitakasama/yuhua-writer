@@ -447,8 +447,7 @@ mod tests {
         // 契约测试：查询串产生的每个 token，都必须在
         // 「正文分词结果的 token 集合」里存在，否则检索必然落空。
         let body = "羽化写作是一款中文长篇小说创作软件";
-        let indexed: std::collections::HashSet<String> =
-            bigram_tokens(body).into_iter().collect();
+        let indexed: std::collections::HashSet<String> = bigram_tokens(body).into_iter().collect();
         for probe in ["羽化", "写作", "小说", "创作", "软件", "中文", "羽化写作"] {
             for tok in query_tokens(probe) {
                 assert!(

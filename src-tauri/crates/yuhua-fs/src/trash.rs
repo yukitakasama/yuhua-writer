@@ -208,10 +208,12 @@ impl TrashManager {
     /// 若目标位置已被占用，**拒绝恢复并报错**，不覆盖现有文件。
     /// 这是刻意的：宁可让用户手动处理，也不能悄悄吃掉现在的内容。
     pub fn restore(&self, trash_dir_name: &str) -> Result<PathBuf> {
-        let item = self.find(trash_dir_name).ok_or_else(|| YuhuaError::NotFound {
-            kind: "trash item",
-            id: trash_dir_name.to_string(),
-        })?;
+        let item = self
+            .find(trash_dir_name)
+            .ok_or_else(|| YuhuaError::NotFound {
+                kind: "trash item",
+                id: trash_dir_name.to_string(),
+            })?;
 
         let target = self.layout.resolve(&item.entry.original_path)?;
         if target.exists() {
@@ -244,10 +246,12 @@ impl TrashManager {
 
     /// 永久删除一个条目（**不可恢复**）。
     pub fn purge(&self, trash_dir_name: &str) -> Result<()> {
-        let item = self.find(trash_dir_name).ok_or_else(|| YuhuaError::NotFound {
-            kind: "trash item",
-            id: trash_dir_name.to_string(),
-        })?;
+        let item = self
+            .find(trash_dir_name)
+            .ok_or_else(|| YuhuaError::NotFound {
+                kind: "trash item",
+                id: trash_dir_name.to_string(),
+            })?;
         std::fs::remove_dir_all(&item.dir).map_err(|e| YuhuaError::io(&item.dir, e))?;
         Ok(())
     }
@@ -385,13 +389,21 @@ mod tests {
         write_chapter(dir.path(), "manuscript/001/001-第一章.md", "正文");
 
         let item = tm
-            .move_to_trash("manuscript/001/001-第一章.md", "第一章", "ch_abc", "chapter")
+            .move_to_trash(
+                "manuscript/001/001-第一章.md",
+                "第一章",
+                "ch_abc",
+                "chapter",
+            )
             .unwrap();
 
         // 原文件必须已被移走
         assert!(!dir.path().join("manuscript/001/001-第一章.md").exists());
         // 内容必须在回收站里完好
-        assert_eq!(std::fs::read_to_string(item.content_path()).unwrap(), "正文");
+        assert_eq!(
+            std::fs::read_to_string(item.content_path()).unwrap(),
+            "正文"
+        );
         assert_eq!(item.entry.original_path, "manuscript/001/001-第一章.md");
         assert_eq!(item.entry.kind, "chapter");
     }
@@ -416,7 +428,12 @@ mod tests {
         write_chapter(dir.path(), "manuscript/001/001-第一章.md", "正文");
 
         let item = tm
-            .move_to_trash("manuscript/001/001-第一章.md", "第一章", "ch_abc", "chapter")
+            .move_to_trash(
+                "manuscript/001/001-第一章.md",
+                "第一章",
+                "ch_abc",
+                "chapter",
+            )
             .unwrap();
         let name = item.entry.trash_dir_name.clone();
 
@@ -441,7 +458,10 @@ mod tests {
         assert_eq!(err.code(), "INVALID_INPUT");
         assert!(err.to_string().contains("已被占用"));
         // 新文件绝不能被覆盖
-        assert_eq!(std::fs::read_to_string(dir.path().join("a.md")).unwrap(), "新写的内容");
+        assert_eq!(
+            std::fs::read_to_string(dir.path().join("a.md")).unwrap(),
+            "新写的内容"
+        );
     }
 
     #[test]
@@ -449,7 +469,9 @@ mod tests {
         // 原卷被删掉后再恢复章节，父目录要自动重建
         let (dir, tm) = setup();
         write_chapter(dir.path(), "manuscript/001/001-第一章.md", "正文");
-        let item = tm.move_to_trash("manuscript/001/001-第一章.md", "第一章", "ch_a", "chapter").unwrap();
+        let item = tm
+            .move_to_trash("manuscript/001/001-第一章.md", "第一章", "ch_a", "chapter")
+            .unwrap();
         std::fs::remove_dir_all(dir.path().join("manuscript")).unwrap();
 
         tm.restore(&item.entry.trash_dir_name).unwrap();
@@ -484,7 +506,8 @@ mod tests {
 
         tm.restore(&item.entry.trash_dir_name).unwrap();
         assert_eq!(
-            std::fs::read_to_string(dir.path().join("manuscript/001-第一卷/001-第一章.md")).unwrap(),
+            std::fs::read_to_string(dir.path().join("manuscript/001-第一卷/001-第一章.md"))
+                .unwrap(),
             "一"
         );
     }
@@ -492,14 +515,18 @@ mod tests {
     #[test]
     fn missing_source_is_rejected() {
         let (_dir, tm) = setup();
-        let err = tm.move_to_trash("nope.md", "X", "ch_x", "chapter").unwrap_err();
+        let err = tm
+            .move_to_trash("nope.md", "X", "ch_x", "chapter")
+            .unwrap_err();
         assert_eq!(err.code(), "NOT_FOUND");
     }
 
     #[test]
     fn path_escaping_workspace_is_rejected() {
         let (_dir, tm) = setup();
-        assert!(tm.move_to_trash("../../secret.txt", "X", "ch_x", "chapter").is_err());
+        assert!(tm
+            .move_to_trash("../../secret.txt", "X", "ch_x", "chapter")
+            .is_err());
     }
 
     #[test]
@@ -563,7 +590,9 @@ mod tests {
         // 用户可以直接打开 .trash 下的 entry.json 看懂发生了什么
         let (dir, tm) = setup();
         write_chapter(dir.path(), "a.md", "A");
-        let item = tm.move_to_trash("a.md", "章节标题", "ch_abc", "chapter").unwrap();
+        let item = tm
+            .move_to_trash("a.md", "章节标题", "ch_abc", "chapter")
+            .unwrap();
 
         let text = std::fs::read_to_string(item.dir.join(ENTRY_FILE)).unwrap();
         let v: serde_json::Value = serde_json::from_str(&text).unwrap();
@@ -585,8 +614,14 @@ mod tests {
         assert_ne!(first.dir, second.dir, "两次删除不能落到同一个目录");
         assert_eq!(tm.list().len(), 2);
         // 两份内容都要能读到
-        assert_eq!(std::fs::read_to_string(first.content_path()).unwrap(), "第一次");
-        assert_eq!(std::fs::read_to_string(second.content_path()).unwrap(), "第二次");
+        assert_eq!(
+            std::fs::read_to_string(first.content_path()).unwrap(),
+            "第一次"
+        );
+        assert_eq!(
+            std::fs::read_to_string(second.content_path()).unwrap(),
+            "第二次"
+        );
     }
 
     #[test]

@@ -215,7 +215,9 @@ impl BackupManager {
     /// 某源文件对应的快照目录（与源文件同层级，便于人肉排查）。
     fn snapshot_dir_for(&self, relative_path: &str) -> PathBuf {
         match relative_path.rsplit_once('/') {
-            Some((parent, _)) => self.dir.join(parent.replace('/', std::path::MAIN_SEPARATOR_STR)),
+            Some((parent, _)) => self
+                .dir
+                .join(parent.replace('/', std::path::MAIN_SEPARATOR_STR)),
             None => self.dir.clone(),
         }
     }
@@ -283,7 +285,9 @@ mod tests {
     #[test]
     fn first_snapshot_is_created() {
         let (_d, bm, src) = setup();
-        let out = bm.snapshot_if_due(&src, REL, at(2026, 1, 1, 9, 0, 0)).unwrap();
+        let out = bm
+            .snapshot_if_due(&src, REL, at(2026, 1, 1, 9, 0, 0))
+            .unwrap();
         match out {
             SnapshotOutcome::Created { path, pruned } => {
                 assert!(path.exists());
@@ -297,11 +301,14 @@ mod tests {
     #[test]
     fn second_snapshot_within_interval_is_skipped() {
         let (_d, bm, src) = setup();
-        bm.snapshot_if_due(&src, REL, at(2026, 1, 1, 9, 0, 0)).unwrap();
+        bm.snapshot_if_due(&src, REL, at(2026, 1, 1, 9, 0, 0))
+            .unwrap();
         std::fs::write(&src, "改了内容").unwrap();
 
         // 1 分钟后：太近，跳过
-        let out = bm.snapshot_if_due(&src, REL, at(2026, 1, 1, 9, 1, 0)).unwrap();
+        let out = bm
+            .snapshot_if_due(&src, REL, at(2026, 1, 1, 9, 1, 0))
+            .unwrap();
         match out {
             SnapshotOutcome::SkippedTooSoon { wait_secs } => {
                 assert_eq!(wait_secs, MIN_SNAPSHOT_INTERVAL_SECS - 60);
@@ -314,10 +321,13 @@ mod tests {
     #[test]
     fn snapshot_after_interval_is_created() {
         let (_d, bm, src) = setup();
-        bm.snapshot_if_due(&src, REL, at(2026, 1, 1, 9, 0, 0)).unwrap();
+        bm.snapshot_if_due(&src, REL, at(2026, 1, 1, 9, 0, 0))
+            .unwrap();
         std::fs::write(&src, "十分钟后的内容").unwrap();
 
-        let out = bm.snapshot_if_due(&src, REL, at(2026, 1, 1, 9, 10, 0)).unwrap();
+        let out = bm
+            .snapshot_if_due(&src, REL, at(2026, 1, 1, 9, 10, 0))
+            .unwrap();
         assert!(matches!(out, SnapshotOutcome::Created { .. }));
         assert_eq!(bm.snapshots_of(REL).len(), 2);
     }
@@ -326,8 +336,11 @@ mod tests {
     fn identical_content_is_not_snapshotted_again() {
         // 用户反复保存但内容没变（例如只移动了光标）：不应堆积重复快照
         let (_d, bm, src) = setup();
-        bm.snapshot_if_due(&src, REL, at(2026, 1, 1, 9, 0, 0)).unwrap();
-        let out = bm.snapshot_if_due(&src, REL, at(2026, 1, 1, 10, 0, 0)).unwrap();
+        bm.snapshot_if_due(&src, REL, at(2026, 1, 1, 9, 0, 0))
+            .unwrap();
+        let out = bm
+            .snapshot_if_due(&src, REL, at(2026, 1, 1, 10, 0, 0))
+            .unwrap();
         assert!(matches!(out, SnapshotOutcome::SkippedNoSource));
         assert_eq!(bm.snapshots_of(REL).len(), 1);
     }
@@ -336,7 +349,9 @@ mod tests {
     fn missing_source_is_skipped() {
         let (_d, bm, _src) = setup();
         let missing = _d.path().join("nope.md");
-        let out = bm.snapshot_if_due(&missing, "nope.md", at(2026, 1, 1, 9, 0, 0)).unwrap();
+        let out = bm
+            .snapshot_if_due(&missing, "nope.md", at(2026, 1, 1, 9, 0, 0))
+            .unwrap();
         assert!(matches!(out, SnapshotOutcome::SkippedNoSource));
     }
 
@@ -345,7 +360,9 @@ mod tests {
         // 新建的空章节没有内容值得备份
         let (_d, bm, src) = setup();
         std::fs::write(&src, "").unwrap();
-        let out = bm.snapshot_if_due(&src, REL, at(2026, 1, 1, 9, 0, 0)).unwrap();
+        let out = bm
+            .snapshot_if_due(&src, REL, at(2026, 1, 1, 9, 0, 0))
+            .unwrap();
         assert!(matches!(out, SnapshotOutcome::SkippedNoSource));
     }
 
@@ -371,8 +388,12 @@ mod tests {
         let (_d, bm, src) = setup();
         for i in 0..3 {
             std::fs::write(&src, format!("v{i}")).unwrap();
-            bm.snapshot_if_due(&src, REL, at(2026, 1, 1, 9, 0, 0) + chrono::Duration::minutes(i * 10))
-                .unwrap();
+            bm.snapshot_if_due(
+                &src,
+                REL,
+                at(2026, 1, 1, 9, 0, 0) + chrono::Duration::minutes(i * 10),
+            )
+            .unwrap();
         }
         let snaps = bm.snapshots_of(REL);
         let contents: Vec<String> = snaps
@@ -385,12 +406,14 @@ mod tests {
     #[test]
     fn different_chapters_do_not_share_snapshots() {
         let (d, bm, src) = setup();
-        bm.snapshot_if_due(&src, REL, at(2026, 1, 1, 9, 0, 0)).unwrap();
+        bm.snapshot_if_due(&src, REL, at(2026, 1, 1, 9, 0, 0))
+            .unwrap();
 
         let other = d.path().join("manuscript/001-第一卷/002-第二章.md");
         std::fs::write(&other, "第二章内容").unwrap();
         const REL2: &str = "manuscript/001-第一卷/002-第二章.md";
-        bm.snapshot_if_due(&other, REL2, at(2026, 1, 1, 9, 0, 0)).unwrap();
+        bm.snapshot_if_due(&other, REL2, at(2026, 1, 1, 9, 0, 0))
+            .unwrap();
 
         assert_eq!(bm.snapshots_of(REL).len(), 1);
         assert_eq!(bm.snapshots_of(REL2).len(), 1);
@@ -409,10 +432,18 @@ mod tests {
         std::fs::write(&a, "卷一第一章").unwrap();
         std::fs::write(&b, "卷二第一章").unwrap();
 
-        bm.snapshot_if_due(&a, "manuscript/001-第一卷/001-第一章.md", at(2026, 1, 1, 9, 0, 0))
-            .unwrap();
-        bm.snapshot_if_due(&b, "manuscript/002-第二卷/001-第一章.md", at(2026, 1, 1, 9, 0, 0))
-            .unwrap();
+        bm.snapshot_if_due(
+            &a,
+            "manuscript/001-第一卷/001-第一章.md",
+            at(2026, 1, 1, 9, 0, 0),
+        )
+        .unwrap();
+        bm.snapshot_if_due(
+            &b,
+            "manuscript/002-第二卷/001-第一章.md",
+            at(2026, 1, 1, 9, 0, 0),
+        )
+        .unwrap();
 
         let sa = bm.snapshots_of("manuscript/001-第一卷/001-第一章.md");
         let sb = bm.snapshots_of("manuscript/002-第二卷/001-第一章.md");
@@ -427,14 +458,18 @@ mod tests {
         let ts = at(2026, 3, 15, 14, 30, 45);
         let name = format!("第一章{SEP}20260315-143045{SUFFIX}");
         let parsed = parse_timestamp_from_name(Path::new(&name)).unwrap();
-        assert_eq!(parsed.format("%Y-%m-%d %H:%M:%S").to_string(), "2026-03-15 14:30:45");
+        assert_eq!(
+            parsed.format("%Y-%m-%d %H:%M:%S").to_string(),
+            "2026-03-15 14:30:45"
+        );
         let _ = ts;
     }
 
     #[test]
     fn prune_empty_dirs_removes_only_empty() {
         let (d, bm, src) = setup();
-        bm.snapshot_if_due(&src, REL, at(2026, 1, 1, 9, 0, 0)).unwrap();
+        bm.snapshot_if_due(&src, REL, at(2026, 1, 1, 9, 0, 0))
+            .unwrap();
         // 造一个空目录
         let empty = bm.dir().join("manuscript/999-空卷");
         std::fs::create_dir_all(&empty).unwrap();

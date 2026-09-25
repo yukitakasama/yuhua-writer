@@ -115,7 +115,9 @@ impl DocxRenderer {
         // （1440 twips = 1 英寸；A4 宽 11906 高 16838 twips）
         let mut out = String::new();
         out.push_str(XML_DECLARATION);
-        out.push_str("<w:document xmlns:w=\"http://schemas.openxmlformats.org/wordprocessingml/2006/main\">");
+        out.push_str(
+            "<w:document xmlns:w=\"http://schemas.openxmlformats.org/wordprocessingml/2006/main\">",
+        );
         out.push_str("<w:body>");
         out.push_str(&body);
         out.push_str(
@@ -161,10 +163,8 @@ impl DocxRenderer {
                 self.render_blocks(children, &mut inner);
                 // 样式层面上 Quote 已带缩进与斜体；这里再包一层 `w:pStyle`。
                 // inner 里的每个 <w:p> 都要替换，所以用字符串替换而不是拼接。
-                let quoted = inner.replace(
-                    "<w:p>",
-                    "<w:p><w:pPr><w:pStyle w:val=\"Quote\"/></w:pPr>",
-                );
+                let quoted =
+                    inner.replace("<w:p>", "<w:p><w:pPr><w:pStyle w:val=\"Quote\"/></w:pPr>");
                 out.push_str(&quoted);
             }
             Block::List {
@@ -254,7 +254,9 @@ impl DocxRenderer {
             match inline {
                 Inline::Text(t) => out.push_str(&self.run(t, "")),
                 Inline::Code(t) => {
-                    out.push_str(&self.run(t, "<w:rFonts w:ascii=\"Consolas\" w:hAnsi=\"Consolas\"/>"));
+                    out.push_str(
+                        &self.run(t, "<w:rFonts w:ascii=\"Consolas\" w:hAnsi=\"Consolas\"/>"),
+                    );
                 }
                 Inline::Strong(children) => {
                     let inner = self.render_inlines_with_props(children, "<w:b/>");
@@ -333,7 +335,9 @@ impl DocxRenderer {
     /// 生成 `[Content_Types].xml`。
     fn content_types_xml(&self) -> String {
         let mut out = String::from(XML_DECLARATION);
-        out.push_str("<Types xmlns=\"http://schemas.openxmlformats.org/package/2006/content-types\">");
+        out.push_str(
+            "<Types xmlns=\"http://schemas.openxmlformats.org/package/2006/content-types\">",
+        );
         out.push_str("<Default Extension=\"rels\" ContentType=\"application/vnd.openxmlformats-package.relationships+xml\"/>");
         out.push_str("<Default Extension=\"xml\" ContentType=\"application/xml\"/>");
         out.push_str("<Override PartName=\"/word/document.xml\" ContentType=\"application/vnd.openxmlformats-officedocument.wordprocessingml.document.main+xml\"/>");
@@ -351,7 +355,9 @@ impl DocxRenderer {
     fn styles_xml(&self) -> String {
         let size = self.options.body_size_half_points;
         let mut out = String::from(XML_DECLARATION);
-        out.push_str("<w:styles xmlns:w=\"http://schemas.openxmlformats.org/wordprocessingml/2006/main\">");
+        out.push_str(
+            "<w:styles xmlns:w=\"http://schemas.openxmlformats.org/wordprocessingml/2006/main\">",
+        );
 
         // docDefaults：整份文档的兜底字体与字号
         let _ = write!(
@@ -576,7 +582,8 @@ mod tests {
 
     /// 把产物解压成「条目名 → 文本」。
     fn unzip(bytes: &[u8]) -> HashMap<String, String> {
-        let mut archive = zip::ZipArchive::new(Cursor::new(bytes.to_vec())).expect("产物必须是合法 zip");
+        let mut archive =
+            zip::ZipArchive::new(Cursor::new(bytes.to_vec())).expect("产物必须是合法 zip");
         let mut map = HashMap::new();
         for index in 0..archive.len() {
             let mut entry = archive.by_index(index).unwrap();
@@ -605,7 +612,11 @@ mod tests {
             "docProps/core.xml",
             "docProps/app.xml",
         ] {
-            assert!(parts.contains_key(name), "缺少部件 {name}，实际有 {:?}", parts.keys());
+            assert!(
+                parts.contains_key(name),
+                "缺少部件 {name}，实际有 {:?}",
+                parts.keys()
+            );
         }
     }
 
@@ -725,7 +736,10 @@ mod tests {
             "a < b & c > d \"引用\"",
         )])]));
         let document = &parts["word/document.xml"];
-        assert!(document.contains("a &lt; b &amp; c &gt; d &quot;引用&quot;"), "{document}");
+        assert!(
+            document.contains("a &lt; b &amp; c &gt; d &quot;引用&quot;"),
+            "{document}"
+        );
         assert!(!document.contains("a < b"), "{document}");
     }
 
@@ -735,16 +749,17 @@ mod tests {
             "</w:t></w:r><w:r><w:t>注入",
         )])]));
         let document = &parts["word/document.xml"];
-        assert!(!document.contains("</w:t></w:r><w:r><w:t>注入"), "{document}");
+        assert!(
+            !document.contains("</w:t></w:r><w:r><w:t>注入"),
+            "{document}"
+        );
         assert!(document.contains("&lt;/w:t&gt;"), "{document}");
     }
 
     #[test]
     fn illegal_control_characters_are_dropped() {
         // XML 1.0 不允许 \u{0}，留着会让 Word 报「文件已损坏」
-        let doc = doc_with(vec![Block::Paragraph(vec![Inline::text(
-            "前\u{0}后",
-        )])]);
+        let doc = doc_with(vec![Block::Paragraph(vec![Inline::text("前\u{0}后")])]);
         let parts = render_to_strings(&doc);
         let document = &parts["word/document.xml"];
         assert!(document.contains("前后"), "{document}");
@@ -766,9 +781,9 @@ mod tests {
 
     #[test]
     fn quote_uses_quote_style() {
-        let parts = render_to_strings(&doc_with(vec![Block::Quote(vec![Block::Paragraph(
-            vec![Inline::text("引用")],
-        )])]));
+        let parts = render_to_strings(&doc_with(vec![Block::Quote(vec![Block::Paragraph(vec![
+            Inline::text("引用"),
+        ])])]));
         let document = &parts["word/document.xml"];
         assert!(document.contains("w:val=\"Quote\""), "{document}");
     }
@@ -906,10 +921,7 @@ mod tests {
 
     #[test]
     fn escape_xml_handles_all_five_entities() {
-        assert_eq!(
-            escape_xml("&<>\"'"),
-            "&amp;&lt;&gt;&quot;&apos;"
-        );
+        assert_eq!(escape_xml("&<>\"'"), "&amp;&lt;&gt;&quot;&apos;");
     }
 
     #[test]

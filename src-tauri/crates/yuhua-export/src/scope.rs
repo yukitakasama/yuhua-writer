@@ -354,7 +354,10 @@ mod tests {
         let ir = assemble(&doc, &ExportScope::Volume(volumes[1].clone())).unwrap();
         assert_eq!(ir.chapter_count(), 2);
         assert_eq!(ir.volumes.len(), 1);
-        assert!(ir.chapters.iter().all(|c| c.title.contains('3') || c.title.contains('4')));
+        assert!(ir
+            .chapters
+            .iter()
+            .all(|c| c.title.contains('3') || c.title.contains('4')));
     }
 
     #[test]
@@ -402,8 +405,8 @@ mod tests {
             }
         }
 
-        let err = assemble_with(&doc, &Empty, &ExportScope::Single(chapters[0].clone()))
-            .unwrap_err();
+        let err =
+            assemble_with(&doc, &Empty, &ExportScope::Single(chapters[0].clone())).unwrap_err();
         assert!(err.to_string().contains("正文不存在"), "{err}");
     }
 
@@ -442,7 +445,10 @@ mod tests {
         let (doc, volumes, chapters) = sample();
         let _ = doc;
         assert_eq!(ExportScope::Whole.describe(), "整书");
-        assert_eq!(ExportScope::Single(chapters[0].clone()).describe(), "当前章");
+        assert_eq!(
+            ExportScope::Single(chapters[0].clone()).describe(),
+            "当前章"
+        );
         assert_eq!(ExportScope::Volume(volumes[0].clone()).describe(), "整卷");
         assert_eq!(
             ExportScope::Selected(chapters.clone()).describe(),
@@ -454,15 +460,15 @@ mod tests {
     fn helper_constructors_build_expected_variants() {
         let (doc, volumes, chapters) = sample();
         assert_eq!(whole_book(), ExportScope::Whole);
-        assert_eq!(volume(volumes[0].clone()), ExportScope::Volume(volumes[0].clone()));
+        assert_eq!(
+            volume(volumes[0].clone()),
+            ExportScope::Volume(volumes[0].clone())
+        );
         assert_eq!(
             single_chapter(chapters[0].clone()),
             ExportScope::Single(chapters[0].clone())
         );
-        assert_eq!(
-            selected(chapters.clone()),
-            ExportScope::Selected(chapters)
-        );
+        assert_eq!(selected(chapters.clone()), ExportScope::Selected(chapters));
         assert_eq!(book_id(&doc), doc.book.id);
     }
 

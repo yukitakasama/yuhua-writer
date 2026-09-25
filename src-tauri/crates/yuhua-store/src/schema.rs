@@ -244,7 +244,10 @@ mod tests {
             .filter_map(|r| r.ok())
             .collect();
         for expected in ["books", "chapters", "volumes"] {
-            assert!(names.iter().any(|n| n == expected), "缺少表 {expected}，实际 {names:?}");
+            assert!(
+                names.iter().any(|n| n == expected),
+                "缺少表 {expected}，实际 {names:?}"
+            );
         }
         // FTS5 虚拟表会额外创建若干影子表
         assert!(

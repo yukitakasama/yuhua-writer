@@ -417,7 +417,9 @@ pub fn read_chapter(path: &Path) -> Result<ChapterFile> {
             match s.split_once('-') {
                 // 只有前缀看起来确实是纯数字序号时才剥离，
                 // 否则「第一卷-风起」这种正常标题会被误切
-                Some((prefix, rest)) if !prefix.is_empty() && prefix.chars().all(|c| c.is_ascii_digit()) => {
+                Some((prefix, rest))
+                    if !prefix.is_empty() && prefix.chars().all(|c| c.is_ascii_digit()) =>
+                {
                     rest.to_string()
                 }
                 _ => s,
@@ -629,7 +631,11 @@ mod tests {
     #[test]
     fn parse_rejects_id_with_wrong_prefix() {
         // 用户误把卷 ID 粘进来：应当忽略并生成新的章节 ID，而不是带着错误 ID 走
-        let m = parse_meta("id: vol_0192f3a4b5c6d7e8f9a0b1c2d3e4f5a6\ntitle: x", "回退", ts());
+        let m = parse_meta(
+            "id: vol_0192f3a4b5c6d7e8f9a0b1c2d3e4f5a6\ntitle: x",
+            "回退",
+            ts(),
+        );
         assert!(m.id.as_str().starts_with("ch_"));
     }
 
@@ -656,11 +662,7 @@ mod tests {
 
     #[test]
     fn parse_handles_nested_unknown_values() {
-        let m = parse_meta(
-            "title: x\nnested: {\"a\": 1}",
-            "回退",
-            ts(),
-        );
+        let m = parse_meta("title: x\nnested: {\"a\": 1}", "回退", ts());
         assert!(m.extra.contains_key("nested"));
     }
 

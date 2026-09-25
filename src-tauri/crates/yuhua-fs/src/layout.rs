@@ -91,7 +91,10 @@ impl WorkspaceLayout {
             .root
             .canonicalize()
             .unwrap_or_else(|_| self.root.clone());
-        let normalized = canonical.to_string_lossy().replace('\\', "/").to_lowercase();
+        let normalized = canonical
+            .to_string_lossy()
+            .replace('\\', "/")
+            .to_lowercase();
         let hash = blake3::hash(normalized.as_bytes());
         hash.to_hex()[..16].to_string()
     }
@@ -162,7 +165,10 @@ impl WorkspaceLayout {
     pub fn index_db_path(&self) -> PathBuf {
         match dirs_index_base() {
             Some(base) => base.join(format!("{}.sqlite", self.workspace_id())),
-            None => self.engine_dir().join("index").join(format!("{}.sqlite", self.workspace_id())),
+            None => self
+                .engine_dir()
+                .join("index")
+                .join(format!("{}.sqlite", self.workspace_id())),
         }
     }
 
@@ -290,7 +296,8 @@ fn normalize_relative(relative: &str) -> Result<String> {
 
     // 显式挡住 Windows 盘符与 UNC，即使 Path 解析在别的平台上行为不同
     let bytes = relative.as_bytes();
-    let has_drive_prefix = bytes.len() >= 2 && bytes[1] == b':' && (bytes[0] as char).is_ascii_alphabetic();
+    let has_drive_prefix =
+        bytes.len() >= 2 && bytes[1] == b':' && (bytes[0] as char).is_ascii_alphabetic();
     if has_drive_prefix || relative.starts_with("\\\\") {
         return Err(YuhuaError::InvalidInput(format!(
             "不接受绝对路径：{relative}"
@@ -322,7 +329,9 @@ fn normalize_relative(relative: &str) -> Result<String> {
     }
 
     if segments.is_empty() {
-        return Err(YuhuaError::InvalidInput(format!("路径无有效内容：{relative}")));
+        return Err(YuhuaError::InvalidInput(format!(
+            "路径无有效内容：{relative}"
+        )));
     }
 
     Ok(segments.join("/"))
@@ -380,7 +389,10 @@ mod tests {
     #[test]
     fn config_lives_in_engine_dir() {
         let l = WorkspaceLayout::new("D:/ws");
-        assert_eq!(l.config_path(), PathBuf::from("D:/ws/.yuhua/workspace.json"));
+        assert_eq!(
+            l.config_path(),
+            PathBuf::from("D:/ws/.yuhua/workspace.json")
+        );
     }
 
     #[test]
@@ -535,7 +547,10 @@ mod tests {
 
     #[test]
     fn sanitize_replaces_windows_illegal_chars() {
-        assert_eq!(sanitize_file_name("第一章：落羽"), "第一章：落羽".replace(':', "："));
+        assert_eq!(
+            sanitize_file_name("第一章：落羽"),
+            "第一章：落羽".replace(':', "：")
+        );
         assert_eq!(sanitize_file_name("a/b"), "a／b");
         assert_eq!(sanitize_file_name("a?b"), "a？b");
         assert_eq!(sanitize_file_name("a*b"), "a＊b");

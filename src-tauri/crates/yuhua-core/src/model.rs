@@ -94,7 +94,12 @@ pub struct Volume {
 
 impl Volume {
     /// 新建一卷。
-    pub fn new(book_id: &BookId, title: impl Into<String>, sort: i32, now: DateTime<FixedOffset>) -> Self {
+    pub fn new(
+        book_id: &BookId,
+        title: impl Into<String>,
+        sort: i32,
+        now: DateTime<FixedOffset>,
+    ) -> Self {
         Self {
             id: VolumeId::new(),
             book_id: book_id.clone(),
@@ -475,7 +480,14 @@ mod tests {
     fn doc_with_one_chapter() -> (Document, VolumeId) {
         let mut d = Document::new("测试书", now());
         let vid = d.volumes[0].id.clone();
-        let ch = Chapter::new(&d.book.id, &vid, "第一章", "manuscript/001/001-第一章.md", 0, now());
+        let ch = Chapter::new(
+            &d.book.id,
+            &vid,
+            "第一章",
+            "manuscript/001/001-第一章.md",
+            0,
+            now(),
+        );
         d.chapters.push(ch);
         (d, vid)
     }
@@ -539,7 +551,14 @@ mod tests {
     #[test]
     fn duplicate_chapter_path_is_rejected() {
         let (mut d, vid) = doc_with_one_chapter();
-        let mut second = Chapter::new(&d.book.id, &vid, "第二章", "manuscript/001/001-第一章.md", 1, now());
+        let mut second = Chapter::new(
+            &d.book.id,
+            &vid,
+            "第二章",
+            "manuscript/001/001-第一章.md",
+            1,
+            now(),
+        );
         second.meta.id = ChapterId::new();
         d.chapters.push(second);
         assert!(d.validate().unwrap_err().to_string().contains("路径重复"));
@@ -563,7 +582,14 @@ mod tests {
     #[test]
     fn duplicate_sort_within_volume_is_rejected() {
         let (mut d, vid) = doc_with_one_chapter();
-        let second = Chapter::new(&d.book.id, &vid, "第二章", "manuscript/001/002.md", 0, now());
+        let second = Chapter::new(
+            &d.book.id,
+            &vid,
+            "第二章",
+            "manuscript/001/002.md",
+            0,
+            now(),
+        );
         d.chapters.push(second);
         let err = d.validate().unwrap_err().to_string();
         assert!(err.contains("排序号"), "got {err}");
@@ -576,7 +602,14 @@ mod tests {
         let vol2 = Volume::new(&d.book.id, "第二卷", 1, now());
         let vid2 = vol2.id.clone();
         d.volumes.push(vol2);
-        d.chapters.push(Chapter::new(&d.book.id, &vid2, "新卷第一章", "manuscript/002/001.md", 0, now()));
+        d.chapters.push(Chapter::new(
+            &d.book.id,
+            &vid2,
+            "新卷第一章",
+            "manuscript/002/001.md",
+            0,
+            now(),
+        ));
         let _ = vid;
         assert!(d.validate().is_ok());
     }
@@ -601,7 +634,14 @@ mod tests {
         let mut d = Document::new("书", now());
         let vid = d.volumes[0].id.clone();
         for (i, title) in ["第三章", "第一章", "第二章"].iter().enumerate() {
-            let mut c = Chapter::new(&d.book.id, &vid, *title, format!("manuscript/00{i}.md"), 0, now());
+            let mut c = Chapter::new(
+                &d.book.id,
+                &vid,
+                *title,
+                format!("manuscript/00{i}.md"),
+                0,
+                now(),
+            );
             // 刻意给乱序的 sort 值
             c.sort = match *title {
                 "第一章" => 2,
@@ -622,8 +662,22 @@ mod tests {
     fn renumber_volume_closes_gaps() {
         let (mut d, vid) = doc_with_one_chapter();
         // 制造空洞：追加两章但 sort 是 5 和 9
-        d.chapters.push(Chapter::new(&d.book.id, &vid, "二", "manuscript/002.md", 5, now()));
-        d.chapters.push(Chapter::new(&d.book.id, &vid, "三", "manuscript/003.md", 9, now()));
+        d.chapters.push(Chapter::new(
+            &d.book.id,
+            &vid,
+            "二",
+            "manuscript/002.md",
+            5,
+            now(),
+        ));
+        d.chapters.push(Chapter::new(
+            &d.book.id,
+            &vid,
+            "三",
+            "manuscript/003.md",
+            9,
+            now(),
+        ));
         d.renumber_volume(&vid);
         let sorts: Vec<i32> = d.chapters_in_volume(&vid).iter().map(|c| c.sort).collect();
         assert_eq!(sorts, vec![0, 1, 2]);
@@ -671,7 +725,11 @@ mod tests {
         let s = d.chapters[0].to_summary();
         let json = serde_json::to_string(&s).unwrap();
         // 摘要结构里绝不能出现正文，否则卷章树会把整本书读进内存
-        assert!(!json.contains("很长的正文"), "摘要包含了正文：{}", &json[..80.min(json.len())]);
+        assert!(
+            !json.contains("很长的正文"),
+            "摘要包含了正文：{}",
+            &json[..80.min(json.len())]
+        );
         assert_eq!(s.word_count, 500);
     }
 
@@ -699,7 +757,8 @@ mod tests {
     fn outline_is_sorted_by_volume_sort() {
         let mut d = Document::new("书", now());
         d.volumes[0].sort = 5;
-        d.volumes.push(Volume::new(&d.book.id, "靠前的卷", 1, now()));
+        d.volumes
+            .push(Volume::new(&d.book.id, "靠前的卷", 1, now()));
         let titles: Vec<String> = d.outline().iter().map(|n| n.title.clone()).collect();
         assert_eq!(titles[0], "靠前的卷");
     }

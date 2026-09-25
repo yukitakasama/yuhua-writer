@@ -164,7 +164,8 @@ impl Workspace {
             });
         }
 
-        let text = std::fs::read_to_string(&config_path).map_err(|e| YuhuaError::io(&config_path, e))?;
+        let text =
+            std::fs::read_to_string(&config_path).map_err(|e| YuhuaError::io(&config_path, e))?;
         let mut config: WorkspaceConfig =
             serde_json::from_str(&text).map_err(|e| YuhuaError::Parse {
                 context: "workspace.json",
@@ -307,7 +308,8 @@ fn write_config(layout: &WorkspaceLayout, config: &WorkspaceConfig) -> Result<()
         context: "workspace.json",
         message: e.to_string(),
     })?;
-    std::fs::create_dir_all(layout.engine_dir()).map_err(|e| YuhuaError::io(layout.engine_dir(), e))?;
+    std::fs::create_dir_all(layout.engine_dir())
+        .map_err(|e| YuhuaError::io(layout.engine_dir(), e))?;
     // 配置也用原子写：它记录了工作区身份，写坏会导致工作区打不开
     crate::atomic::atomic_write(&layout.config_path(), &json)
 }

@@ -97,7 +97,13 @@ pub fn scan_workspace(workspace: &Workspace) -> Result<Document> {
     // 挂载「未分卷」章节
     if let Some(unfiled) = volumes.iter().find(|v| v.sort == -1) {
         for (sort, file) in root_chapters.iter().enumerate() {
-            if let Some(ch) = load_chapter(file, &book.id, &unfiled.id, sort as i32, &layout.to_relative_str(file)) {
+            if let Some(ch) = load_chapter(
+                file,
+                &book.id,
+                &unfiled.id,
+                sort as i32,
+                &layout.to_relative_str(file),
+            ) {
                 chapters.push(ch);
             }
         }
@@ -216,7 +222,9 @@ fn read_markdown_files(dir: &Path) -> Vec<std::path::PathBuf> {
 fn strip_sort_prefix(name: &str) -> String {
     match name.split_once('-') {
         Some((prefix, rest))
-            if !prefix.is_empty() && prefix.chars().all(|c| c.is_ascii_digit()) && !rest.is_empty() =>
+            if !prefix.is_empty()
+                && prefix.chars().all(|c| c.is_ascii_digit())
+                && !rest.is_empty() =>
         {
             rest.to_string()
         }

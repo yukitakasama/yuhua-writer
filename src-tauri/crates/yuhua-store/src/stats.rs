@@ -125,7 +125,11 @@ pub fn word_stats(
 /// 分章字数排行（用于统计页的「各章字数排行」）。
 ///
 /// 返回 `(章节标题, 字数)`，按字数降序。
-pub fn chapter_word_ranking(conn: &Connection, book_id: &str, limit: u32) -> Result<Vec<(String, u32)>> {
+pub fn chapter_word_ranking(
+    conn: &Connection,
+    book_id: &str,
+    limit: u32,
+) -> Result<Vec<(String, u32)>> {
     let mut stmt = conn
         .prepare(
             "SELECT title, word_count FROM chapters
@@ -143,7 +147,10 @@ pub fn chapter_word_ranking(conn: &Connection, book_id: &str, limit: u32) -> Res
 }
 
 /// 分卷字数分布（用于统计页的「卷分布」）。
-pub fn volume_word_distribution(conn: &Connection, book_id: &str) -> Result<Vec<(String, String, u32)>> {
+pub fn volume_word_distribution(
+    conn: &Connection,
+    book_id: &str,
+) -> Result<Vec<(String, String, u32)>> {
     let mut stmt = conn
         .prepare(
             "SELECT v.id, v.title, COALESCE(SUM(c.word_count), 0) AS total
@@ -302,13 +309,7 @@ mod tests {
     #[test]
     fn all_three_dimensions_together() {
         let s = setup();
-        let st = word_stats(
-            s.idx.connection(),
-            &s.book_id,
-            Some(&s.vol1),
-            Some(&s.ch2),
-        )
-        .unwrap();
+        let st = word_stats(s.idx.connection(), &s.book_id, Some(&s.vol1), Some(&s.ch2)).unwrap();
         assert_eq!(st.chapter, 6);
         assert_eq!(st.volume, 10);
         assert_eq!(st.book, 20);
@@ -451,7 +452,9 @@ mod tests {
     fn stats_update_after_chapter_edit() {
         // 模拟写作过程：改一章的字数，全书统计应当跟随变化
         let s = setup();
-        let before = word_stats(s.idx.connection(), &s.book_id, None, None).unwrap().book;
+        let before = word_stats(s.idx.connection(), &s.book_id, None, None)
+            .unwrap()
+            .book;
         assert_eq!(before, 20);
 
         // 找到第一章并加长它
@@ -465,7 +468,9 @@ mod tests {
             )
             .unwrap();
 
-        let after = word_stats(s.idx.connection(), &s.book_id, None, None).unwrap().book;
+        let after = word_stats(s.idx.connection(), &s.book_id, None, None)
+            .unwrap()
+            .book;
         assert_eq!(after, 28);
         let _ = body;
     }

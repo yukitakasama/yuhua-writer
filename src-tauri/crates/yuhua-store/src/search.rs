@@ -384,9 +384,21 @@ mod tests {
         idx.sync_volumes(&doc.volumes).unwrap();
 
         let samples = [
-            ("第一章 落羽", "羽化写作的第一章正文，主角名叫落羽。", "manuscript/001.md"),
-            ("第二章 山雨", "山中下起了大雨，落羽躲进破庙里避雨。", "manuscript/002.md"),
-            ("第三章 风起", "风起云涌，与羽化无关的一段描写。", "manuscript/003.md"),
+            (
+                "第一章 落羽",
+                "羽化写作的第一章正文，主角名叫落羽。",
+                "manuscript/001.md",
+            ),
+            (
+                "第二章 山雨",
+                "山中下起了大雨，落羽躲进破庙里避雨。",
+                "manuscript/002.md",
+            ),
+            (
+                "第三章 风起",
+                "风起云涌，与羽化无关的一段描写。",
+                "manuscript/003.md",
+            ),
         ];
         for (title, body, path) in samples {
             let mut c = Chapter::new(&doc.book.id, &vol, title, path, 0, ts());
@@ -487,7 +499,11 @@ mod tests {
         let r = search(idx.connection(), &q).unwrap();
         // 只有第三章标题里没有「羽化」，实际没有任何标题含「羽化」
         // 因此 title_only 下应命中 0，验证了列过滤生效
-        assert_eq!(r.total, 0, "title_only 应只在标题列检索，实际命中 {}", r.total);
+        assert_eq!(
+            r.total, 0,
+            "title_only 应只在标题列检索，实际命中 {}",
+            r.total
+        );
     }
 
     #[test]
@@ -528,7 +544,9 @@ mod tests {
     #[test]
     fn deleted_chapter_disappears_from_search() {
         let idx = seeded();
-        let before = search(idx.connection(), &SearchQuery::new("羽化")).unwrap().total;
+        let before = search(idx.connection(), &SearchQuery::new("羽化"))
+            .unwrap()
+            .total;
         assert_eq!(before, 2);
 
         // 找到含「羽化」的一章删掉
@@ -542,7 +560,9 @@ mod tests {
             .unwrap();
         idx.remove_chapter(&id).unwrap();
 
-        let after = search(idx.connection(), &SearchQuery::new("羽化")).unwrap().total;
+        let after = search(idx.connection(), &SearchQuery::new("羽化"))
+            .unwrap()
+            .total;
         assert_eq!(after, 1, "删除后检索结果未同步减少");
     }
 
@@ -589,8 +609,14 @@ mod tests {
     fn char_boundary_helpers_always_land_on_boundaries() {
         let s = "中文abc日";
         for i in 0..=s.len() {
-            assert!(s.is_char_boundary(floor_char_boundary(s, i)), "floor({i}) 越界");
-            assert!(s.is_char_boundary(ceil_char_boundary(s, i)), "ceil({i}) 越界");
+            assert!(
+                s.is_char_boundary(floor_char_boundary(s, i)),
+                "floor({i}) 越界"
+            );
+            assert!(
+                s.is_char_boundary(ceil_char_boundary(s, i)),
+                "ceil({i}) 越界"
+            );
         }
         assert_eq!(floor_char_boundary(s, 999), s.len());
         assert_eq!(ceil_char_boundary(s, 999), s.len());

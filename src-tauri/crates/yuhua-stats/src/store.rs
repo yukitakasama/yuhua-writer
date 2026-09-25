@@ -389,7 +389,10 @@ mod tests {
         stats.schema = 99;
         store.save(&stats).unwrap();
         let back = store.load(&jan()).unwrap();
-        assert_eq!(back.schema, STATS_SCHEMA, "当前版本写出的文件应当标当前版本");
+        assert_eq!(
+            back.schema, STATS_SCHEMA,
+            "当前版本写出的文件应当标当前版本"
+        );
     }
 
     #[test]
@@ -519,7 +522,11 @@ mod tests {
             .add_chapter_delta("ch_3", 100)
             .unwrap();
         let name = "daily-2026-01 (冲突副本 2026-01-16).json";
-        fs::write(store.dir().join(name), serde_json::to_string(&copy).unwrap()).unwrap();
+        fs::write(
+            store.dir().join(name),
+            serde_json::to_string(&copy).unwrap(),
+        )
+        .unwrap();
 
         let merged = store.load_merged(&jan()).unwrap();
         assert_eq!(merged.day(day(2026, 1, 15)).unwrap().words(), 1520 + 700);
@@ -538,7 +545,11 @@ mod tests {
             .add_chapter_delta("ch_2", 300)
             .unwrap();
         let name = "daily-2026-01.sync-conflict-20260116-090000-ABCDEF.json";
-        fs::write(store.dir().join(name), serde_json::to_string(&copy).unwrap()).unwrap();
+        fs::write(
+            store.dir().join(name),
+            serde_json::to_string(&copy).unwrap(),
+        )
+        .unwrap();
 
         let merged = store.load_merged(&jan()).unwrap();
         assert_eq!(merged.day(day(2026, 1, 15)).unwrap().words(), 1820);
@@ -653,6 +664,9 @@ mod tests {
         let back = store.load(&jan()).unwrap();
         assert_eq!(back.day(day(2026, 1, 5)).unwrap().words(), 1234);
         let raw = fs::read_to_string(store.path_for(&jan())).unwrap();
-        assert!(raw.contains("第一章") || raw.contains("\\u7b2c"), "实际：{raw}");
+        assert!(
+            raw.contains("第一章") || raw.contains("\\u7b2c"),
+            "实际：{raw}"
+        );
     }
 }

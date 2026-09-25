@@ -74,20 +74,20 @@ pub mod session;
 pub mod store;
 pub mod summary;
 
-pub use collect::{CollectOutcome, collect_batch, collect_delta, positive_delta};
+pub use collect::{collect_batch, collect_delta, positive_delta, CollectOutcome};
 pub use heatmap::{
-    CalendarMonth, HeatCell, HeatSummary, HEATMAP_LEVELS, LevelScale, build_scale, days_in_year,
-    month_calendar, summarize_range, year_heatmap,
+    build_scale, days_in_year, month_calendar, summarize_range, year_heatmap, CalendarMonth,
+    HeatCell, HeatSummary, LevelScale, HEATMAP_LEVELS,
 };
 pub use merge::{covers, merge_all, merge_day, merge_monthly};
 pub use model::{
-    ChapterKey, DEFAULT_STREAK_THRESHOLD, DayRecord, MonthKey, MonthlyStats, STATS_SCHEMA, Session,
+    ChapterKey, DayRecord, MonthKey, MonthlyStats, Session, DEFAULT_STREAK_THRESHOLD, STATS_SCHEMA,
 };
-pub use session::{ActiveSession, IDLE_TIMEOUT_SECS, SessionTracker, sessions_on};
-pub use store::{StatsStore, parse_month_file_name};
+pub use session::{sessions_on, ActiveSession, SessionTracker, IDLE_TIMEOUT_SECS};
+pub use store::{parse_month_file_name, StatsStore};
 pub use summary::{
-    AVERAGE_WINDOW_DAYS, Summary, average_over_window, count_streak, estimate_completion,
-    summarize, summarize_with,
+    average_over_window, count_streak, estimate_completion, summarize, summarize_with, Summary,
+    AVERAGE_WINDOW_DAYS,
 };
 
 #[cfg(test)]
@@ -181,11 +181,7 @@ mod integration_tests {
         for _ in 0..40 {
             let a = random_month(&mut rng, 1);
             let b = random_month(&mut rng, 1);
-            assert_eq!(
-                merge_monthly(&a, &b),
-                merge_monthly(&b, &a),
-                "交换律被破坏"
-            );
+            assert_eq!(merge_monthly(&a, &b), merge_monthly(&b, &a), "交换律被破坏");
         }
     }
 
@@ -394,7 +390,11 @@ mod integration_tests {
         let year_total: u32 = heat.iter().map(|c| c.words).sum();
 
         assert_eq!(cal.total_words, 4000);
-        assert_eq!(u64::from(year_total), cal.total_words, "两个视图的数字必须一致");
+        assert_eq!(
+            u64::from(year_total),
+            cal.total_words,
+            "两个视图的数字必须一致"
+        );
         assert_eq!(heat.len(), 365);
     }
 
@@ -411,11 +411,18 @@ mod integration_tests {
         tracker.add_words("ch_01J8XK2M9P", 1520, ts(2026, 1, 15, 9, 47));
         tracker.finish_and_store(&store).unwrap();
 
-        let raw = std::fs::read_to_string(store.path_for(&MonthKey::new(2026, 1).unwrap())).unwrap();
+        let raw =
+            std::fs::read_to_string(store.path_for(&MonthKey::new(2026, 1).unwrap())).unwrap();
         for forbidden in ["body", "content", "excerpt", "正文"] {
-            assert!(!raw.contains(forbidden), "统计文件里出现了 {forbidden}：{raw}");
+            assert!(
+                !raw.contains(forbidden),
+                "统计文件里出现了 {forbidden}：{raw}"
+            );
         }
-        assert!(raw.contains("ch_01J8XK2M9P"), "章节 ID 应当在，用于分章统计");
+        assert!(
+            raw.contains("ch_01J8XK2M9P"),
+            "章节 ID 应当在，用于分章统计"
+        );
     }
 
     #[test]
@@ -424,7 +431,12 @@ mod integration_tests {
         let dir = tempfile::tempdir().unwrap();
         let store = StatsStore::at(dir.path());
         let days: BTreeMap<NaiveDate, DayRecord> = store.load_all_days().unwrap();
-        let s = summarize_with(&days, d(2026, 1, 15), DEFAULT_STREAK_THRESHOLD, Some(100_000));
+        let s = summarize_with(
+            &days,
+            d(2026, 1, 15),
+            DEFAULT_STREAK_THRESHOLD,
+            Some(100_000),
+        );
 
         assert_eq!(s.total_words, 0);
         assert_eq!(s.average_per_day_7, 0);

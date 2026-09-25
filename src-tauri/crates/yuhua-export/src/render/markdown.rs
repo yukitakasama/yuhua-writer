@@ -205,7 +205,11 @@ impl<'a> Renderer<'a> for MarkdownRenderer {
         let mut out = String::new();
         if self.options.include_header {
             let _ = writeln!(out, "<!-- {} -->", document.book.title);
-            let _ = writeln!(out, "<!-- 作者：{} -->", document.book.author_or_anonymous());
+            let _ = writeln!(
+                out,
+                "<!-- 作者：{} -->",
+                document.book.author_or_anonymous()
+            );
             let _ = writeln!(out, "<!-- 共 {} 章 -->\n", document.chapter_count());
         }
 
@@ -308,7 +312,10 @@ pub fn strip_front_matter(text: &str) -> &str {
         return text;
     };
     // `---` 后面必须立刻换行，否则 `---abc` 这种正文会被误判
-    let Some(rest) = rest.strip_prefix('\n').or_else(|| rest.strip_prefix("\r\n")) else {
+    let Some(rest) = rest
+        .strip_prefix('\n')
+        .or_else(|| rest.strip_prefix("\r\n"))
+    else {
         return text;
     };
     for (index, line) in rest.split_inclusive('\n').enumerate() {
@@ -390,7 +397,10 @@ mod tests {
         let text = render_to_string(&doc);
         // 章标题是 ##，正文里的 ###### 叠加后是 8 级，被钳到 6 级
         assert!(text.contains("###### 极深标题"), "{text}");
-        assert!(!text.contains("####### "), "不该出现七级及以上的标题：{text}");
+        assert!(
+            !text.contains("####### "),
+            "不该出现七级及以上的标题：{text}"
+        );
     }
 
     #[test]

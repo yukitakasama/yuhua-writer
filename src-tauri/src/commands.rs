@@ -245,7 +245,13 @@ pub fn create_volume(state: State<'_, AppState>, title: String) -> CmdResult<Vec
 
     let doc_before = state.document()?;
     let now = now_local();
-    let next_sort = doc_before.volumes.iter().map(|v| v.sort).max().unwrap_or(-1) + 1;
+    let next_sort = doc_before
+        .volumes
+        .iter()
+        .map(|v| v.sort)
+        .max()
+        .unwrap_or(-1)
+        + 1;
     let volume = yuhua_core::model::Volume::new(&doc_before.book.id, &title, next_sort, now);
 
     // 建目录 + 持久化。锁的作用域只覆盖「取布局」这一步。
@@ -285,12 +291,16 @@ pub fn rename_volume(
         .map_err(|e| CommandError::Domain(yuhua_core::YuhuaError::InvalidInput(e)))?;
 
     state.with_document_mut(|doc| {
-        let vol = doc.volumes.iter_mut().find(|v| v.id == vid).ok_or_else(|| {
-            CommandError::Domain(yuhua_core::YuhuaError::NotFound {
-                kind: "volume",
-                id: vid.to_string(),
-            })
-        })?;
+        let vol = doc
+            .volumes
+            .iter_mut()
+            .find(|v| v.id == vid)
+            .ok_or_else(|| {
+                CommandError::Domain(yuhua_core::YuhuaError::NotFound {
+                    kind: "volume",
+                    id: vid.to_string(),
+                })
+            })?;
         vol.title = title.clone();
         Ok(())
     })?;
@@ -382,14 +392,8 @@ pub fn create_chapter(
 
     // 先写文件（真源），再更新内存与索引
     let now = now_local();
-    let chapter = yuhua_core::model::Chapter::new(
-        &doc_before.book.id,
-        &vid,
-        &title,
-        &rel,
-        next_sort,
-        now,
-    );
+    let chapter =
+        yuhua_core::model::Chapter::new(&doc_before.book.id, &vid, &title, &rel, next_sort, now);
     let abs = lock_session(&s)?.layout().resolve(&rel)?;
     let cf = yuhua_fs::chapter_io::ChapterFile {
         meta: chapter.meta.clone(),
@@ -442,7 +446,10 @@ pub fn rename_chapter(
 
 /// 删除一章（移入回收站）。
 #[tauri::command]
-pub fn delete_chapter(state: State<'_, AppState>, chapter_id: String) -> CmdResult<Vec<OutlineNode>> {
+pub fn delete_chapter(
+    state: State<'_, AppState>,
+    chapter_id: String,
+) -> CmdResult<Vec<OutlineNode>> {
     let s = session(&state)?;
     let cid = ChapterId::parse(chapter_id)
         .map_err(|e| CommandError::Domain(yuhua_core::YuhuaError::InvalidInput(e)))?;
@@ -839,7 +846,10 @@ pub fn list_trash(state: State<'_, AppState>) -> CmdResult<Vec<yuhua_core::Trash
 
 /// 恢复回收站条目。
 #[tauri::command]
-pub fn restore_trash(state: State<'_, AppState>, trash_dir_name: String) -> CmdResult<RepairResult> {
+pub fn restore_trash(
+    state: State<'_, AppState>,
+    trash_dir_name: String,
+) -> CmdResult<RepairResult> {
     let s = session(&state)?;
     let tm = yuhua_fs::trash::TrashManager::new(lock_session(&s)?.layout().clone());
     let path = tm.restore(&trash_dir_name)?;

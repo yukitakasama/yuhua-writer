@@ -29,7 +29,9 @@ use rusqlite::{params, Connection, OptionalExtension};
 use yuhua_core::model::{Book, Chapter};
 use yuhua_core::{Result, YuhuaError};
 
-use crate::schema::{create_tables, db_err, reset_all, set_schema_version_for_reset, CURRENT_SCHEMA_VERSION};
+use crate::schema::{
+    create_tables, db_err, reset_all, set_schema_version_for_reset, CURRENT_SCHEMA_VERSION,
+};
 use crate::tokenizer::BigramTokenizer;
 
 /// 一次索引操作的统计结果。
@@ -264,7 +266,12 @@ impl Index {
     ///
     /// 第 3 步是「索引跟随磁盘」的关键：没有它，删掉一章后
     /// 检索仍会命中一篇已经不存在的文章，点击跳转会失败。
-    pub fn sync_document(&self, book: &Book, root: &str, chapters: &[Chapter]) -> Result<IndexOutcome> {
+    pub fn sync_document(
+        &self,
+        book: &Book,
+        root: &str,
+        chapters: &[Chapter],
+    ) -> Result<IndexOutcome> {
         let mut outcome = IndexOutcome::default();
 
         self.upsert_book(book, root)?;
@@ -285,9 +292,7 @@ impl Index {
                 outcome.skipped += 1;
                 continue;
             }
-            let existed = self
-                .chapter_fingerprint(&ch.path)?
-                .is_some();
+            let existed = self.chapter_fingerprint(&ch.path)?.is_some();
             self.upsert_chapter(ch)?;
             if existed {
                 outcome.updated += 1;
@@ -483,7 +488,13 @@ mod tests {
     }
 
     /// 造一个带正文的章节。
-    fn chapter(volume_id: &yuhua_core::VolumeId, book_id: &yuhua_core::BookId, title: &str, path: &str, body: &str) -> Chapter {
+    fn chapter(
+        volume_id: &yuhua_core::VolumeId,
+        book_id: &yuhua_core::BookId,
+        title: &str,
+        path: &str,
+        body: &str,
+    ) -> Chapter {
         let mut c = Chapter::new(book_id, volume_id, title, path, 0, ts());
         c.body = body.to_string();
         c.content_hash = content_hash(body);
@@ -500,7 +511,11 @@ mod tests {
         let title: String = f
             .index
             .connection()
-            .query_row("SELECT title FROM books WHERE id = ?1", params![b.id.as_str()], |r| r.get(0))
+            .query_row(
+                "SELECT title FROM books WHERE id = ?1",
+                params![b.id.as_str()],
+                |r| r.get(0),
+            )
             .unwrap();
         assert_eq!(title, "改名后的书");
         // 仍只有一条记录
@@ -515,13 +530,23 @@ mod tests {
     #[test]
     fn upsert_chapter_inserts_and_counts_words() {
         let f = fixture();
-        let c = chapter(&f.volume_id, &f.doc.book.id, "第一章", "manuscript/001.md", "你好世界");
+        let c = chapter(
+            &f.volume_id,
+            &f.doc.book.id,
+            "第一章",
+            "manuscript/001.md",
+            "你好世界",
+        );
         f.index.upsert_chapter(&c).unwrap();
 
         let wc: i64 = f
             .index
             .connection()
-            .query_row("SELECT word_count FROM chapters WHERE path = 'manuscript/001.md'", [], |r| r.get(0))
+            .query_row(
+                "SELECT word_count FROM chapters WHERE path = 'manuscript/001.md'",
+                [],
+                |r| r.get(0),
+            )
             .unwrap();
         assert_eq!(wc, 4);
         assert_eq!(f.index.chapter_count().unwrap(), 1);
@@ -530,7 +555,13 @@ mod tests {
     #[test]
     fn upsert_chapter_updates_existing() {
         let f = fixture();
-        let mut c = chapter(&f.volume_id, &f.doc.book.id, "第一章", "manuscript/001.md", "短");
+        let mut c = chapter(
+            &f.volume_id,
+            &f.doc.book.id,
+            "第一章",
+            "manuscript/001.md",
+            "短",
+        );
         f.index.upsert_chapter(&c).unwrap();
 
         c.body = "现在变长了很多字".into();
@@ -555,7 +586,13 @@ mod tests {
     fn upsert_chapter_does_not_duplicate_fts_rows() {
         // 全文表是「先删后插」，反复更新不应累积重复行
         let f = fixture();
-        let c = chapter(&f.volume_id, &f.doc.book.id, "第一章", "manuscript/001.md", "正文");
+        let c = chapter(
+            &f.volume_id,
+            &f.doc.book.id,
+            "第一章",
+            "manuscript/001.md",
+            "正文",
+        );
         for _ in 0..5 {
             f.index.upsert_chapter(&c).unwrap();
         }
@@ -570,7 +607,13 @@ mod tests {
     #[test]
     fn remove_chapter_cleans_both_tables() {
         let f = fixture();
-        let c = chapter(&f.volume_id, &f.doc.book.id, "第一章", "manuscript/001.md", "正文");
+        let c = chapter(
+            &f.volume_id,
+            &f.doc.book.id,
+            "第一章",
+            "manuscript/001.md",
+            "正文",
+        );
         f.index.upsert_chapter(&c).unwrap();
         f.index.remove_chapter(c.meta.id.as_str()).unwrap();
 
@@ -586,15 +629,27 @@ mod tests {
     #[test]
     fn needs_reindex_for_unknown_path() {
         let f = fixture();
-        assert!(f.index.needs_reindex("manuscript/new.md", 123, "hash").unwrap());
+        assert!(f
+            .index
+            .needs_reindex("manuscript/new.md", 123, "hash")
+            .unwrap());
     }
 
     #[test]
     fn needs_reindex_false_when_mtime_unchanged() {
         let f = fixture();
-        let c = chapter(&f.volume_id, &f.doc.book.id, "第一章", "manuscript/001.md", "正文");
+        let c = chapter(
+            &f.volume_id,
+            &f.doc.book.id,
+            "第一章",
+            "manuscript/001.md",
+            "正文",
+        );
         c_mtime(&f.index, &c);
-        assert!(!f.index.needs_reindex("manuscript/001.md", c.mtime, &c.content_hash).unwrap());
+        assert!(!f
+            .index
+            .needs_reindex("manuscript/001.md", c.mtime, &c.content_hash)
+            .unwrap());
     }
 
     /// 把一个章节写入索引（mtime 已由构造决定）。
@@ -605,10 +660,19 @@ mod tests {
     #[test]
     fn needs_reindex_true_when_content_changed() {
         let f = fixture();
-        let c = chapter(&f.volume_id, &f.doc.book.id, "第一章", "manuscript/001.md", "正文");
+        let c = chapter(
+            &f.volume_id,
+            &f.doc.book.id,
+            "第一章",
+            "manuscript/001.md",
+            "正文",
+        );
         f.index.upsert_chapter(&c).unwrap();
         // mtime 变了且哈希也变了 → 需要重索引
-        assert!(f.index.needs_reindex("manuscript/001.md", c.mtime + 1000, "不同的哈希").unwrap());
+        assert!(f
+            .index
+            .needs_reindex("manuscript/001.md", c.mtime + 1000, "不同的哈希")
+            .unwrap());
     }
 
     #[test]
@@ -616,10 +680,18 @@ mod tests {
         // 这是「双闸门」的核心价值：云盘同步改了 mtime 但内容没变，
         // 不应该白白重索引一遍
         let f = fixture();
-        let c = chapter(&f.volume_id, &f.doc.book.id, "第一章", "manuscript/001.md", "正文");
+        let c = chapter(
+            &f.volume_id,
+            &f.doc.book.id,
+            "第一章",
+            "manuscript/001.md",
+            "正文",
+        );
         f.index.upsert_chapter(&c).unwrap();
         assert!(
-            !f.index.needs_reindex("manuscript/001.md", c.mtime + 99999, &c.content_hash).unwrap(),
+            !f.index
+                .needs_reindex("manuscript/001.md", c.mtime + 99999, &c.content_hash)
+                .unwrap(),
             "内容未变时不应要求重索引"
         );
     }
@@ -628,10 +700,25 @@ mod tests {
     fn sync_document_inserts_all_new_chapters() {
         let f = fixture();
         let chapters = vec![
-            chapter(&f.volume_id, &f.doc.book.id, "一", "manuscript/001.md", "第一章正文"),
-            chapter(&f.volume_id, &f.doc.book.id, "二", "manuscript/002.md", "第二章正文"),
+            chapter(
+                &f.volume_id,
+                &f.doc.book.id,
+                "一",
+                "manuscript/001.md",
+                "第一章正文",
+            ),
+            chapter(
+                &f.volume_id,
+                &f.doc.book.id,
+                "二",
+                "manuscript/002.md",
+                "第二章正文",
+            ),
         ];
-        let out = f.index.sync_document(&f.doc.book, "D:/ws", &chapters).unwrap();
+        let out = f
+            .index
+            .sync_document(&f.doc.book, "D:/ws", &chapters)
+            .unwrap();
         assert_eq!(out.inserted, 2);
         assert_eq!(out.updated, 0);
         assert_eq!(out.skipped, 0);
@@ -641,11 +728,22 @@ mod tests {
     #[test]
     fn sync_document_skips_unchanged_chapters() {
         let f = fixture();
-        let chapters = vec![chapter(&f.volume_id, &f.doc.book.id, "一", "manuscript/001.md", "正文")];
-        f.index.sync_document(&f.doc.book, "D:/ws", &chapters).unwrap();
+        let chapters = vec![chapter(
+            &f.volume_id,
+            &f.doc.book.id,
+            "一",
+            "manuscript/001.md",
+            "正文",
+        )];
+        f.index
+            .sync_document(&f.doc.book, "D:/ws", &chapters)
+            .unwrap();
 
         // 再同步一次，什么都没变
-        let out = f.index.sync_document(&f.doc.book, "D:/ws", &chapters).unwrap();
+        let out = f
+            .index
+            .sync_document(&f.doc.book, "D:/ws", &chapters)
+            .unwrap();
         assert_eq!(out.skipped, 1);
         assert_eq!(out.changed(), 0);
     }
@@ -653,14 +751,25 @@ mod tests {
     #[test]
     fn sync_document_updates_changed_chapter() {
         let f = fixture();
-        let mut chapters = vec![chapter(&f.volume_id, &f.doc.book.id, "一", "manuscript/001.md", "旧正文")];
-        f.index.sync_document(&f.doc.book, "D:/ws", &chapters).unwrap();
+        let mut chapters = vec![chapter(
+            &f.volume_id,
+            &f.doc.book.id,
+            "一",
+            "manuscript/001.md",
+            "旧正文",
+        )];
+        f.index
+            .sync_document(&f.doc.book, "D:/ws", &chapters)
+            .unwrap();
 
         chapters[0].body = "全新的正文内容".into();
         chapters[0].content_hash = content_hash(&chapters[0].body);
         chapters[0].mtime += 5000;
 
-        let out = f.index.sync_document(&f.doc.book, "D:/ws", &chapters).unwrap();
+        let out = f
+            .index
+            .sync_document(&f.doc.book, "D:/ws", &chapters)
+            .unwrap();
         assert_eq!(out.updated, 1);
         assert_eq!(out.inserted, 0);
     }
@@ -670,15 +779,32 @@ mod tests {
         // 索引必须跟随磁盘：删掉的文件不能继续被检索到
         let f = fixture();
         let chapters = vec![
-            chapter(&f.volume_id, &f.doc.book.id, "一", "manuscript/001.md", "第一章"),
-            chapter(&f.volume_id, &f.doc.book.id, "二", "manuscript/002.md", "第二章"),
+            chapter(
+                &f.volume_id,
+                &f.doc.book.id,
+                "一",
+                "manuscript/001.md",
+                "第一章",
+            ),
+            chapter(
+                &f.volume_id,
+                &f.doc.book.id,
+                "二",
+                "manuscript/002.md",
+                "第二章",
+            ),
         ];
-        f.index.sync_document(&f.doc.book, "D:/ws", &chapters).unwrap();
+        f.index
+            .sync_document(&f.doc.book, "D:/ws", &chapters)
+            .unwrap();
         assert_eq!(f.index.chapter_count().unwrap(), 2);
 
         // 磁盘上第二章被删除了
         let remaining = vec![chapters[0].clone()];
-        let out = f.index.sync_document(&f.doc.book, "D:/ws", &remaining).unwrap();
+        let out = f
+            .index
+            .sync_document(&f.doc.book, "D:/ws", &remaining)
+            .unwrap();
         assert_eq!(out.removed, 1);
         assert_eq!(f.index.chapter_count().unwrap(), 1);
     }
@@ -696,10 +822,25 @@ mod tests {
         // 对应不变量 1：删掉索引后必须能完全重建
         let f = fixture();
         let chapters = vec![
-            chapter(&f.volume_id, &f.doc.book.id, "一", "manuscript/001.md", "第一章正文"),
-            chapter(&f.volume_id, &f.doc.book.id, "二", "manuscript/002.md", "第二章正文"),
+            chapter(
+                &f.volume_id,
+                &f.doc.book.id,
+                "一",
+                "manuscript/001.md",
+                "第一章正文",
+            ),
+            chapter(
+                &f.volume_id,
+                &f.doc.book.id,
+                "二",
+                "manuscript/002.md",
+                "第二章正文",
+            ),
         ];
-        let first = f.index.sync_document(&f.doc.book, "D:/ws", &chapters).unwrap();
+        let first = f
+            .index
+            .sync_document(&f.doc.book, "D:/ws", &chapters)
+            .unwrap();
         assert_eq!(first.inserted, 2);
 
         // 模拟索引损坏 / 被删除：清空后重建
@@ -714,8 +855,16 @@ mod tests {
     #[test]
     fn rebuild_works_after_full_clear() {
         let f = fixture();
-        let chapters = vec![chapter(&f.volume_id, &f.doc.book.id, "一", "manuscript/001.md", "正文")];
-        f.index.sync_document(&f.doc.book, "D:/ws", &chapters).unwrap();
+        let chapters = vec![chapter(
+            &f.volume_id,
+            &f.doc.book.id,
+            "一",
+            "manuscript/001.md",
+            "正文",
+        )];
+        f.index
+            .sync_document(&f.doc.book, "D:/ws", &chapters)
+            .unwrap();
         f.index.clear().unwrap();
         assert_eq!(f.index.chapter_count().unwrap(), 0);
 
@@ -761,7 +910,11 @@ mod tests {
         let sort: i64 = f
             .index
             .connection()
-            .query_row("SELECT sort FROM volumes WHERE id = ?1", params![v2.id.as_str()], |r| r.get(0))
+            .query_row(
+                "SELECT sort FROM volumes WHERE id = ?1",
+                params![v2.id.as_str()],
+                |r| r.get(0),
+            )
             .unwrap();
         assert_eq!(sort, 0);
     }
@@ -813,7 +966,13 @@ mod tests {
     #[test]
     fn upsert_chapter_persists_all_metadata() {
         let f = fixture();
-        let mut c = chapter(&f.volume_id, &f.doc.book.id, "第一章", "manuscript/001.md", "正文");
+        let mut c = chapter(
+            &f.volume_id,
+            &f.doc.book.id,
+            "第一章",
+            "manuscript/001.md",
+            "正文",
+        );
         c.meta.summary = "这是一句话摘要".into();
         c.meta.word_goal = 3000;
         c.meta.status = yuhua_core::meta::ChapterStatus::Revising;

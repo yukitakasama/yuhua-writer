@@ -472,7 +472,10 @@ mod tests {
     fn flatten_inlines_handles_nesting() {
         let inlines = vec![
             Inline::text("前"),
-            Inline::Strong(vec![Inline::text("粗"), Inline::Emph(vec![Inline::text("斜")])]),
+            Inline::Strong(vec![
+                Inline::text("粗"),
+                Inline::Emph(vec![Inline::text("斜")]),
+            ]),
             Inline::Code("code".into()),
             Inline::Link {
                 url: "https://example.com".into(),

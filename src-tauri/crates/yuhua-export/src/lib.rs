@@ -69,7 +69,7 @@ pub use error::{ExportError, Result};
 pub use ir::{Block, BookMeta, ChapterContent, Document, Inline, VolumeMeta};
 pub use markdown::{Degradation, DegradationKind, ParsedChapter};
 pub use render::{
-    ExportFormat, PuertoPath, Renderer, TEMP_MARKER, render, render_to_path, write_bytes_atomically,
+    render, render_to_path, write_bytes_atomically, ExportFormat, PuertoPath, Renderer, TEMP_MARKER,
 };
 pub use scope::{ChapterSource, ExportScope, InMemorySource};
 
@@ -200,4 +200,3 @@ mod tests {
         }
     }
 }
-

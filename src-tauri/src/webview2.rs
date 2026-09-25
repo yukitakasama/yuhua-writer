@@ -71,7 +71,10 @@ pub fn probe() -> WebView2Status {
     }
 
     for path in REG_PATHS {
-        if let Ok(output) = Command::new("reg").args(["query", path, "/v", "pv"]).output() {
+        if let Ok(output) = Command::new("reg")
+            .args(["query", path, "/v", "pv"])
+            .output()
+        {
             if output.status.success() {
                 let text = String::from_utf8_lossy(&output.stdout);
                 // 注册表里有 pv（版本号）即说明已安装。

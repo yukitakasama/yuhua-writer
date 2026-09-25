@@ -487,8 +487,10 @@ impl Builder {
         // 这样仍然保留了「同一段里的连续 Text 事件被并成一条」的效果
         // （转义符、实体都会触发多次 Text 事件，不合并会碎成一堆单字）。
         let mergeable = match self.inlines.last() {
-            Some(Inline::Text(_)) => self.inlines.len() == self.last_text_index + 1
-                && self.last_text_depth == self.containers.len(),
+            Some(Inline::Text(_)) => {
+                self.inlines.len() == self.last_text_index + 1
+                    && self.last_text_depth == self.containers.len()
+            }
             _ => false,
         };
         if mergeable && self.link_stack.is_empty() {
@@ -754,7 +756,6 @@ impl Builder {
         }
     }
 
-
     /// 打开一个行内容器。
     fn open_container(&mut self, container: Container) {
         self.containers.push((container, self.inlines.len()));
@@ -919,7 +920,10 @@ mod tests {
         let Block::Paragraph(inlines) = &parsed[0] else {
             panic!("期望段落");
         };
-        assert_eq!(inlines[0], Inline::Strong(vec![Inline::Text("粗体".into())]));
+        assert_eq!(
+            inlines[0],
+            Inline::Strong(vec![Inline::Text("粗体".into())])
+        );
         // 粗体后的空格没有被并进粗体（层级不同不合并）；
         // 斜体单独成节点，其文字也没有被并到空格那一条里。
         assert_eq!(inlines[1], Inline::Text(" ".into()));
@@ -1196,12 +1200,10 @@ mod tests {
     #[test]
     fn inline_math_is_preserved_verbatim_with_delimiters() {
         let parsed = parse_blocks("质能方程 $E=mc^2$ 很著名", "公式").unwrap();
-        assert!(
-            parsed
-                .degradations
-                .iter()
-                .any(|d| d.kind == DegradationKind::Math)
-        );
+        assert!(parsed
+            .degradations
+            .iter()
+            .any(|d| d.kind == DegradationKind::Math));
         let text = Block::flatten_blocks_to_string(&parsed.blocks);
         assert!(text.contains("$E=mc^2$"), "{text}");
     }
@@ -1209,12 +1211,10 @@ mod tests {
     #[test]
     fn raw_html_is_kept_as_text_not_dropped() {
         let parsed = parse_blocks("这里有 <script>alert(1)</script> 代码", "HTML").unwrap();
-        assert!(
-            parsed
-                .degradations
-                .iter()
-                .any(|d| d.kind == DegradationKind::RawHtml)
-        );
+        assert!(parsed
+            .degradations
+            .iter()
+            .any(|d| d.kind == DegradationKind::RawHtml));
         let text = Block::flatten_blocks_to_string(&parsed.blocks);
         // 文本必须原样保留（转义是渲染器的事），不能消失
         assert!(text.contains("<script>"), "{text}");
@@ -1224,12 +1224,10 @@ mod tests {
     #[test]
     fn html_block_is_recorded_and_kept() {
         let parsed = parse_blocks("<div class=\"x\">\n内容\n</div>", "HTML 块").unwrap();
-        assert!(
-            parsed
-                .degradations
-                .iter()
-                .any(|d| d.kind == DegradationKind::RawHtml)
-        );
+        assert!(parsed
+            .degradations
+            .iter()
+            .any(|d| d.kind == DegradationKind::RawHtml));
         let text = Block::flatten_blocks_to_string(&parsed.blocks);
         assert!(text.contains("内容"), "{text}");
     }
@@ -1237,12 +1235,10 @@ mod tests {
     #[test]
     fn strikethrough_degrades_but_keeps_text() {
         let parsed = parse_blocks("~~删掉~~保留", "删除线").unwrap();
-        assert!(
-            parsed
-                .degradations
-                .iter()
-                .any(|d| d.kind == DegradationKind::Strikethrough)
-        );
+        assert!(parsed
+            .degradations
+            .iter()
+            .any(|d| d.kind == DegradationKind::Strikethrough));
         let text = Block::flatten_blocks_to_string(&parsed.blocks);
         assert!(text.contains("删掉保留"), "{text}");
     }
@@ -1250,12 +1246,10 @@ mod tests {
     #[test]
     fn task_list_degrades_with_checkbox_marker() {
         let parsed = parse_blocks("- [x] 已完成\n- [ ] 未完成", "任务").unwrap();
-        assert!(
-            parsed
-                .degradations
-                .iter()
-                .any(|d| d.kind == DegradationKind::TaskList)
-        );
+        assert!(parsed
+            .degradations
+            .iter()
+            .any(|d| d.kind == DegradationKind::TaskList));
         let text = Block::flatten_blocks_to_string(&parsed.blocks);
         assert!(text.contains("[x] 已完成"), "{text}");
         assert!(text.contains("[ ] 未完成"), "{text}");
@@ -1423,6 +1417,9 @@ mod tests {
             panic!("期望链接，得到 {inlines:?}");
         };
         assert_eq!(url, "https://example.com");
-        assert!(matches!(text.as_slice(), [Inline::Image { .. }]), "{text:?}");
+        assert!(
+            matches!(text.as_slice(), [Inline::Image { .. }]),
+            "{text:?}"
+        );
     }
 }

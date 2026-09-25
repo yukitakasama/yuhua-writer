@@ -25,7 +25,7 @@ use std::collections::BTreeMap;
 use chrono::{Datelike, Duration, NaiveDate};
 use serde::{Deserialize, Serialize};
 
-use crate::model::{DEFAULT_STREAK_THRESHOLD, DayRecord};
+use crate::model::{DayRecord, DEFAULT_STREAK_THRESHOLD};
 
 /// 近 7 日平均日更所用的窗口长度（天）。
 pub const AVERAGE_WINDOW_DAYS: i64 = 7;
@@ -171,11 +171,7 @@ pub fn week_start(date: NaiveDate) -> NaiveDate {
 /// **分母恒为 len**（自然日数），不是「有写字的天数」。
 /// 这是 10.1 节「平均日更」与用户直觉一致的关键：
 /// 一周里只写了一天，那平均日更就是那天的字数除以 7。
-pub fn average_over_window(
-    days: &BTreeMap<NaiveDate, DayRecord>,
-    end: NaiveDate,
-    len: i64,
-) -> u64 {
+pub fn average_over_window(days: &BTreeMap<NaiveDate, DayRecord>, end: NaiveDate, len: i64) -> u64 {
     if len <= 0 {
         return 0;
     }
@@ -371,9 +367,17 @@ mod tests {
     fn week_starts_on_monday() {
         // 2026-01-15 是周四，本周起点是 01-12
         assert_eq!(week_start(d(2026, 1, 15)), d(2026, 1, 12));
-        assert_eq!(week_start(d(2026, 1, 12)), d(2026, 1, 12), "周一自己就是起点");
+        assert_eq!(
+            week_start(d(2026, 1, 12)),
+            d(2026, 1, 12),
+            "周一自己就是起点"
+        );
         assert_eq!(week_start(d(2026, 1, 18)), d(2026, 1, 12), "周日仍属本周");
-        assert_eq!(week_start(d(2026, 1, 19)), d(2026, 1, 19), "下周一开新的一周");
+        assert_eq!(
+            week_start(d(2026, 1, 19)),
+            d(2026, 1, 19),
+            "下周一开新的一周"
+        );
     }
 
     #[test]
@@ -386,7 +390,11 @@ mod tests {
 
     #[test]
     fn best_day_picks_the_maximum() {
-        let map = days(&[(d(2026, 1, 10), 800), (d(2026, 1, 11), 3000), (d(2026, 1, 12), 1200)]);
+        let map = days(&[
+            (d(2026, 1, 10), 800),
+            (d(2026, 1, 11), 3000),
+            (d(2026, 1, 12), 1200),
+        ]);
         let s = summarize(&map, d(2026, 1, 12));
         assert_eq!(s.best_day, 3000);
         assert_eq!(s.best_day_date, Some(d(2026, 1, 11)));
@@ -484,7 +492,11 @@ mod tests {
             (d(2026, 1, 14), 500),
             (d(2026, 1, 15), 500),
         ]);
-        assert_eq!(count_streak(&map, d(2026, 1, 15), 100), 4, "1 月 10、11 日断了");
+        assert_eq!(
+            count_streak(&map, d(2026, 1, 15), 100),
+            4,
+            "1 月 10、11 日断了"
+        );
     }
 
     #[test]
@@ -502,7 +514,11 @@ mod tests {
     #[test]
     fn streak_threshold_boundary_is_inclusive() {
         let map = days(&[(d(2026, 1, 15), 100)]);
-        assert_eq!(count_streak(&map, d(2026, 1, 15), 100), 1, "恰好等于阈值算达标");
+        assert_eq!(
+            count_streak(&map, d(2026, 1, 15), 100),
+            1,
+            "恰好等于阈值算达标"
+        );
         let map = days(&[(d(2026, 1, 15), 99)]);
         assert_eq!(count_streak(&map, d(2026, 1, 15), 100), 0);
     }
@@ -560,7 +576,11 @@ mod tests {
         // 还剩 80000 字，日更 2000，需要 40 天
         let (date, days_left) = estimate_completion(20_000, Some(100_000), 2000, d(2026, 1, 15));
         assert_eq!(days_left, Some(40));
-        assert_eq!(date, Some(d(2026, 2, 24)), "1 月 15 日加 40 天是 2 月 24 日");
+        assert_eq!(
+            date,
+            Some(d(2026, 2, 24)),
+            "1 月 15 日加 40 天是 2 月 24 日"
+        );
     }
 
     #[test]
@@ -644,5 +664,4 @@ mod tests {
         assert_eq!(ratio(50, 100), Some(0.5));
         assert_eq!(ratio(200, 100), Some(2.0));
     }
-
 }

@@ -16,7 +16,7 @@ use yuhua_core::{BookId, ChapterId, Document as CoreDocument, VolumeId};
 use yuhua_export::ir::{Block, BookMeta, ChapterContent, Inline, VolumeMeta};
 use yuhua_export::render::epub::MIMETYPE_CONTENT;
 use yuhua_export::scope::{self, ExportScope};
-use yuhua_export::{ExportFormat, Renderer, render, render_to_path};
+use yuhua_export::{render, render_to_path, ExportFormat, Renderer};
 
 /// 造一份包含各种块类型与「危险字符」的 IR。
 fn sample_ir() -> yuhua_export::Document {
@@ -172,7 +172,10 @@ fn epub_metadata_is_complete() {
     let opf = &parts["OEBPS/content.opf"];
     assert!(opf.contains("<dc:title>羽化笔记</dc:title>"), "{opf}");
     assert!(opf.contains("<dc:language>zh</dc:language>"), "{opf}");
-    assert!(opf.contains("<dc:creator id=\"creator\">张三</dc:creator>"), "{opf}");
+    assert!(
+        opf.contains("<dc:creator id=\"creator\">张三</dc:creator>"),
+        "{opf}"
+    );
     assert!(opf.contains("urn:uuid:"), "{opf}");
     assert!(opf.contains("property=\"dcterms:modified\""), "{opf}");
 }
@@ -197,7 +200,10 @@ fn docx_contains_expected_parts_and_text() {
     assert!(document.contains("第一章 羽化"), "{document}");
     assert!(document.contains("第二章 归墟"), "{document}");
     // 中文字体必须显式声明（R18）
-    assert!(parts["word/styles.xml"].contains("w:eastAsia="), "缺少东亚字体声明");
+    assert!(
+        parts["word/styles.xml"].contains("w:eastAsia="),
+        "缺少东亚字体声明"
+    );
     // 每章分页
     assert!(document.contains("w:type=\"page\""));
 }
@@ -219,10 +225,7 @@ fn docx_and_epub_escape_dangerous_characters() {
                 // DOCX/EPUB 是压缩容器，文本在压缩流里；解压后再查
                 let parts = unzip(&bytes);
                 let joined: String = parts.values().cloned().collect::<Vec<_>>().join("\n");
-                assert!(
-                    !joined.contains("<script>alert"),
-                    "{format:?} 未转义脚本"
-                );
+                assert!(!joined.contains("<script>alert"), "{format:?} 未转义脚本");
                 assert!(
                     joined.contains("&lt;script&gt;"),
                     "{format:?} 应把 < 转义成 &lt;"
@@ -342,14 +345,21 @@ fn end_to_end_from_core_document_through_scope_to_file() {
     assert_eq!(ir.degradations[0].chapter_title, "第2章");
 
     let dir = tempfile::tempdir().unwrap();
-    for format in [ExportFormat::Txt, ExportFormat::Markdown, ExportFormat::Html] {
+    for format in [
+        ExportFormat::Txt,
+        ExportFormat::Markdown,
+        ExportFormat::Html,
+    ] {
         let target = dir.path().join(format!("book.{}", format.extension()));
         let report = render_to_path(format, &ir, &target).unwrap();
         assert!(report.bytes > 0, "{format:?}");
         let text = std::fs::read_to_string(&target).unwrap();
         assert!(text.contains("第一章"), "{format:?}");
         // 表格内容不能丢
-        assert!(text.contains('a') || text.contains("列"), "{format:?} 丢了表格内容");
+        assert!(
+            text.contains('a') || text.contains("列"),
+            "{format:?} 丢了表格内容"
+        );
     }
 }
 
@@ -370,14 +380,8 @@ fn markdown_output_strips_front_matter_and_keeps_structure() {
     let now = chrono::DateTime::parse_from_rfc3339("2026-01-01T09:00:00+08:00").unwrap();
     let mut core = CoreDocument::new("剥离测试", now);
     let vid = core.volumes[0].id.clone();
-    let mut chapter = yuhua_core::Chapter::new(
-        &core.book.id,
-        &vid,
-        "第一章",
-        "manuscript/000.md",
-        0,
-        now,
-    );
+    let mut chapter =
+        yuhua_core::Chapter::new(&core.book.id, &vid, "第一章", "manuscript/000.md", 0, now);
     // 模拟 yuhua-fs 剥离后的 body（不含 Front Matter）
     chapter.body = "正文第一段\n\n## 小节\n\n正文第二段".into();
     core.chapters.push(chapter);

@@ -107,10 +107,7 @@ pub fn merge_day(left: &DayRecord, right: &DayRecord) -> DayRecord {
 ///
 /// 实现「最后修改者胜」（LWW），并在时间戳打平时用取值兜底，
 /// 保证同一对输入无论顺序如何都收敛到同一个结果（交换律）。
-fn merge_goal(
-    left: &DayRecord,
-    right: &DayRecord,
-) -> (Option<u32>, Option<DateTime<FixedOffset>>) {
+fn merge_goal(left: &DayRecord, right: &DayRecord) -> (Option<u32>, Option<DateTime<FixedOffset>>) {
     match (left.goal_updated_at, right.goal_updated_at) {
         (None, None) => (left.goal.or(right.goal), None),
         // 只有一边有戳：有戳的那边是「知道自己在改」，优先
@@ -276,8 +273,12 @@ mod tests {
     fn duplicate_session_does_not_double_minutes() {
         let a = sample();
         let mut b = MonthlyStats::new(&MonthKey::new(2026, 1).unwrap());
-        b.day_mut(day(2026, 1, 15))
-            .push_session(Session::new(ts(2026, 1, 15, 9, 12), 47, 1520, &[]));
+        b.day_mut(day(2026, 1, 15)).push_session(Session::new(
+            ts(2026, 1, 15, 9, 12),
+            47,
+            1520,
+            &[],
+        ));
         let merged = merge_monthly(&a, &b);
         assert_eq!(
             merged.day(day(2026, 1, 15)).unwrap().minutes(),
@@ -506,10 +507,7 @@ mod tests {
 
     #[test]
     fn merge_all_returns_none_for_empty_input() {
-        assert!(
-            merge_all(&[]).is_none(),
-            "没有文件时不能凭空造出一个空月份"
-        );
+        assert!(merge_all(&[]).is_none(), "没有文件时不能凭空造出一个空月份");
         let a = sample();
         assert_eq!(merge_all(std::slice::from_ref(&a)), Some(a.clone()));
         assert_eq!(merge_all(&[a.clone(), a.clone()]), Some(a));

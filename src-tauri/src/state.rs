@@ -186,23 +186,12 @@ impl AppState {
         let conn = open_database(&db_path)?;
         let index = Index::new(conn);
 
-        // 扫描磁盘装配文稿
-        let mut document = crate::scan::scan_workspace(&workspace)?;
-
-        // 空工作区（刚 `create` 出来、manuscript/ 下还没有任何卷目录）扫描结果
-        // 会是「零卷零章」。但领域模型要求「章不能没有卷」，UI 也依赖
-        // 「至少有一个卷」才能提供「新建章节」的落点，因此这里补一个默认卷。
-        // 卷名「第一卷」与排序号 0 与 Document::new 保持一致，前端拿到的初始
-        // 体验与「新建书」完全相同。
-        if document.volumes.is_empty() {
-            // 注意必须用**扫描得到的 book.id** 建卷，不能借 Document::new 的
-            // 默认卷 —— 它会新铸一个 BookId，导致卷不属于本书，
-            // 直接违反不变量 2「同一本书内引用一致」。
-            let now = chrono::Local::now().fixed_offset();
-            document
-                .volumes
-                .push(yuhua_core::model::Volume::new(&document.book.id, "第一卷", 0, now));
-        }
+        // 扫描磁盘装配文稿。
+        //
+        // 「空工作区补一个默认卷」的逻辑放在 scan_workspace 内部，而不是这里 ——
+        // 那样能同时覆盖 rescan_workspace 等所有扫描调用方，
+        // 避免只在这一条路径上生效而在别处又出现「零卷」。
+        let document = crate::scan::scan_workspace(&workspace)?;
         document.validate()?;
 
         // 全量同步索引
@@ -418,7 +407,12 @@ mod tests {
         let root = dir.path().join("ws");
         let state = AppState::new();
         let handle = state.create(root.clone(), "书".into()).unwrap();
-        assert!(!handle.lock().unwrap().layout().index_db_path().starts_with(&root));
+        assert!(!handle
+            .lock()
+            .unwrap()
+            .layout()
+            .index_db_path()
+            .starts_with(&root));
     }
 
     #[test]

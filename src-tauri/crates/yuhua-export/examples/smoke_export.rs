@@ -11,7 +11,9 @@ use yuhua_export::{
 };
 
 fn main() {
-    let out_dir = std::env::args().nth(1).expect("用法：smoke_export <输出目录>");
+    let out_dir = std::env::args()
+        .nth(1)
+        .expect("用法：smoke_export <输出目录>");
     std::fs::create_dir_all(&out_dir).unwrap();
 
     // 构造一份带「有风险内容」的文稿：转义字符、嵌套强调、引用、列表
@@ -27,16 +29,12 @@ fn main() {
         vid.clone(),
         "第一章 落羽",
         vec![
-            Block::Paragraph(vec![
-                Inline::text("第一段正文，含中文标点：你好，世界。"),
-            ]),
+            Block::Paragraph(vec![Inline::text("第一段正文，含中文标点：你好，世界。")]),
             Block::Paragraph(vec![
                 Inline::text("转义风险："),
                 Inline::text("<script>alert(1)</script> & \"双引号\" '单引号'"),
             ]),
-            Block::Quote(vec![Block::Paragraph(vec![Inline::text(
-                "引用中的一段话",
-            )])]),
+            Block::Quote(vec![Block::Paragraph(vec![Inline::text("引用中的一段话")])]),
             Block::List {
                 ordered: false,
                 start: 1,
@@ -49,9 +47,9 @@ fn main() {
                 level: 2,
                 text: "小节标题".to_string(),
             },
-            Block::Paragraph(vec![
-                Inline::text("结尾段落，用于验证中文不乱码：落羽化羽。"),
-            ]),
+            Block::Paragraph(vec![Inline::text(
+                "结尾段落，用于验证中文不乱码：落羽化羽。",
+            )]),
         ],
     );
     ch1.volume_id = vid.clone();
