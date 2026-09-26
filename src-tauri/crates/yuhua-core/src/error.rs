@@ -91,6 +91,11 @@ impl YuhuaError {
         }
     }
 
+    /// 构造一个导出错误。
+    pub fn export_failed(message: impl Into<String>) -> Self {
+        Self::Export(message.into())
+    }
+
     /// 稳定的机器可读错误码。
     ///
     /// 前端据此决定 UI 表现（例如 WORKSPACE_INVALID 引导用户重新选择目录，

@@ -103,6 +103,18 @@ export interface MockBackend {
   emptyTrash(): number;
   getRecoveryReport(): RecoveryReport;
   rebuildIndex(): void;
+  exportDocument(
+    format: string,
+    scope: unknown,
+    outputPath: string,
+  ): Promise<{
+    path: string;
+    bytes: number;
+    degradations: Array<{ chapterTitle: string; kind: string; detail: string }>;
+  }>;
+  listExportFormats(): Promise<
+    Array<{ id: string; displayName: string; extension: string; available: boolean }>
+  >;
 }
 
 /** 计数用的单调递增器，保证同一毫秒内创建的 ID 也不重复。 */
@@ -764,6 +776,38 @@ export function createMockBackend(): MockBackend {
     rebuildIndex() {
       // 索引是缓存，重建不改变任何数据
     },
+
+    // 导出引擎（M7）
+    async exportDocument(
+      format: string,
+      _scope: unknown,
+      outputPath: string,
+    ): Promise<{
+      path: string;
+      bytes: number;
+      degradations: Array<{ chapterTitle: string; kind: string; detail: string }>;
+    }> {
+      // Mock 实现：返回模拟结果，不实际写文件
+      const mockBytes = 1024 * (format === "pdf" ? 50 : format === "docx" ? 30 : 10);
+      return {
+        path: outputPath,
+        bytes: mockBytes,
+        degradations: [],
+      };
+    },
+
+    async listExportFormats(): Promise<
+      Array<{ id: string; displayName: string; extension: string; available: boolean }>
+    > {
+      return [
+        { id: "txt", displayName: "纯文本", extension: "txt", available: true },
+        { id: "markdown", displayName: "Markdown", extension: "md", available: true },
+        { id: "html", displayName: "网页", extension: "html", available: true },
+        { id: "docx", displayName: "Word 文档", extension: "docx", available: true },
+        { id: "pdf", displayName: "PDF", extension: "pdf", available: true },
+        { id: "epub", displayName: "电子书", extension: "epub", available: true },
+      ];
+    },
   };
 
   return backend;
@@ -1080,3 +1124,7 @@ function charOffsetToByte(text: string, charOffset: number): number {
   }
   return bytes;
 }
+
+// ---------------------------------------------------------------------------
+// 写作统计（M8）
+// ---------------------------------------------------------------------------

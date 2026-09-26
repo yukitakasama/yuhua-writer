@@ -48,6 +48,7 @@ use yuhua_fs::conflict::DetectedConflict;
 use yuhua_fs::workspace::WorkspaceSummary;
 use yuhua_store::search::{SearchQuery, SearchResults};
 use yuhua_store::stats::WordStats;
+use yuhua_export::{ExportFormat, ExportScope};
 
 use crate::error::CommandError;
 use crate::state::{poisoned, AppState, SessionHandle, WorkspaceSession};
@@ -1153,6 +1154,195 @@ pub fn list_recent_workspaces(_state: State<'_, AppState>) -> Vec<WorkspaceSumma
         .into_iter()
         .map(|r| yuhua_fs::workspace::Workspace::summarize(&r.root))
         .collect()
+}
+
+// ============================================================================
+//  导出引擎（M7）
+// ============================================================================
+
+/// 导出范围的 IPC 形状。
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(tag = "type", rename_all = "camelCase")]
+pub enum ExportScopeDto {
+    /// 当前章。
+    #[serde(rename_all = "camelCase")]
+    Single {
+        /// 章节 ID。
+        chapter_id: String,
+    },
+    /// 选中章节。
+    #[serde(rename_all = "camelCase")]
+    Selected {
+        /// 章节 ID 列表。
+        chapter_ids: Vec<String>,
+    },
+    /// 整卷。
+    #[serde(rename_all = "camelCase")]
+    Volume {
+        /// 卷 ID。
+        volume_id: String,
+    },
+    /// 整书。
+    Whole,
+}
+
+/// 导出格式的 IPC 形状。
+#[derive(Debug, Clone, Copy, Serialize, Deserialize)]
+#[serde(rename_all = "lowercase")]
+pub enum ExportFormatDto {
+    /// 纯文本。
+    Txt,
+    /// Markdown。
+    Markdown,
+    /// HTML。
+    Html,
+    /// Word 文档。
+    Docx,
+    /// PDF。
+    Pdf,
+    /// 电子书。
+    Epub,
+}
+
+impl ExportFormatDto {
+    fn to_domain(self) -> ExportFormat {
+        match self {
+            Self::Txt => ExportFormat::Txt,
+            Self::Markdown => ExportFormat::Markdown,
+            Self::Html => ExportFormat::Html,
+            Self::Docx => ExportFormat::Docx,
+            Self::Pdf => ExportFormat::Pdf,
+            Self::Epub => ExportFormat::Epub,
+        }
+    }
+}
+
+/// 导出结果。
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ExportResultDto {
+    /// 输出文件的绝对路径。
+    pub path: String,
+    /// 产物字节数。
+    pub bytes: usize,
+    /// 降级提示（表格 / 代码块等不支持语法的处理）。
+    pub degradations: Vec<DegradationDto>,
+}
+
+/// 降级记录的 IPC 形状。
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct DegradationDto {
+    /// 章节标题。
+    pub chapter_title: String,
+    /// 降级类型（table / codeBlock / image 等）。
+    pub kind: String,
+    /// 具体描述。
+    pub detail: String,
+}
+
+/// 导出文档。
+///
+/// ## 参数
+///
+/// - `format`：目标格式（txt / markdown / html / docx / pdf / epub）
+/// - `scope`：导出范围（当前章 / 选中章节 / 整卷 / 整书）
+/// - `output_path`：输出文件的绝对路径
+///
+/// ## 返回
+///
+/// 返回实际写入的路径、字节数与降级记录。降级记录非空时前端应当提示用户
+/// （例如「表格已转换为纯文本」），确保不静默丢弃内容。
+///
+/// ## 错误
+///
+/// - `FONT_UNAVAILABLE`：PDF 导出时找不到可用的中文字体
+/// - `INVALID_INPUT`：范围为空（选中 0 章 / 整卷但卷下无章）
+/// - `IO_ERROR`：无法写入目标路径
+#[tauri::command]
+pub fn export_document(
+    state: State<'_, AppState>,
+    format: ExportFormatDto,
+    scope: ExportScopeDto,
+    output_path: String,
+) -> CmdResult<ExportResultDto> {
+    let doc = state.document()?;
+
+    // 1. 翻译 IPC 范围到领域范围
+    let domain_scope = match scope {
+        ExportScopeDto::Single { chapter_id } => {
+            let cid = ChapterId::parse(chapter_id)
+                .map_err(|e| CommandError::Domain(yuhua_core::YuhuaError::InvalidInput(e)))?;
+            ExportScope::Single(cid)
+        }
+        ExportScopeDto::Selected { chapter_ids } => {
+            let ids: Result<Vec<_>, _> = chapter_ids.into_iter().map(|s| ChapterId::parse(s)).collect();
+            let ids = ids.map_err(|e| CommandError::Domain(yuhua_core::YuhuaError::InvalidInput(e)))?;
+            ExportScope::Selected(ids)
+        }
+        ExportScopeDto::Volume { volume_id } => {
+            let vid = VolumeId::parse(volume_id)
+                .map_err(|e| CommandError::Domain(yuhua_core::YuhuaError::InvalidInput(e)))?;
+            ExportScope::Volume(vid)
+        }
+        ExportScopeDto::Whole => ExportScope::Whole,
+    };
+
+    // 2. 装配 IR（按章读正文，不会整书载入内存）
+    let ir = yuhua_export::scope::assemble(&doc, &domain_scope)
+        .map_err(|e| CommandError::Domain(yuhua_core::YuhuaError::export_failed(e.to_string())))?;
+
+    // 3. 渲染并原子写盘
+    let target = std::path::PathBuf::from(output_path);
+    let result = yuhua_export::render_to_path(format.to_domain(), &ir, &target)
+        .map_err(|e| CommandError::Domain(yuhua_core::YuhuaError::export_failed(e.to_string())))?;
+
+    // 4. 翻译降级记录
+    let degradations = ir
+        .degradations
+        .into_iter()
+        .map(|d| DegradationDto {
+            chapter_title: d.chapter_title,
+            kind: format!("{:?}", d.kind),
+            detail: d.detail,
+        })
+        .collect();
+
+    Ok(ExportResultDto {
+        path: result.path.to_string_lossy().to_string(),
+        bytes: result.bytes,
+        degradations,
+    })
+}
+
+/// 列出所有可用的导出格式。
+///
+/// 返回格式的 ID、显示名、扩展名与可用性。前端据此构建导出面板的格式选择器。
+#[tauri::command]
+pub fn list_export_formats(_state: State<'_, AppState>) -> Vec<ExportFormatInfoDto> {
+    ExportFormat::ALL
+        .iter()
+        .map(|&fmt| ExportFormatInfoDto {
+            id: fmt.id().to_string(),
+            display_name: fmt.display_name().to_string(),
+            extension: fmt.extension().to_string(),
+            available: fmt.is_available(),
+        })
+        .collect()
+}
+
+/// 导出格式信息。
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ExportFormatInfoDto {
+    /// 格式标识符（txt / md / html / docx / pdf / epub）。
+    pub id: String,
+    /// 面向用户的格式名。
+    pub display_name: String,
+    /// 默认文件扩展名（不含点）。
+    pub extension: String,
+    /// 该格式是否已可用。
+    pub available: bool,
 }
 
 // ============================================================================

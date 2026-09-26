@@ -84,6 +84,9 @@ pub fn run() {
             commands::search_chapters,
             // ---- 写作统计（M8）----
             commands::get_stats_summary,
+            // ---- 导出引擎（M7）----
+            commands::export_document,
+            commands::list_export_formats,
             // ---- 数据安全 ----
             commands::rebuild_index,
             commands::rescan_workspace,

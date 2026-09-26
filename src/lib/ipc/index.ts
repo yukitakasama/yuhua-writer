@@ -557,3 +557,68 @@ export function countModeOptions(): Array<{
     { value: "wordsForEnglish", labelKey: "wordCount.wordsForEnglish" },
   ];
 }
+
+// ---------------------------------------------------------------------------
+// 导出引擎
+// ---------------------------------------------------------------------------
+
+/** 导出范围。 */
+export type ExportScope =
+  | { type: "single"; chapterId: string }
+  | { type: "selected"; chapterIds: string[] }
+  | { type: "volume"; volumeId: string }
+  | { type: "whole" };
+
+/** 导出格式。 */
+export type ExportFormat = "txt" | "markdown" | "html" | "docx" | "pdf" | "epub";
+
+/** 导出格式信息。 */
+export interface ExportFormatInfo {
+  id: string;
+  displayName: string;
+  extension: string;
+  available: boolean;
+}
+
+/** 降级记录。 */
+export interface Degradation {
+  chapterTitle: string;
+  kind: string;
+  detail: string;
+}
+
+/** 导出结果。 */
+export interface ExportResult {
+  path: string;
+  bytes: number;
+  degradations: Degradation[];
+}
+
+/**
+ * 导出文档。
+ *
+ * @param format 导出格式
+ * @param scope 导出范围
+ * @param outputPath 输出文件的绝对路径
+ * @returns 导出结果（路径、字节数与降级记录）
+ */
+export function exportDocument(
+  format: ExportFormat,
+  scope: ExportScope,
+  outputPath: string,
+): Promise<ExportResult> {
+  return call(
+    "export_document",
+    { format, scope, outputPath },
+    (b) => b.exportDocument(format, scope, outputPath),
+  );
+}
+
+/**
+ * 列出所有可用的导出格式。
+ *
+ * 返回格式的 ID、显示名、扩展名与可用性。
+ */
+export function listExportFormats(): Promise<ExportFormatInfo[]> {
+  return call("list_export_formats", {}, (b) => b.listExportFormats());
+}
