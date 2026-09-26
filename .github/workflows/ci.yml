@@ -50,6 +50,19 @@ jobs:
       - name: 构建前端产物
         run: pnpm build
 
+      # 两道守卫脚本此前定义了却从未被 CI 调用（issue：脚本里自己写着
+      # 「挂进 build 之后即可」）。它们必须放在 `pnpm build` 之后 ——
+      # check:kit 要检查的是构建产物里有没有泄漏预览页。
+      #
+      # 两个脚本的失败方式不同但都能让 CI 失败：
+      # check-ipc.mjs 用 process.exit(1)，check-devkit-excluded.mjs
+      # 用 process.exitCode = 1，因此这里无需额外包装。
+      - name: IPC 契约检查
+        run: pnpm check:ipc
+
+      - name: 预览页未泄漏进产物
+        run: pnpm check:kit
+
   # ---------------------------------------------------------------- Rust
   rust:
     name: Rust（fmt / clippy / test）

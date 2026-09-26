@@ -233,9 +233,17 @@ pub fn get_word_stats(
 }
 
 /// 新建一卷。
+///
+/// 命令壳只做参数解包；真正的逻辑在 [`create_volume_impl`]，这样它就
+/// 能用 `&AppState` 直接单测 —— `State<'_, T>` 没有公开构造方式。
 #[tauri::command]
 pub fn create_volume(state: State<'_, AppState>, title: String) -> CmdResult<Vec<OutlineNode>> {
-    let s = session(&state)?;
+    create_volume_impl(&state, title)
+}
+
+/// [`create_volume`] 的实现（不含 Tauri 外壳，便于测试）。
+fn create_volume_impl(state: &AppState, title: String) -> CmdResult<Vec<OutlineNode>> {
+    let s = session(state)?;
     let title = title.trim().to_string();
     if title.is_empty() {
         return Err(CommandError::Domain(yuhua_core::YuhuaError::InvalidInput(
@@ -269,8 +277,14 @@ pub fn create_volume(state: State<'_, AppState>, title: String) -> CmdResult<Vec
         Ok(())
     })?;
 
+    // 先落盘再重扫。顺序不能反：重扫会用配置里的卷清单重建内存结构，
+    // 若配置里还没有这个新卷，它会被当成「用户手工建的目录」——
+    // 那样拿到的标题是 `strip_sort_prefix(001-新卷名)`，虽然碰巧一样，
+    // 但 sort 会退化成枚举下标，与 `renumber_volumes` 的结果不再一致。
+    persist_volumes(state)?;
+
     // 同步索引
-    reload_and_sync(&state)?;
+    reload_and_sync(state)?;
     Ok(state.document()?.outline())
 }
 
@@ -278,6 +292,15 @@ pub fn create_volume(state: State<'_, AppState>, title: String) -> CmdResult<Vec
 #[tauri::command]
 pub fn rename_volume(
     state: State<'_, AppState>,
+    volume_id: String,
+    title: String,
+) -> CmdResult<Vec<OutlineNode>> {
+    rename_volume_impl(&state, volume_id, title)
+}
+
+/// [`rename_volume`] 的实现（不含 Tauri 外壳，便于测试）。
+fn rename_volume_impl(
+    state: &AppState,
     volume_id: String,
     title: String,
 ) -> CmdResult<Vec<OutlineNode>> {
@@ -305,14 +328,30 @@ pub fn rename_volume(
         Ok(())
     })?;
 
-    reload_and_sync(&state)?;
+    // ---- 关键顺序：先落盘，再重扫 ----
+    //
+    // 重命名此前只改内存，紧接着的 `reload_and_sync` 用扫描结果
+    // **整体覆盖**内存文稿，于是新卷名当场丢失 ——
+    // 界面闪一下又变回旧名，用户以为是自己没点到。
+    //
+    // 修法是让卷名有一个磁盘上的家（`workspace.json` 的 `volumes`），
+    // 扫描改为「配置优先」。因此这里必须先写配置：若先重扫，
+    // 扫描读到的还是旧配置，改动照样被冲掉。
+    persist_volumes(state)?;
+
+    reload_and_sync(state)?;
     Ok(state.document()?.outline())
 }
 
 /// 删除一卷（移入回收站）。
 #[tauri::command]
 pub fn delete_volume(state: State<'_, AppState>, volume_id: String) -> CmdResult<Vec<OutlineNode>> {
-    let s = session(&state)?;
+    delete_volume_impl(&state, volume_id)
+}
+
+/// [`delete_volume`] 的实现（不含 Tauri 外壳，便于测试）。
+fn delete_volume_impl(state: &AppState, volume_id: String) -> CmdResult<Vec<OutlineNode>> {
+    let s = session(state)?;
     let vid = VolumeId::parse(volume_id)
         .map_err(|e| CommandError::Domain(yuhua_core::YuhuaError::InvalidInput(e)))?;
 
@@ -327,15 +366,46 @@ pub fn delete_volume(state: State<'_, AppState>, volume_id: String) -> CmdResult
         })?
         .clone();
 
-    // 找到磁盘目录
-    let dir_name = yuhua_fs::layout::WorkspaceLayout::volume_dir_name(vol.sort, &vol.title);
+    // 找磁盘目录。
+    //
+    // ## 为什么优先用配置里的 `dir_name`，而不是现拼
+    //
+    // 现拼的 `volume_dir_name(vol.sort, &vol.title)` 依赖两个可能已经
+    // 过期的内存字段：卷被重命名后 title 是新的、目录名还是旧的；
+    // 卷被重排后 sort 是新的、目录名里的编号还是旧的。两种情况下
+    // 拼出来的路径都指向**别的目录或不存在的位置**，于是
+    // `.exists()` 为假 → 跳过回收站 → 章节从内存与索引里被删掉，
+    // 而磁盘文件原封不动，下次扫描它们又"复活"。
+    //
+    // 配置里的 `dir_name` 是**当初建这个目录时用的那一个**，
+    // 因此它是这条路径上唯一的权威。
+    let dir_name = lock_session(&s)?
+        .config()
+        .volumes
+        .iter()
+        .find(|r| r.id == vid.as_str())
+        .map(|r| r.dir_name.clone())
+        .unwrap_or_else(|| {
+            yuhua_fs::layout::WorkspaceLayout::volume_dir_name(vol.sort, &vol.title)
+        });
     let rel = format!("manuscript/{dir_name}");
 
     let layout = lock_session(&s)?.layout().clone();
     let trash = yuhua_fs::trash::TrashManager::new(layout.clone());
-    // 目录不存在时跳过回收站（例如空卷还没建目录）
-    if layout.manuscript_dir().join(&dir_name).exists() {
+    // 目录不存在时（例如空卷还没建目录）跳过回收站 —— 但**不静默**：
+    // 卷仍然会从内存、配置与索引里移除，只是没有任何文件被移动。
+    // 一条 at-least-once 的说明比一个"成功"更诚实。
+    let dir_exists = layout.manuscript_dir().join(&dir_name).exists();
+    if dir_exists {
         trash.move_to_trash(&rel, &vol.title, vid.as_str(), "volume")?;
+    } else {
+        // 「UI 说删了、其实没删且没人知道」是明确禁止的状态。
+        // 卷此刻确实不在磁盘上，因此删除是**真的完成了**；
+        // 但用户若以为有文件被移进回收站，需要能从这里看出来。
+        eprintln!(
+            "[删除卷] 卷「{}」在磁盘上没有对应目录（{}），卷信息已移除，未移动任何文件。",
+            vol.title, rel
+        );
     }
 
     state.with_document_mut(|doc| {
@@ -345,8 +415,12 @@ pub fn delete_volume(state: State<'_, AppState>, volume_id: String) -> CmdResult
         Ok(())
     })?;
 
+    // 从配置里移除这一卷。必须在重扫之前：重扫是「配置优先」的，
+    // 配置里还留着它的话，这一卷会连同它的目录名一起被重新建出来。
+    persist_volumes(state)?;
+
     // 索引里也要清掉这些章节
-    reload_and_sync(&state)?;
+    reload_and_sync(state)?;
     Ok(state.document()?.outline())
 }
 
@@ -357,7 +431,16 @@ pub fn create_chapter(
     volume_id: String,
     title: String,
 ) -> CmdResult<Vec<OutlineNode>> {
-    let s = session(&state)?;
+    create_chapter_impl(&state, volume_id, title)
+}
+
+/// [`create_chapter`] 的实现（不含 Tauri 外壳，便于测试）。
+fn create_chapter_impl(
+    state: &AppState,
+    volume_id: String,
+    title: String,
+) -> CmdResult<Vec<OutlineNode>> {
+    let s = session(state)?;
     let vid = VolumeId::parse(volume_id)
         .map_err(|e| CommandError::Domain(yuhua_core::YuhuaError::InvalidInput(e)))?;
 
@@ -386,7 +469,19 @@ pub fn create_chapter(
         .unwrap_or(-1)
         + 1;
 
-    let dir_name = yuhua_fs::layout::WorkspaceLayout::volume_dir_name(vol.sort, &vol.title);
+    // 目标目录必须取自配置里的 `dir_name`，理由与 `delete_volume` 相同：
+    // 现拼 `volume_dir_name(vol.sort, &vol.title)` 在卷被重命名或重排后
+    // 会指向**旧目录名**（重命名后）或**另一个卷的目录**（重排后），
+    // 于是新章节文件被建进一个孤儿目录，或者串到别的卷里去。
+    let dir_name = lock_session(&s)?
+        .config()
+        .volumes
+        .iter()
+        .find(|r| r.id == vid.as_str())
+        .map(|r| r.dir_name.clone())
+        .unwrap_or_else(|| {
+            yuhua_fs::layout::WorkspaceLayout::volume_dir_name(vol.sort, &vol.title)
+        });
     let file_name = yuhua_fs::layout::WorkspaceLayout::chapter_file_name(next_sort, &title);
     let rel = format!("manuscript/{dir_name}/{file_name}");
 
@@ -402,7 +497,7 @@ pub fn create_chapter(
     };
     yuhua_fs::chapter_io::write_chapter(&abs, &cf).map_err(CommandError::Domain)?;
 
-    reload_and_sync(&state)?;
+    reload_and_sync(state)?;
     Ok(state.document()?.outline())
 }
 
@@ -510,6 +605,11 @@ pub fn reorder_volumes(
     state: State<'_, AppState>,
     ordered_ids: Vec<String>,
 ) -> CmdResult<Vec<OutlineNode>> {
+    reorder_volumes_impl(&state, ordered_ids)
+}
+
+/// [`reorder_volumes`] 的实现（不含 Tauri 外壳，便于测试）。
+fn reorder_volumes_impl(state: &AppState, ordered_ids: Vec<String>) -> CmdResult<Vec<OutlineNode>> {
     state.with_document_mut(|doc| {
         for (i, id) in ordered_ids.iter().enumerate() {
             let Ok(vid) = VolumeId::parse(id.clone()) else {
@@ -524,7 +624,10 @@ pub fn reorder_volumes(
         Ok(())
     })?;
 
-    reload_and_sync(&state)?;
+    // 与重命名同理：先落盘再重扫，否则新的 sort 会被扫描结果覆盖
+    persist_volumes(state)?;
+
+    reload_and_sync(state)?;
     Ok(state.document()?.outline())
 }
 
@@ -582,6 +685,60 @@ pub fn read_chapter(state: State<'_, AppState>, chapter_id: String) -> CmdResult
     })
 }
 
+/// 保存前的乐观并发检查。
+///
+/// ## 为什么抽成独立函数
+///
+/// 这段逻辑有三条容易写错的分支（哈希不符、读不出来、空哈希放行），
+/// 而它恰好是「绝不静默覆盖」这条不变量的**唯一**落地点。放在
+/// `save_chapter` 里就永远只能靠集成测试覆盖 —— 而 `State<'_, AppState>`
+/// 没有公开构造方式，命令函数在单测里根本调不到。
+///
+/// 抽出来之后每条分支都能用一个临时目录直接钉死（见本模块的测试）。
+///
+/// ## 三条分支的语义
+///
+/// | `expected` | 行为 |
+/// | --- | --- |
+/// | `None` / `""` | 无条件放行（向后兼容：调用方没做并发控制时的既有行为） |
+/// | 非空且与磁盘一致 | 放行 |
+/// | 非空且与磁盘不一致 | 拒绝 —— 文件被外部改过 |
+/// | 非空但**读不出磁盘** | 拒绝 —— 见下面「为什么读失败不能放行」 |
+///
+/// ## 为什么读失败不能放行
+///
+/// 「不知道磁盘上是什么」与「磁盘上和我读到的一样」是两回事。
+/// 把读失败塌成空串再判「空串即无冲突」，恰好会在文件被云盘锁住
+/// 或被误删时放行一次覆盖，把用户的稿子冲掉 —— 而那正是这条防护
+/// 存在的理由。因此读失败必须中止保存。
+fn check_no_external_conflict(abs: &std::path::Path, expected: Option<&str>) -> CmdResult<()> {
+    let Some(expected) = expected else {
+        return Ok(());
+    };
+    if expected.is_empty() {
+        // 空哈希是调用方的明确声明「我不做并发控制」，不是「磁盘上没内容」。
+        // 这个分支必须保留原样：前端有调用点只传正文。
+        return Ok(());
+    }
+
+    let cf = yuhua_fs::chapter_io::read_chapter(abs).map_err(|e| {
+        CommandError::Domain(yuhua_core::YuhuaError::InvalidInput(format!(
+            "无法读取磁盘上的章节内容，为安全起见本次保存已取消：{e}"
+        )))
+    })?;
+
+    // 用「正文」而非「整个文件」算哈希：Front Matter 里的 updated 每次
+    // 保存都会变，算进去会让每次保存都误判为「内容变了」。
+    let current = yuhua_store::index::content_hash(&cf.body);
+    if current != expected {
+        return Err(CommandError::Domain(yuhua_core::YuhuaError::InvalidInput(
+            "该章节已被外部修改（可能来自云盘同步或其它编辑器），为避免覆盖你的改动，本次保存已取消。请重新打开该章查看最新内容。"
+                .into(),
+        )));
+    }
+    Ok(())
+}
+
 /// 保存章节正文。
 ///
 /// ## 保存流程（对应计划书 4.4 节的四种机制）
@@ -597,6 +754,7 @@ pub fn read_chapter(state: State<'_, AppState>, chapter_id: String) -> CmdResult
 /// \`expected_hash\` 非空时，若磁盘上的当前内容哈希与它不符，
 /// 说明文件被外部（云盘 / 别的编辑器）改过。此时**拒绝覆盖**并报错，
 /// 由前端提示用户处理 —— 这正是不变量「绝不静默覆盖」的落地。
+/// 具体判定见 [`check_no_external_conflict`]。
 #[tauri::command]
 pub fn save_chapter(
     state: State<'_, AppState>,
@@ -624,19 +782,7 @@ pub fn save_chapter(
     let abs = layout.resolve(&rel)?;
 
     // ---- 乐观并发检查 ----
-    if let Some(expected) = expected_hash.as_deref() {
-        if !expected.is_empty() {
-            let current = yuhua_fs::chapter_io::read_chapter(&abs)
-                .map(|cf| yuhua_store::index::content_hash(&cf.body))
-                .unwrap_or_default();
-            if current != expected && !current.is_empty() {
-                return Err(CommandError::Domain(yuhua_core::YuhuaError::InvalidInput(
-                    "该章节已被外部修改（可能来自云盘同步或其它编辑器），                     为避免覆盖你的改动，本次保存已取消。请重新打开该章查看最新内容。"
-                        .into(),
-                )));
-            }
-        }
-    }
+    check_no_external_conflict(&abs, expected_hash.as_deref())?;
 
     // ---- 崩溃日志：begin ----
     let journal = yuhua_fs::journal::Journal::new(layout.journal_dir());
@@ -1013,6 +1159,27 @@ pub fn list_recent_workspaces(_state: State<'_, AppState>) -> Vec<WorkspaceSumma
 //  内部工具
 // ============================================================================
 
+/// 把当前内存文稿的卷清单写入 `workspace.json`。
+///
+/// ## 为什么所有改卷的命令都要在重扫**之前**调用它
+///
+/// 扫描是「配置优先、目录名兜底」的（见 `scan` 模块）。因此
+/// 「改内存 → 写配置 → 重扫」是唯一能保住改动的顺序：
+///
+/// - 先重扫：扫描按**旧**配置重建卷，刚做的重命名 / 重排当场丢失
+/// - 不写配置：同上，目录名里的旧标题会把新标题盖掉
+///
+/// 这正是「重命名被静默丢弃」这个缺陷的根因，也是本次修复的核心。
+fn persist_volumes(state: &AppState) -> CmdResult<()> {
+    let s = session(state)?;
+    let doc = state.document()?;
+    // 先把结果取出来再返回：若直接 `lock_session(&s)?.save_volumes(&doc)`，
+    // 末尾表达式里的临时守卫会比 `s` 活得更久，借用检查会拒绝。
+    // `save_volumes` 需要 `&mut`，而 `MutexGuard` 的 DerefMut 正好提供它。
+    let result = lock_session(&s)?.save_volumes(&doc);
+    result
+}
+
 /// 重新扫描磁盘并同步索引与内存文稿。
 ///
 /// 所有会改变结构的操作（新建 / 删除 / 重命名 / 排序）走完磁盘写入后
@@ -1088,6 +1255,457 @@ pub struct CountModeDto {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    // ========================================================================
+    //  任务 C：覆盖防护的三条分支
+    //
+    //  这些用例针对 `check_no_external_conflict` 而不是 `save_chapter`：
+    //  `State<'_, AppState>` 没有公开构造方式（tauri::State 的字段私有、
+    //  也没有 `From<&T>`），因此命令函数在单测里调不到。原实现把这段
+    //  逻辑内联在 `save_chapter` 里，于是它**一行测试都没有** ——
+    //  这正是「读失败即放行」能活到现在的原因。抽成纯函数后每条分支
+    //  都能用临时目录钉死。
+    // ========================================================================
+
+    /// 造一个已存在的章节文件，返回（临时目录, 绝对路径）。
+    ///
+    /// 临时目录必须由调用方持有：它一 drop 目录就没了。
+    fn chapter_file(body: &str) -> (tempfile::TempDir, std::path::PathBuf) {
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join("001-第一章.md");
+        let cf = yuhua_fs::chapter_io::ChapterFile {
+            // ChapterMeta 没有 Default（id 必须成对生成），走它的构造函数
+            meta: yuhua_core::ChapterMeta::new("第一章", now_local()),
+            body: body.to_string(),
+            had_front_matter: true,
+        };
+        yuhua_fs::chapter_io::write_chapter(&path, &cf).unwrap();
+        (dir, path)
+    }
+
+    #[test]
+    fn conflict_check_aborts_when_file_missing() {
+        // 文件不存在（被云盘挪走 / 被误删）时必须中止，**不能**当成
+        // 「没有冲突」放行 —— 那会在下一行创建出一个空壳文件把稿子顶掉
+        let dir = tempfile::tempdir().unwrap();
+        let missing = dir.path().join("不存在.md");
+
+        let err = check_no_external_conflict(&missing, Some("任意哈希")).unwrap_err();
+        assert_eq!(err.code(), "INVALID_INPUT");
+        // 核心断言之二：失败路径**没有**顺手把文件建出来
+        assert!(!missing.exists(), "读失败时不能创建任何文件");
+    }
+
+    #[test]
+    fn conflict_check_rejects_modified_file() {
+        // 这条是核心回归：磁盘内容与调用方手里的哈希不符 = 被外部改过
+        let (_dir, path) = chapter_file("磁盘上的新内容");
+        let stale = yuhua_store::index::content_hash("调用方以为的内容");
+
+        let err = check_no_external_conflict(&path, Some(&stale)).unwrap_err();
+        assert_eq!(err.code(), "INVALID_INPUT");
+        assert!(
+            err.to_string().contains("已被外部修改"),
+            "错误文案要能让用户看懂发生了什么，got {err}"
+        );
+        // 磁盘内容必须保持原样 —— 检查函数只能是只读的
+        let after = yuhua_fs::chapter_io::read_chapter(&path).unwrap();
+        assert_eq!(after.body, "磁盘上的新内容");
+    }
+
+    #[test]
+    fn conflict_check_allows_matching_hash() {
+        let (_dir, path) = chapter_file("一致的内容");
+        let expected = yuhua_store::index::content_hash("一致的内容");
+        assert!(check_no_external_conflict(&path, Some(&expected)).is_ok());
+    }
+
+    #[test]
+    fn conflict_check_allows_none_and_empty_hash() {
+        // 向后兼容：这两个取值是调用方在说「我不做并发控制」，
+        // 必须无条件放行，且**不应**去读磁盘（文件不存在也要通过）
+        let missing = std::path::Path::new("D:/definitely/not/here.md");
+        assert!(check_no_external_conflict(missing, None).is_ok());
+        assert!(check_no_external_conflict(missing, Some("")).is_ok());
+    }
+
+    #[test]
+    fn conflict_hash_ignores_front_matter_updated_field() {
+        // 哈希算的是正文而非整个文件：Front Matter 里的 updated 每次保存
+        // 都会变，算进去会让「自己保存后立刻再保存」误判为外部修改。
+        // 这里改一下 meta 再写回，哈希必须不变
+        let (_dir, path) = chapter_file("正文没变");
+        let expected = yuhua_store::index::content_hash("正文没变");
+
+        let mut cf = yuhua_fs::chapter_io::read_chapter(&path).unwrap();
+        cf.meta.updated = now_local();
+        yuhua_fs::chapter_io::write_chapter(&path, &cf).unwrap();
+
+        assert!(
+            check_no_external_conflict(&path, Some(&expected)).is_ok(),
+            "只改 Front Matter 不应被判为外部修改"
+        );
+    }
+
+    // ========================================================================
+    //  文案：嵌入的源码缩进不得泄漏给用户
+    // ========================================================================
+
+    #[test]
+    fn user_facing_messages_have_no_embedded_indent() {
+        // 字面量折行时把源码缩进（21 个空格）带进字符串，会原样显示给用户。
+        // 这条测试盯的是「文案里不该出现连续空白」这个**通用**规则，
+        // 因此新增同类文案时也会被它抓到。
+        let (_dir, path) = chapter_file("磁盘内容");
+        let stale = yuhua_store::index::content_hash("别的内容");
+        let msg = check_no_external_conflict(&path, Some(&stale))
+            .unwrap_err()
+            .to_string();
+        assert!(
+            !msg.contains("  "),
+            "用户可见文案里出现了连续空格（多半是折行时带进了源码缩进）：{msg}"
+        );
+    }
+
+    #[test]
+    fn future_format_version_message_has_no_embedded_indent() {
+        // 同型 bug 的第二处：workspace.rs 的「版本过高」提示
+        let dir = tempfile::tempdir().unwrap();
+        let root = dir.path().join("ws");
+        let ws = yuhua_fs::workspace::Workspace::create(&root, "书").unwrap();
+
+        let mut cfg = ws.config.clone();
+        cfg.format_version = yuhua_fs::layout::FORMAT_VERSION + 5;
+        std::fs::write(
+            root.join(".yuhua/workspace.json"),
+            serde_json::to_string_pretty(&cfg).unwrap(),
+        )
+        .unwrap();
+
+        let err = yuhua_fs::workspace::Workspace::open(&root).unwrap_err();
+        let msg = err.to_string();
+        assert!(msg.contains("高于本软件支持"), "got {msg}");
+        assert!(
+            !msg.contains("  "),
+            "版本过高提示里出现了连续空格（折行带进了源码缩进）：{msg}"
+        );
+    }
+
+    // ========================================================================
+    //  任务 B：卷名 / 卷序的持久化（对着计划 2.3 的五条验收标准）
+    //
+    //  这些用例调的是 `*_impl(&AppState, …)` 而不是 `#[tauri::command]`
+    //  函数：`State<'_, T>` 没有公开构造方式，命令函数在单测里调不到。
+    //  命令壳现在只做参数解包，逻辑全在 `*_impl` 里。
+    // ========================================================================
+
+    /// 打开一个测试用工作区，返回（临时目录, 状态）。
+    fn opened_workspace() -> (tempfile::TempDir, AppState) {
+        let dir = tempfile::tempdir().unwrap();
+        let state = AppState::new();
+        state
+            .create(dir.path().join("ws"), "测试书".into())
+            .unwrap();
+        (dir, state)
+    }
+
+    /// 取当前文稿里所有卷的 (id, title, sort)，**按 sort 升序**。
+    ///
+    /// 按 sort 排序而不是按存储顺序：界面上看到的就是 sort 序
+    /// （`Document::outline` 与 `to_summary` 都按它排），
+    /// 而 `doc.volumes` 的存储顺序在一次重扫后是**目录枚举序**，
+    /// 两者在重排后并不相同 —— 断言时用错那个会得到假失败。
+    fn volume_triples(state: &AppState) -> Vec<(String, String, i32)> {
+        let mut out: Vec<(String, String, i32)> = state
+            .document()
+            .unwrap()
+            .volumes
+            .iter()
+            .map(|v| (v.id.to_string(), v.title.clone(), v.sort))
+            .collect();
+        out.sort_by_key(|(_, _, sort)| *sort);
+        out
+    }
+
+    /// 取某一卷对应的磁盘目录名（从配置里读，与命令层同一套规则）。
+    fn configured_dir_name(state: &AppState, volume_id: &str) -> String {
+        let s = state.current().unwrap();
+        let guard = s.lock().unwrap();
+        guard
+            .config()
+            .volumes
+            .iter()
+            .find(|r| r.id == volume_id)
+            .map(|r| r.dir_name.clone())
+            .unwrap_or_else(|| panic!("配置里找不到卷 {volume_id}"))
+    }
+
+    /// 列出 `manuscript/` 下的子目录名（已排序）。
+    fn manuscript_subdirs(state: &AppState) -> Vec<String> {
+        let s = state.current().unwrap();
+        let guard = s.lock().unwrap();
+        let manuscript = guard.layout().manuscript_dir();
+        let mut names: Vec<String> = std::fs::read_dir(&manuscript)
+            .unwrap()
+            .flatten()
+            .filter(|e| e.path().is_dir())
+            .map(|e| e.file_name().to_string_lossy().to_string())
+            .collect();
+        names.sort();
+        names
+    }
+
+    /// 验收 1：`rename_volume` 之后卷名是新名字（**修复前会失败**）。
+    ///
+    /// 修复前的链路是「改内存 → 重扫」，而重扫从目录名重建标题，
+    /// 于是新名字被旧目录名覆盖。
+    #[test]
+    fn rename_volume_survives_rescan() {
+        let (_dir, state) = opened_workspace();
+        let vid = volume_triples(&state)[0].0.clone();
+
+        rename_volume_impl(&state, vid.clone(), "改过的卷名".into()).unwrap();
+
+        // 直接看内存（重扫已经发生过）
+        let triple = volume_triples(&state)
+            .into_iter()
+            .find(|(id, _, _)| *id == vid)
+            .expect("卷不见了");
+        assert_eq!(triple.1, "改过的卷名", "重命名被重扫冲掉了");
+
+        // 再从磁盘配置确认它真的持久化了 —— 只在内存里对不算数
+        let config_text = std::fs::read_to_string(
+            state
+                .current()
+                .unwrap()
+                .lock()
+                .unwrap()
+                .layout()
+                .config_path(),
+        )
+        .unwrap();
+        assert!(
+            config_text.contains("改过的卷名"),
+            "卷名没有写进 workspace.json：{config_text}"
+        );
+    }
+
+    /// 验收 2：`rename_volume` 之后 `create_chapter`，
+    /// 新章节落在**该卷真实的目录**里，且没有新建多余目录。
+    #[test]
+    fn create_chapter_after_rename_lands_in_the_real_directory() {
+        let (_dir, state) = opened_workspace();
+        let vid = volume_triples(&state)[0].0.clone();
+
+        // 目录名带着旧标题
+        let dir_before_rename = configured_dir_name(&state, &vid);
+        let subdirs_before = manuscript_subdirs(&state);
+
+        rename_volume_impl(&state, vid.clone(), "全新的卷名".into()).unwrap();
+
+        // 重命名**不碰目录名**：目录名退化为纯哈希键，这是本方案的取舍
+        let dir_after_rename = configured_dir_name(&state, &vid);
+        assert_eq!(
+            dir_before_rename, dir_after_rename,
+            "重命名不应改动磁盘目录名（否则云盘会看到删除+新增）"
+        );
+
+        create_chapter_impl(&state, vid.clone(), "新章".into()).unwrap();
+
+        // 新章节文件必须落在**同一个**目录里
+        let subdirs_after = manuscript_subdirs(&state);
+        assert_eq!(
+            subdirs_before, subdirs_after,
+            "新建章节不该在 manuscript/ 下多出目录"
+        );
+
+        let chapter = state
+            .document()
+            .unwrap()
+            .chapters
+            .iter()
+            .find(|c| c.volume_id.to_string() == vid)
+            .expect("新章没有挂到目标卷上")
+            .clone();
+        assert!(
+            chapter
+                .path
+                .starts_with(&format!("manuscript/{dir_after_rename}/")),
+            "新章路径 {} 不在该卷目录 {} 下",
+            chapter.path,
+            dir_after_rename
+        );
+        // 文件必须真的存在
+        let s = state.current().unwrap();
+        let guard = s.lock().unwrap();
+        assert!(
+            guard.layout().resolve(&chapter.path).unwrap().is_file(),
+            "章节文件没有被真的创建出来"
+        );
+    }
+
+    /// 验收 3：`reorder_volumes` 之后重开工作区，顺序保持。
+    #[test]
+    fn reorder_volumes_survives_reopen() {
+        let dir = tempfile::tempdir().unwrap();
+        let root = dir.path().join("ws");
+        let state = AppState::new();
+        state.create(root.clone(), "测试书".into()).unwrap();
+
+        // 建到三卷，再整体倒序
+        create_volume_impl(&state, "乙卷".into()).unwrap();
+        create_volume_impl(&state, "丙卷".into()).unwrap();
+        let before = volume_triples(&state);
+        assert_eq!(before.len(), 3);
+
+        let reversed: Vec<String> = before.iter().rev().map(|(id, _, _)| id.clone()).collect();
+        reorder_volumes_impl(&state, reversed.clone()).unwrap();
+
+        let titles_after_reorder: Vec<String> = volume_triples(&state)
+            .into_iter()
+            .map(|(_, t, _)| t)
+            .collect();
+        assert_eq!(
+            titles_after_reorder,
+            vec!["丙卷", "乙卷", "第一卷"],
+            "重排后的顺序不对"
+        );
+
+        // 重开工作区（第二次 AppState::open），顺序必须保持
+        state.open(root).unwrap();
+        let after_reopen: Vec<(String, String, i32)> = volume_triples(&state);
+
+        assert_eq!(
+            after_reopen
+                .iter()
+                .map(|(_, t, _)| t.clone())
+                .collect::<Vec<_>>(),
+            titles_after_reorder,
+            "重开工作区后卷序丢了"
+        );
+        // ID 也必须保持稳定，否则索引里引用它们的章节会变成孤儿
+        assert_eq!(
+            after_reopen
+                .iter()
+                .map(|(id, _, _)| id.clone())
+                .collect::<Vec<_>>(),
+            reversed,
+            "重开后卷 ID 变了"
+        );
+    }
+
+    /// 验收 4：旧格式兼容 —— 手工写一个**不含 `volumes`** 的 workspace.json，
+    /// 能正常打开、卷从目录名推导、且回填后再次打开得到相同结果。
+    #[test]
+    fn opens_legacy_config_without_volumes_field() {
+        let dir = tempfile::tempdir().unwrap();
+        let root = dir.path().join("ws");
+        let state = AppState::new();
+        state.create(root.clone(), "旧书".into()).unwrap();
+
+        // 造一个卷目录 + 章节（用旧版本的目录名规则）
+        let legacy_dir = root.join("manuscript/001-第一卷 风起");
+        std::fs::create_dir_all(&legacy_dir).unwrap();
+        std::fs::write(legacy_dir.join("001-第一章.md"), "正文").unwrap();
+
+        // 手工把配置改回"旧格式"：删掉 volumes 字段。
+        // 用 serde_json 的 Value 删而不是写死一段 JSON —— 这样
+        // formatVersion / workspaceId 之类的字段保持原样，测试
+        // 只改它想改的那一处。
+        let config_path = root.join(".yuhua/workspace.json");
+        let mut value: serde_json::Value =
+            serde_json::from_str(&std::fs::read_to_string(&config_path).unwrap()).unwrap();
+        value.as_object_mut().unwrap().remove("volumes");
+        std::fs::write(&config_path, serde_json::to_string_pretty(&value).unwrap()).unwrap();
+
+        // 前提校验：这份配置确实缺字段，且缺字段本身不会让它解析失败
+        let raw = std::fs::read_to_string(&config_path).unwrap();
+        assert!(!raw.contains("volumes"), "前提：配置里不该有 volumes");
+
+        // 第一次打开：从目录名推导，并回填。
+        //
+        // 注意会有**两个**卷：`state.create` 在零卷时补了一个默认的
+        // 「第一卷」（它此刻已有磁盘目录，见 `AppState::open` 的补齐逻辑），
+        // 再加上我们手工建的那个目录。这里刻意不断言"恰好一个"，
+        // 而是断言两个来源都正确 —— 否则测试会依赖一个无关的细节。
+        state.open(root.clone()).unwrap();
+        let first = volume_triples(&state);
+        assert_eq!(first.len(), 2, "应当从目录名推导出两个卷：{first:?}");
+        assert!(
+            first.iter().any(|(_, t, _)| t == "第一卷 风起"),
+            "手工建的目录没有被推导成卷：{first:?}"
+        );
+        assert!(
+            first.iter().any(|(_, t, _)| t == "第一卷"),
+            "默认卷不该在旧格式打开时丢失：{first:?}"
+        );
+        assert_eq!(state.document().unwrap().chapters.len(), 1);
+
+        // 回填后磁盘上应当有 volumes 了
+        let after_backfill = std::fs::read_to_string(&config_path).unwrap();
+        assert!(
+            after_backfill.contains("第一卷 风起"),
+            "旧格式没有被回填：{after_backfill}"
+        );
+
+        // 第二次打开：结果必须与第一次**完全相同**
+        state.open(root).unwrap();
+        let second = volume_triples(&state);
+        assert_eq!(first, second, "回填后再次打开的结果与第一次不一致");
+    }
+
+    /// 验收 5：`delete_volume` 在目录不存在时，卷确实从大纲里消失。
+    #[test]
+    fn delete_volume_without_directory_still_removes_it() {
+        let (_dir, state) = opened_workspace();
+        create_volume_impl(&state, "乙卷".into()).unwrap();
+
+        let target = volume_triples(&state)
+            .into_iter()
+            .find(|(_, t, _)| t == "乙卷")
+            .expect("找不到乙卷")
+            .0;
+
+        // 手工把目录删掉，模拟"空卷还没建目录"或"用户在文件管理器里删了"
+        let dir_name = configured_dir_name(&state, &target);
+        let s = state.current().unwrap();
+        let manuscript = s.lock().unwrap().layout().manuscript_dir();
+        std::fs::remove_dir_all(manuscript.join(&dir_name)).unwrap();
+        assert!(!manuscript.join(&dir_name).exists(), "前提：目录已被删除");
+
+        delete_volume_impl(&state, target.clone()).unwrap();
+
+        // 卷必须从内存与大纲里消失 —— 这是「UI 说删了、其实没删」的反面
+        let remaining = volume_triples(&state);
+        assert!(
+            !remaining.iter().any(|(id, _, _)| *id == target),
+            "目录不存在时卷没有被移除：{remaining:?}"
+        );
+        assert!(
+            !state
+                .document()
+                .unwrap()
+                .outline()
+                .iter()
+                .any(|n| n.volume_id.to_string() == target),
+            "卷仍然出现在大纲里"
+        );
+        // 配置里也不该再留着它，否则下次扫描会把它重新建出来
+        let config_text = std::fs::read_to_string(
+            state
+                .current()
+                .unwrap()
+                .lock()
+                .unwrap()
+                .layout()
+                .config_path(),
+        )
+        .unwrap();
+        assert!(
+            !config_text.contains(&target),
+            "已删除的卷仍留在 workspace.json 里：{config_text}"
+        );
+    }
 
     #[test]
     fn count_modes_cover_all_three() {

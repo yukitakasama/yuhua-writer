@@ -126,6 +126,82 @@ impl WorkspaceSession {
     pub fn workspace(&self) -> &Workspace {
         &self.workspace
     }
+
+    /// 把当前文稿的卷清单写入 `workspace.json`。
+    ///
+    /// ## 为什么 `dir_name` 要**沿用**配置里的旧值，而不是现算
+    ///
+    /// 这是本函数最关键的一条规则，也是「卷名可以随时改、目录名一动不动」
+    /// 这个设计成立的支点。
+    ///
+    /// `dir_name` 是卷在磁盘上的**身份**（配置与目录之间靠它对应）。
+    /// 若拿当前内存的 `sort` 与 `title` 现算 `volume_dir_name(..)`：
+    ///
+    /// - **重命名后**会得到一个磁盘上不存在的目录名，于是下一次扫描
+    ///   在 `volume_dirs` 里找不到匹配的目录 → 卷被当成"配置里的幽灵"丢弃，
+    ///   取而代之的是从目录名兜底新建的**另一个 ID** ——
+    ///   界面上表现为「改个名字，卷整个没了」。
+    /// - **重排后**同理：sort 变了，目录名的编号却没变。
+    ///
+    /// 因此只有**新卷**（配置里还没有它的 ID）才现算目录名 ——
+    /// 而那一刻 `create_volume` 刚用同一个公式把目录建了出来，两边必然一致。
+    ///
+    /// ## 为什么传入的是「整份文稿」而不是一串卷
+    ///
+    /// 因为调用方（命令层）手里只有 `Document`，而 `VolumeRecord`
+    /// 需要 `dir_name`。让每个调用点各算一遍是重复且容易漏的，
+    /// 收敛到这里一处。
+    ///
+    /// ## 顺序纪律：必须先落盘再重扫
+    ///
+    /// 所有会改卷的命令都遵循「改内存 → `save_volumes` → 重扫」。
+    /// 反过来（先重扫）会让扫描拿旧配置重建卷，改动当场丢失 ——
+    /// 那正是本次要修的那个缺陷。
+    pub fn save_volumes(&mut self, doc: &Document) -> Result<(), CommandError> {
+        let existing = self.workspace.volumes().to_vec();
+        // 磁盘上真实存在的卷目录，用于给"配置里还没有"的卷找到它真正的名字
+        let on_disk = crate::scan::list_volume_dir_names(&self.workspace.layout);
+
+        let records: Vec<yuhua_fs::workspace::VolumeRecord> = doc
+            .volumes
+            .iter()
+            // sort == -1 的「未分卷」是一个**虚拟容器**（根下散章的挂载点），
+            // 它在磁盘上没有对应目录，写进配置只会在下次扫描时变成一个
+            // 指向不存在目录的记录。
+            .filter(|v| v.sort >= 0)
+            .map(|v| {
+                let id = v.id.to_string();
+                // 目录名的取值优先级（见上面的说明）：
+                // 1. 配置里已有的记录 —— 沿用，目录名是磁盘上的既成事实
+                // 2. 磁盘上真实存在的目录 —— 用户手工建的目录会被扫描
+                //    兜底收成一个新卷，此时它的目录名只能是磁盘上那个。
+                //    匹配规则用「剥掉序号前缀后等于卷标题」，这与
+                //    `scan_workspace` 建卷时用的是**同一个** `strip_sort_prefix`，
+                //    因此两边必然得出同一个结论。
+                // 3. 都没有 —— 全新卷，按规则现算
+                //    （调用方刚从同一个公式把目录建了出来）
+                let dir_name = existing
+                    .iter()
+                    .find(|r| r.id == id)
+                    .map(|r| r.dir_name.clone())
+                    .or_else(|| {
+                        on_disk
+                            .iter()
+                            .find(|d| crate::scan::strip_sort_prefix(d) == v.title)
+                            .cloned()
+                    })
+                    .unwrap_or_else(|| WorkspaceLayout::volume_dir_name(v.sort, &v.title));
+                yuhua_fs::workspace::VolumeRecord {
+                    id,
+                    title: v.title.clone(),
+                    sort: v.sort,
+                    dir_name,
+                }
+            })
+            .collect();
+        self.workspace.save_volumes(&records)?;
+        Ok(())
+    }
 }
 
 impl std::fmt::Debug for WorkspaceSession {
@@ -178,7 +254,7 @@ impl AppState {
     ///
     /// 全程不持有会话锁：此时会话还没发布出去，没有并发访问者。
     pub fn open(&self, root: PathBuf) -> Result<SessionHandle, CommandError> {
-        let workspace = Workspace::open(root)?;
+        let mut workspace = Workspace::open(root)?;
         let root_str = workspace.layout.root().to_string_lossy().to_string();
 
         // 索引库在工作区之外（不变量 3）
@@ -191,8 +267,79 @@ impl AppState {
         // 「空工作区补一个默认卷」的逻辑放在 scan_workspace 内部，而不是这里 ——
         // 那样能同时覆盖 rescan_workspace 等所有扫描调用方，
         // 避免只在这一条路径上生效而在别处又出现「零卷」。
-        let document = crate::scan::scan_workspace(&workspace)?;
+        let (document, volume_dirs) = crate::scan::scan_workspace_with_dirs(&workspace)?;
         document.validate()?;
+
+        // ---- 旧格式回填：把扫描推导出的卷清单写进配置 ----
+        //
+        // 放在这里而不是 scan_workspace 内部，是为了让扫描保持**纯读**
+        // （它被 reload_and_sync 在持锁状态下调用，不该有写盘副作用）。
+        //
+        // 只在配置为空时回填：非空说明这个工作区已经记录过卷信息，
+        // 此时扫描结果可能包含用户手工新建的目录 —— 那些目录会在
+        // 下一次「结构改动」时才被写进配置，不必在每次打开时都写一次盘。
+        // 每开一次工作区就重写 workspace.json 会制造云盘同步噪音。
+        if workspace.volumes().is_empty() {
+            // 目录名取自**磁盘实际的名字**（`volume_dirs`），
+            // 绝不用 `volume_dir_name(sort, title)` 现算 —— 那是一个
+            // 生成规则，而用户手工建的 / 手工改过名的目录并不服从它。
+            // 现算会写进一个不存在的目录名，下次扫描找不到匹配，
+            // 于是从目录名兜底再建一个同名却不同 ID 的卷（见 scan 模块
+            // `VolumeDirMap` 的文档）。
+            let records: Vec<yuhua_fs::workspace::VolumeRecord> = volume_dirs
+                .iter()
+                .filter_map(|(id, dir_name)| {
+                    let vol = document.volumes.iter().find(|v| v.id.as_str() == id)?;
+                    Some(yuhua_fs::workspace::VolumeRecord {
+                        id: id.clone(),
+                        title: vol.title.clone(),
+                        sort: vol.sort,
+                        dir_name: dir_name.clone(),
+                    })
+                })
+                .collect();
+
+            // 配置里还没有、磁盘上也没有目录的卷（新工作区的默认「第一卷」）
+            // 需要补一个目录出来：扫描是**目录驱动**的，不在磁盘上的卷
+            // 下次扫描就会被丢弃，而它的 ID 会被重新生成，
+            // 索引里引用它的章节全成孤儿。
+            let missing: Vec<yuhua_fs::workspace::VolumeRecord> = document
+                .volumes
+                .iter()
+                .filter(|v| v.sort >= 0)
+                .filter(|v| !records.iter().any(|r| r.id == v.id.to_string()))
+                .map(|v| yuhua_fs::workspace::VolumeRecord {
+                    id: v.id.to_string(),
+                    title: v.title.clone(),
+                    sort: v.sort,
+                    // 这里**可以**现算：它是全新目录，由我们按规则创建
+                    dir_name: WorkspaceLayout::volume_dir_name(v.sort, &v.title),
+                })
+                .collect();
+
+            for record in &missing {
+                let dir = workspace.layout.manuscript_dir().join(&record.dir_name);
+                if let Err(e) = std::fs::create_dir_all(&dir) {
+                    // 建不出来不阻断打开：卷仍然在内存与界面上是正确的，
+                    // 首次写章节时 `write_chapter` 还会再试着建一次父目录
+                    eprintln!(
+                        "[工作区] 卷目录创建失败（不影响本次打开）：{}：{e}",
+                        dir.display()
+                    );
+                }
+            }
+
+            let mut all = records;
+            all.extend(missing);
+            all.sort_by_key(|r| r.sort);
+
+            // 回填失败不阻断打开：配置写不进去只意味着下次打开会再推导一遍，
+            // 而卷名此刻已经在内存与界面上是正确的。为了一个缓存性的写入
+            // 让用户打不开工作区，是明显更糟的取舍。
+            if let Err(e) = workspace.save_volumes(&all) {
+                eprintln!("[工作区] 卷清单回填失败（不影响本次打开）：{e}");
+            }
+        }
 
         // 全量同步索引
         index.upsert_book(&document.book, &root_str)?;

@@ -7,7 +7,13 @@
 
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-import { __resetMockBackend, adaptSearchResults, byteRangesToCharRanges, isTauri, utf8Length } from "./index";
+import {
+  __resetMockBackend,
+  adaptSearchResults,
+  byteRangesToCharRanges,
+  isTauri,
+  utf8Length,
+} from "./index";
 import { IpcFailure, isIpcError, normalizeError, toFailure } from "./errors";
 
 beforeEach(() => {
@@ -36,7 +42,12 @@ describe("isTauri", () => {
 
 describe("错误归一化", () => {
   it("已经是标准形状的对象原样通过", () => {
-    const error = { code: "IO_ERROR", message: "失败了", recoverable: true, detail: "底层原因" };
+    const error = {
+      code: "IO_ERROR",
+      message: "失败了",
+      recoverable: true,
+      detail: "底层原因",
+    };
     expect(normalizeError(error)).toEqual(error);
   });
 
@@ -69,19 +80,31 @@ describe("错误归一化", () => {
   });
 
   it("isIpcError 正确区分", () => {
-    expect(isIpcError({ code: "A", message: "b", recoverable: true })).toBe(true);
+    expect(isIpcError({ code: "A", message: "b", recoverable: true })).toBe(
+      true,
+    );
     expect(isIpcError({ code: "A", message: "b" })).toBe(false);
     expect(isIpcError(null)).toBe(false);
     expect(isIpcError("字符串")).toBe(false);
   });
 
   it("toFailure 保留已有的 IpcFailure 实例", () => {
-    const original = new IpcFailure({ code: "X", message: "y", recoverable: true, detail: null });
+    const original = new IpcFailure({
+      code: "X",
+      message: "y",
+      recoverable: true,
+      detail: null,
+    });
     expect(toFailure(original)).toBe(original);
   });
 
   it("toFailure 包装普通错误，且 code / recoverable 可读", () => {
-    const failure = toFailure({ code: "IO_ERROR", message: "读文件失败", recoverable: true, detail: null });
+    const failure = toFailure({
+      code: "IO_ERROR",
+      message: "读文件失败",
+      recoverable: true,
+      detail: null,
+    });
     expect(failure).toBeInstanceOf(IpcFailure);
     expect(failure.code).toBe("IO_ERROR");
     expect(failure.recoverable).toBe(true);
@@ -129,7 +152,15 @@ describe("byteRangesToCharRanges", () => {
   });
 
   it("多个区间分别转换", () => {
-    expect(byteRangesToCharRanges("羽化写作", [[0, 3], [9, 12]])).toEqual([[0, 1], [3, 4]]);
+    expect(
+      byteRangesToCharRanges("羽化写作", [
+        [0, 3],
+        [9, 12],
+      ]),
+    ).toEqual([
+      [0, 1],
+      [3, 4],
+    ]);
   });
 
   it("越界区间被夹紧，不产生负数或越界下标", () => {
@@ -154,7 +185,9 @@ describe("adaptSearchResults", () => {
           path: "a.md",
           volumeId: "vol_1",
           score: 1,
-          snippets: [{ text: "羽化写作", ranges: [[3, 6]] as Array<[number, number]> }],
+          snippets: [
+            { text: "羽化写作", ranges: [[3, 6]] as Array<[number, number]> },
+          ],
         },
       ],
       total: 1,
@@ -168,7 +201,16 @@ describe("adaptSearchResults", () => {
 
   it("没有片段的命中不会被破坏", () => {
     const input = {
-      hits: [{ chapterId: "c", title: "t", path: "p", volumeId: "v", score: 0, snippets: [] }],
+      hits: [
+        {
+          chapterId: "c",
+          title: "t",
+          path: "p",
+          volumeId: "v",
+          score: 0,
+          snippets: [],
+        },
+      ],
       total: 1,
       limit: 30,
       offset: 0,
@@ -178,7 +220,13 @@ describe("adaptSearchResults", () => {
   });
 
   it("保留其它字段不变", () => {
-    const input = { hits: [], total: 7, limit: 10, offset: 3, tokens: ["a", "b"] };
+    const input = {
+      hits: [],
+      total: 7,
+      limit: 10,
+      offset: 3,
+      tokens: ["a", "b"],
+    };
     expect(adaptSearchResults(input)).toEqual(input);
   });
 });
@@ -191,16 +239,27 @@ describe("降级到 mock 后端", () => {
     expect(recents[0]).toHaveProperty("root");
   });
 
-  it("非 Tauri 环境下 openWorkspace 返回完整文档结构", async () => {
+  it("非 Tauri 环境下 openWorkspace 返回 Rust OpenResult 的真实形状", async () => {
     const ipc = await import("./index");
     const result = await ipc.openWorkspace("C:/示例");
-    expect(result.document.volumes.length).toBeGreaterThan(0);
-    expect(result.document.book.title).toBeTruthy();
+    // 这四个键就是 commands.rs 里 OpenResult 的字段。
+    // 断言键集合而不是逐个取值，是为了让「后端加了/改了字段」
+    // 也在这里被看见 —— 只断言 outline 非空会漏掉形状漂移。
+    expect(Object.keys(result).sort()).toEqual([
+      "outline",
+      "recovery",
+      "words",
+      "workspace",
+    ]);
+    expect(result.outline.length).toBeGreaterThan(0);
+    expect(result.workspace.title).toBeTruthy();
   });
 
   it("mock 的错误被包装成 IpcFailure", async () => {
     const ipc = await import("./index");
-    await expect(ipc.renameVolume("vol_不存在", "x")).rejects.toBeInstanceOf(IpcFailure);
+    await expect(ipc.renameVolume("vol_不存在", "x")).rejects.toBeInstanceOf(
+      IpcFailure,
+    );
   });
 
   it("被包装的错误带有可分支的 code", async () => {
@@ -235,10 +294,11 @@ describe("降级到 mock 后端", () => {
     expect(checked).toBeGreaterThan(0);
   });
 
-  it("createWorkspace 走通并返回可用的文档", async () => {
+  it("createWorkspace 走通并返回可用的结果", async () => {
     const ipc = await import("./index");
     const result = await ipc.createWorkspace("C:/新书", "测试新书");
-    expect(result.document.book.title).toBe("测试新书");
-    expect(result.document.volumes.length).toBe(1);
+    expect(result.workspace.title).toBe("测试新书");
+    expect(result.outline.length).toBe(1);
+    expect(result.outline[0]?.chapters.length).toBe(0);
   });
 });

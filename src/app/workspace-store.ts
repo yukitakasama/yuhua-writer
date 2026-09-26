@@ -22,7 +22,14 @@ import { createStore, produce, type SetStoreFunction } from "solid-js/store";
 import { createSignal } from "solid-js";
 
 import * as ipc from "@/lib/ipc";
-import type { ChapterContent, ChapterStatus, ChapterSummary, Volume, WorkspaceDocument } from "@/lib/ipc";
+import type {
+  ChapterContent,
+  ChapterStatus,
+  ChapterSummary,
+  OpenWorkspaceResult,
+  Volume,
+  WorkspaceDocument,
+} from "@/lib/ipc";
 import {
   chapterOrderOf,
   moveChapter as moveChapterInTree,
@@ -86,7 +93,9 @@ export function volumes(): Volume[] {
 export function chaptersIn(volumeId: string): ChapterSummary[] {
   const doc = state.document;
   if (!doc) return [];
-  return doc.chapters.filter((c) => c.volumeId === volumeId).sort((a, b) => a.sort - b.sort);
+  return doc.chapters
+    .filter((c) => c.volumeId === volumeId)
+    .sort((a, b) => a.sort - b.sort);
 }
 
 /** 全书章节总数。 */
@@ -114,12 +123,80 @@ export async function refreshRecents(): Promise<void> {
   }
 }
 
+/**
+ * 把 `open_workspace` 的返回折成前端内部使用的文稿形状。
+ *
+ * ## 为什么需要这一次折算
+ *
+ * Rust 的 `OpenResult` 给的是「工作区摘要 + 大纲 + 全书字数 + 恢复报告」，
+ * 而界面需要的是「书 + 卷 + 章摘要」。两边的形状本就不同 ——
+ * 折算是契约的一部分，不是临时补丁。
+ *
+ * 卷列表从大纲里取：`OutlineNode` 已经带了 `volumeId/title/sort`，
+ * 不额外发 `get_volumes` 之类的命令（那种命令不存在，也不该为它存在）。
+ *
+ * ## ⚠️ 已知缺口：`book` 的元数据在 open 路径上不可得
+ *
+ * `WorkspaceSummary` 只有 `title`，没有作者 / 简介 / 书级更新时间。
+ * 这里用一个**最小占位**：`id` 取 `workspaceId`、`title` 取书名，其余空串。
+ * **绝不伪造**作者或简介 —— 界面上显示一个假作者名比显示空白更糟。
+ *
+ * 要真正填上这条缺口，需要后端新增一条返回书级元数据的命令
+ * （或在 `OpenResult` 上加字段）。本次修复刻意不扩契约。
+ *
+ * ## 为什么抽成纯函数
+ *
+ * 原来这三处直接用 `result.document`，而 `OpenResult` 里没有这个字段 ——
+ * 真实 Tauri 路径下 `document` 恒为 `undefined`，一渲染卷章树就抛错。
+ * 抽成纯函数后，这个折算过程可以直接用「Rust 的形状」单测，
+ * 不必把整个 store 和 Tauri 运行时都拉起来。
+ */
+export function documentFromOpenResult(
+  result: OpenWorkspaceResult,
+): WorkspaceDocument {
+  const { workspace, outline, recovery } = result;
+
+  // 卷从大纲来。`OutlineNode` 的字段是卷的投影，缺 `bookId` 与 `created`
+  // —— 前者这里能补（就是同一本书），后者后端在这一路径上没有提供，
+  // 用空串而不是伪造一个时间（见上面的「已知缺口」）。
+  const volumes: Volume[] = outline.map((node) => ({
+    id: node.volumeId,
+    bookId: workspace.workspaceId,
+    title: node.title,
+    sort: node.sort,
+    created: "",
+  }));
+
+  return {
+    book: {
+      id: workspace.workspaceId,
+      title: workspace.title,
+      author: "",
+      description: "",
+      created: workspace.created,
+      updated: workspace.lastOpened ?? workspace.created,
+    },
+    volumes,
+    chapters: outline.flatMap((node) => node.chapters),
+    recovery,
+  };
+}
+
 /** 打开一个已有工作区。 */
 export async function openWorkspace(root: string): Promise<boolean> {
   setState({ status: "loading", error: null });
   try {
     const result = await ipc.openWorkspace(root);
-    setState({ status: "ready", root: result.root, document: result.document, error: null });
+    // 根路径以 `workspace.root` 为准：它来自磁盘上的配置，
+    // 而传入的 `root` 是用户手输或对话框给的，两者可能只是写法不同
+    // （结尾斜杠、大小写、`..`）。以磁盘那份为准能避免"同一个工作区
+    // 被当成两个"这种隐蔽的状态分叉。
+    setState({
+      status: "ready",
+      root: result.workspace.root,
+      document: documentFromOpenResult(result),
+      error: null,
+    });
     return true;
   } catch (err) {
     setState({ status: "error", error: ipc.toFailure(err).error });
@@ -128,11 +205,19 @@ export async function openWorkspace(root: string): Promise<boolean> {
 }
 
 /** 新建一个工作区。 */
-export async function createWorkspace(root: string, title: string): Promise<boolean> {
+export async function createWorkspace(
+  root: string,
+  title: string,
+): Promise<boolean> {
   setState({ status: "loading", error: null });
   try {
     const result = await ipc.createWorkspace(root, title);
-    setState({ status: "ready", root: result.root, document: result.document, error: null });
+    setState({
+      status: "ready",
+      root: result.workspace.root,
+      document: documentFromOpenResult(result),
+      error: null,
+    });
     await refreshRecents();
     return true;
   } catch (err) {
@@ -173,7 +258,10 @@ function setVolumes(volumes: Volume[]): void {
 }
 
 /** 新建一卷。 */
-export async function addVolume(title: string, sort?: number): Promise<boolean> {
+export async function addVolume(
+  title: string,
+  sort?: number,
+): Promise<boolean> {
   try {
     await ipc.createVolume(sort === undefined ? { title } : { title, sort });
     await reloadDocument();
@@ -185,7 +273,10 @@ export async function addVolume(title: string, sort?: number): Promise<boolean> 
 }
 
 /** 重命名一卷：先本地改（内联编辑要即时反馈），失败再回滚。 */
-export async function renameVolumeLocal(volumeId: string, title: string): Promise<boolean> {
+export async function renameVolumeLocal(
+  volumeId: string,
+  title: string,
+): Promise<boolean> {
   const before = state.document?.volumes ?? [];
   setVolumes(before.map((v) => (v.id === volumeId ? { ...v, title } : v)));
   try {
@@ -212,7 +303,10 @@ export async function renameVolumeLocal(volumeId: string, title: string): Promis
  * 与发出去的顺序因此必然一致。若让调用方各自实现一遍排序，
  * 两者迟早会分叉。
  */
-export async function moveVolumeTo(volumeId: string, toIndex: number): Promise<boolean> {
+export async function moveVolumeTo(
+  volumeId: string,
+  toIndex: number,
+): Promise<boolean> {
   const doc = state.document;
   if (doc === null) return false;
   const snapshot = { volumes: doc.volumes, chapters: doc.chapters };
@@ -259,7 +353,11 @@ export async function removeVolume(volumeId: string): Promise<boolean> {
  * 后端 `create_chapter` 的既定行为（有测试钉住），依靠它比
  * 每次多扫一遍更划算。
  */
-export async function addChapter(volumeId: string, title?: string, sort?: number): Promise<ChapterSummary | null> {
+export async function addChapter(
+  volumeId: string,
+  title?: string,
+  sort?: number,
+): Promise<ChapterSummary | null> {
   try {
     const input: ipc.CreateChapterInput = { volumeId };
     if (title !== undefined) input.title = title;
@@ -271,7 +369,9 @@ export async function addChapter(volumeId: string, title?: string, sort?: number
     // 从大纲里拿不到时退回读一次列表：宁可多一次读，
     // 也不要让"新建章之后没有自动选中"这种交互断裂
     if (created === null) {
-      return state.document?.chapters.find((c) => c.volumeId === volumeId) ?? null;
+      return (
+        state.document?.chapters.find((c) => c.volumeId === volumeId) ?? null
+      );
     }
     return created;
   } catch (err) {
@@ -281,7 +381,10 @@ export async function addChapter(volumeId: string, title?: string, sort?: number
 }
 
 /** 重命名一章：先本地改，失败回滚。 */
-export async function renameChapterLocal(chapterId: string, title: string): Promise<boolean> {
+export async function renameChapterLocal(
+  chapterId: string,
+  title: string,
+): Promise<boolean> {
   const before = state.document?.chapters ?? [];
   setState(
     "document",
@@ -299,7 +402,10 @@ export async function renameChapterLocal(chapterId: string, title: string): Prom
 }
 
 /** 设置章节状态。 */
-export async function setStatus(chapterId: string, status: ChapterStatus): Promise<boolean> {
+export async function setStatus(
+  chapterId: string,
+  status: ChapterStatus,
+): Promise<boolean> {
   try {
     await ipc.setChapterStatus(chapterId, status);
     setState(
@@ -348,11 +454,18 @@ export async function removeChapter(chapterId: string): Promise<boolean> {
  *
  * 这是个真实取舍：两种失败都不好，但"少一份"比"多一份"好处理。
  */
-export async function moveChapterTo(chapterId: string, toVolumeId: string, toIndex: number): Promise<boolean> {
+export async function moveChapterTo(
+  chapterId: string,
+  toVolumeId: string,
+  toIndex: number,
+): Promise<boolean> {
   const doc = state.document;
   if (doc === null) return false;
   const snapshot = { volumes: doc.volumes, chapters: doc.chapters };
-  const result = moveChapterInTree(snapshot, chapterId, { volumeId: toVolumeId, index: toIndex });
+  const result = moveChapterInTree(snapshot, chapterId, {
+    volumeId: toVolumeId,
+    index: toIndex,
+  });
   if (!result.changed) return true;
 
   const moving = doc.chapters.find((c) => c.id === chapterId);
@@ -360,9 +473,15 @@ export async function moveChapterTo(chapterId: string, toVolumeId: string, toInd
 
   try {
     // 源卷先重排（见上面的顺序说明）
-    await ipc.reorderChapters(moving.volumeId, chapterOrderOf(result.snapshot, moving.volumeId));
+    await ipc.reorderChapters(
+      moving.volumeId,
+      chapterOrderOf(result.snapshot, moving.volumeId),
+    );
     if (moving.volumeId !== toVolumeId) {
-      await ipc.reorderChapters(toVolumeId, chapterOrderOf(result.snapshot, toVolumeId));
+      await ipc.reorderChapters(
+        toVolumeId,
+        chapterOrderOf(result.snapshot, toVolumeId),
+      );
     }
     await reloadDocument();
     return true;
@@ -383,7 +502,7 @@ export async function reloadDocument(): Promise<void> {
   if (state.root === "") return;
   try {
     const result = await ipc.openWorkspace(state.root);
-    setState("document", result.document);
+    setState("document", documentFromOpenResult(result));
   } catch (err) {
     setState("error", ipc.toFailure(err).error);
   }
@@ -393,7 +512,9 @@ export async function reloadDocument(): Promise<void> {
 // 当前选中的章节
 // ---------------------------------------------------------------------------
 
-const [selectedChapterId, setSelectedChapterId] = createSignal<string | null>(null);
+const [selectedChapterId, setSelectedChapterId] = createSignal<string | null>(
+  null,
+);
 export { selectedChapterId };
 
 /** 选中一章。 */
@@ -441,7 +562,12 @@ export async function loadChapterBody(chapterId: string): Promise<void> {
   setEditing({ id: chapterId, body: "", hash: "", loading: true });
   try {
     const content: ChapterContent = await ipc.readChapter(chapterId);
-    setEditing({ id: chapterId, body: content.body, hash: content.contentHash, loading: false });
+    setEditing({
+      id: chapterId,
+      body: content.body,
+      hash: content.contentHash,
+      loading: false,
+    });
   } catch (err) {
     setEditing(null);
     setState("error", ipc.toFailure(err).error);
@@ -449,12 +575,20 @@ export async function loadChapterBody(chapterId: string): Promise<void> {
 }
 
 /** 保存当前编辑的正文。 */
-export async function saveChapterBody(chapterId: string, body: string): Promise<boolean> {
+export async function saveChapterBody(
+  chapterId: string,
+  body: string,
+): Promise<boolean> {
   const current = editing();
   const expected = current?.id === chapterId ? current.hash : undefined;
   try {
     const content = await ipc.saveChapter(chapterId, body, expected);
-    setEditing({ id: chapterId, body: content.body, hash: content.contentHash, loading: false });
+    setEditing({
+      id: chapterId,
+      body: content.body,
+      hash: content.contentHash,
+      loading: false,
+    });
     // 字数变了，摘要里的数值要同步刷新
     setState(
       "document",

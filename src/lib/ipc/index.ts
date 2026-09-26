@@ -88,7 +88,11 @@ export function __resetMockBackend(): void {
  * `mockFn` 由调用方传入而不是在内部按命令名分发：
  * 这样每个 mock 实现的类型都与真实命令精确对应，不需要再写一遍映射表。
  */
-async function call<T>(command: string, args: Record<string, unknown>, mockFn: (backend: MockBackend) => Promise<T> | T): Promise<T> {
+async function call<T>(
+  command: string,
+  args: Record<string, unknown>,
+  mockFn: (backend: MockBackend) => Promise<T> | T,
+): Promise<T> {
   if (!isTauri()) {
     try {
       return await mockFn(mock());
@@ -118,13 +122,23 @@ export function listRecentWorkspaces(): Promise<WorkspaceSummary[]> {
 }
 
 /** 新建一个工作区并打开。 */
-export function createWorkspace(root: string, title: string): Promise<OpenWorkspaceResult> {
-  return call("create_workspace", { root, title }, (b) => b.createWorkspace(root, title));
+export function createWorkspace(
+  root: string,
+  title: string,
+): Promise<OpenWorkspaceResult> {
+  // 参数名必须是 `path`：Rust 签名是
+  // `create_workspace(state, path: String, title: String)`。
+  // 传 `root` 会让 Tauri 报「缺少 path 参数」—— 而这一点此前
+  // 无人发现，因为测试全走 mock 分支（见本文件顶部的降级说明）。
+  return call("create_workspace", { path: root, title }, (b) =>
+    b.createWorkspace(root, title),
+  );
 }
 
 /** 打开一个已有工作区。 */
 export function openWorkspace(root: string): Promise<OpenWorkspaceResult> {
-  return call("open_workspace", { root }, (b) => b.openWorkspace(root));
+  // 同 createWorkspace：Rust 的参数名是 `path`（commands.rs 的 open_workspace）
+  return call("open_workspace", { path: root }, (b) => b.openWorkspace(root));
 }
 
 /** 关闭当前工作区。 */
@@ -154,17 +168,33 @@ export function hasWorkspace(): Promise<boolean> {
  * 前端在收到大纲后刷新文稿（见 workspace-store 的 `addVolume`）。
  */
 export function createVolume(input: CreateVolumeInput): Promise<OutlineNode[]> {
-  return call("create_volume", { title: input.title }, (b) => b.createVolume(input) as OutlineNode[] | Promise<OutlineNode[]>);
+  return call(
+    "create_volume",
+    { title: input.title },
+    (b) => b.createVolume(input) as OutlineNode[] | Promise<OutlineNode[]>,
+  );
 }
 
 /** 重命名一卷。返回更新后的大纲。 */
-export function renameVolume(volumeId: string, title: string): Promise<OutlineNode[]> {
-  return call("rename_volume", { volumeId, title }, (b) => b.renameVolume(volumeId, title) as OutlineNode[] | Promise<OutlineNode[]>);
+export function renameVolume(
+  volumeId: string,
+  title: string,
+): Promise<OutlineNode[]> {
+  return call(
+    "rename_volume",
+    { volumeId, title },
+    (b) =>
+      b.renameVolume(volumeId, title) as OutlineNode[] | Promise<OutlineNode[]>,
+  );
 }
 
 /** 删除一卷（连同其下章节一起进回收站）。返回更新后的大纲。 */
 export function deleteVolume(volumeId: string): Promise<OutlineNode[]> {
-  return call("delete_volume", { volumeId }, (b) => b.deleteVolume(volumeId) as OutlineNode[] | Promise<OutlineNode[]>);
+  return call(
+    "delete_volume",
+    { volumeId },
+    (b) => b.deleteVolume(volumeId) as OutlineNode[] | Promise<OutlineNode[]>,
+  );
 }
 
 /**
@@ -183,7 +213,12 @@ export function deleteVolume(volumeId: string): Promise<OutlineNode[]> {
  * 因此调用方（tree-ops 的 `moveVolume`）负责算出新顺序。
  */
 export function reorderVolumes(orderedIds: string[]): Promise<OutlineNode[]> {
-  return call("reorder_volumes", { orderedIds }, (b) => b.reorderVolumes(orderedIds) as OutlineNode[] | Promise<OutlineNode[]>);
+  return call(
+    "reorder_volumes",
+    { orderedIds },
+    (b) =>
+      b.reorderVolumes(orderedIds) as OutlineNode[] | Promise<OutlineNode[]>,
+  );
 }
 
 // ---------------------------------------------------------------------------
@@ -199,7 +234,9 @@ export function reorderVolumes(orderedIds: string[]): Promise<OutlineNode[]> {
  * 调用方需要新章 ID 时，从返回的大纲里按"数量增加了的那一卷"的
  * 末项取（见 workspace-store 的 `addChapter`）。
  */
-export function createChapter(input: CreateChapterInput): Promise<OutlineNode[]> {
+export function createChapter(
+  input: CreateChapterInput,
+): Promise<OutlineNode[]> {
   return call(
     "create_chapter",
     { volumeId: input.volumeId, title: input.title ?? "" },
@@ -232,7 +269,11 @@ export function readChapter(chapterId: string): Promise<ChapterContent> {
  * 此时拒绝写入并报冲突，而不是静默覆盖用户的稿子 ——
  * 计划书 4.5 节「绝不静默覆盖」就落在这个参数上。
  */
-export function saveChapter(chapterId: string, body: string, expectedHash?: string): Promise<ChapterContent> {
+export function saveChapter(
+  chapterId: string,
+  body: string,
+  expectedHash?: string,
+): Promise<ChapterContent> {
   return call(
     "save_chapter",
     { chapterId, body, expectedHash: expectedHash ?? null },
@@ -241,13 +282,22 @@ export function saveChapter(chapterId: string, body: string, expectedHash?: stri
 }
 
 /** 更新章节元数据。 */
-export function updateChapterMeta(input: UpdateChapterMetaInput): Promise<void> {
-  return call("update_chapter_meta", { ...input }, (b) => b.updateChapterMeta(input));
+export function updateChapterMeta(
+  input: UpdateChapterMetaInput,
+): Promise<void> {
+  return call("update_chapter_meta", { ...input }, (b) =>
+    b.updateChapterMeta(input),
+  );
 }
 
 /** 重命名一章（元数据快捷方式）。返回更新后的大纲。 */
-export function renameChapter(chapterId: string, title: string): Promise<OutlineNode[]> {
-  return call("rename_chapter", { chapterId, title }, (b) => b.renameChapter(chapterId, title));
+export function renameChapter(
+  chapterId: string,
+  title: string,
+): Promise<OutlineNode[]> {
+  return call("rename_chapter", { chapterId, title }, (b) =>
+    b.renameChapter(chapterId, title),
+  );
 }
 
 /**
@@ -258,17 +308,31 @@ export function renameChapter(chapterId: string, title: string): Promise<Outline
  * 包装而不是让每个调用点拼 `{ chapterId, status }`：
  * 调用方关心的是"改状态"，不是"哪个命令能改状态"。
  */
-export function setChapterStatus(chapterId: string, status: ChapterStatus): Promise<void> {
+export function setChapterStatus(
+  chapterId: string,
+  status: ChapterStatus,
+): Promise<void> {
   return call(
     "update_chapter_meta",
-    { chapterId, title: null, status, wordGoal: null, summary: null, notes: null },
+    {
+      chapterId,
+      title: null,
+      status,
+      wordGoal: null,
+      summary: null,
+      notes: null,
+    },
     (b) => b.setChapterStatus(chapterId, status),
   );
 }
 
 /** 删除一章（移入回收站）。返回更新后的大纲。 */
 export function deleteChapter(chapterId: string): Promise<OutlineNode[]> {
-  return call("delete_chapter", { chapterId }, (b) => b.deleteChapter(chapterId) as OutlineNode[] | Promise<OutlineNode[]>);
+  return call(
+    "delete_chapter",
+    { chapterId },
+    (b) => b.deleteChapter(chapterId) as OutlineNode[] | Promise<OutlineNode[]>,
+  );
 }
 
 /**
@@ -278,11 +342,16 @@ export function deleteChapter(chapterId: string): Promise<OutlineNode[]> {
  * `toIndex` 是信息损失。跨卷移动由调用方拆成
  * 「源卷 reorder + 目标卷 reorder」两步（见 tree-ops 的 `moveChapter`）。
  */
-export function reorderChapters(volumeId: string, orderedIds: string[]): Promise<OutlineNode[]> {
+export function reorderChapters(
+  volumeId: string,
+  orderedIds: string[],
+): Promise<OutlineNode[]> {
   return call(
     "reorder_chapters",
     { volumeId, orderedIds },
-    (b) => b.reorderChapters(volumeId, orderedIds) as OutlineNode[] | Promise<OutlineNode[]>,
+    (b) =>
+      b.reorderChapters(volumeId, orderedIds) as
+        OutlineNode[] | Promise<OutlineNode[]>,
   );
 }
 
@@ -295,9 +364,29 @@ export function getOutline(): Promise<OutlineNode[]> {
   return call("get_outline", {}, (b) => b.getOutline());
 }
 
-/** 取字数统计。 */
-export function getWordStats(chapterId?: string): Promise<WordStats> {
-  return call("get_word_stats", { chapterId: chapterId ?? null }, (b) => b.getWordStats(chapterId));
+/**
+ * 取字数统计。
+ *
+ * ## 为什么要同时给 `volumeId` 与 `chapterId`
+ *
+ * Rust 的签名是
+ * `get_word_stats(state, volume_id: Option<String>, chapter_id: Option<String>)`
+ * —— 两个参数**各管一个字段**，`WordStats` 会同时给出
+ * `chapter`（该章）、`volume`（该卷）与 `book`（全书）三个数。
+ *
+ * 因此想同时拿到「这一章」与「它所在卷」的数，就必须两个都传：
+ * 只传 `chapterId` 会让 `volume` 恒为 0。这不只是多余的请求问题 ——
+ * 它是一个**静默的错数**：界面会显示「本卷 0 字」。
+ */
+export function getWordStats(
+  volumeId?: string,
+  chapterId?: string,
+): Promise<WordStats> {
+  return call(
+    "get_word_stats",
+    { volumeId: volumeId ?? null, chapterId: chapterId ?? null },
+    (b) => b.getWordStats(volumeId, chapterId),
+  );
 }
 
 /**
@@ -308,7 +397,9 @@ export function getWordStats(chapterId?: string): Promise<WordStats> {
  * 这里复用它而不是再加一条命令 —— 多一条命令就多一处要
  * 同步的契约，而正文与统计本来就该一起取（打开一章时两者都要）。
  */
-export async function getChapterWordCount(chapterId: string): Promise<WordCount> {
+export async function getChapterWordCount(
+  chapterId: string,
+): Promise<WordCount> {
   const content = await readChapter(chapterId);
   return content.words;
 }
@@ -390,12 +481,16 @@ export function listTrash(): Promise<TrashEntry[]> {
 
 /** 从回收站恢复一条。 */
 export function restoreFromTrash(trashDirName: string): Promise<void> {
-  return call("restore_trash", { trashDirName }, (b) => b.restoreFromTrash(trashDirName));
+  return call("restore_trash", { trashDirName }, (b) =>
+    b.restoreFromTrash(trashDirName),
+  );
 }
 
 /** 永久删除一条回收站条目。 */
 export function purgeFromTrash(trashDirName: string): Promise<void> {
-  return call("purge_trash", { trashDirName }, (b) => b.purgeFromTrash(trashDirName));
+  return call("purge_trash", { trashDirName }, (b) =>
+    b.purgeFromTrash(trashDirName),
+  );
 }
 
 /** 清空回收站。 */
@@ -412,7 +507,7 @@ export function emptyTrash(): Promise<number> {
  *
  * 后端没有独立的 `get_recovery_report`：崩溃恢复报告是
  * **打开工作区时**由 `open_workspace` 一并返回的
- * （见 `OpenWorkspaceResult.document.recovery`）。
+ * （见 `OpenWorkspaceResult.recovery`）。
  * 这是有意的设计 —— 恢复报告必须在作者看到任何界面之前就绪，
  * 否则"上次崩溃时没保存完"这个提示会迟到。
  *
@@ -420,10 +515,8 @@ export function emptyTrash(): Promise<number> {
  * 而这个函数只在恢复面板被打开时调用。
  */
 export async function getRecoveryReport(): Promise<RecoveryReport> {
-  const outline = await getOutline();
-  void outline;
   const result = await openWorkspace(currentRoot());
-  return result.document.recovery;
+  return result.recovery;
 }
 
 /**
@@ -451,7 +544,13 @@ export function rebuildIndex(): Promise<void> {
 }
 
 /** 字数口径的中文标签，供 UI 渲染切换控件。 */
-export function countModeOptions(): Array<{ value: CountMode; labelKey: "wordCount.withPunctuation" | "wordCount.withoutPunctuation" | "wordCount.wordsForEnglish" }> {
+export function countModeOptions(): Array<{
+  value: CountMode;
+  labelKey:
+    | "wordCount.withPunctuation"
+    | "wordCount.withoutPunctuation"
+    | "wordCount.wordsForEnglish";
+}> {
   return [
     { value: "withPunctuation", labelKey: "wordCount.withPunctuation" },
     { value: "withoutPunctuation", labelKey: "wordCount.withoutPunctuation" },

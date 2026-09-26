@@ -52,4 +52,4 @@ pub use conflict::{detect_conflicts, is_conflict_copy, DetectedConflict};
 pub use journal::{Journal, JournalEntry};
 pub use layout::{WorkspaceLayout, FORMAT_VERSION};
 pub use trash::{TrashItem, TrashManager};
-pub use workspace::{RecentWorkspace, Workspace, WorkspaceConfig, WorkspaceSummary};
+pub use workspace::{RecentWorkspace, VolumeRecord, Workspace, WorkspaceConfig, WorkspaceSummary};

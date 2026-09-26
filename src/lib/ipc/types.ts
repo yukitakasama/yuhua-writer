@@ -29,7 +29,11 @@
 export type ChapterStatus = "draft" | "done" | "revising";
 
 /** 全部章节状态的有序列表，供渲染下拉框。 */
-export const CHAPTER_STATUSES: readonly ChapterStatus[] = ["draft", "done", "revising"] as const;
+export const CHAPTER_STATUSES: readonly ChapterStatus[] = [
+  "draft",
+  "done",
+  "revising",
+] as const;
 
 /**
  * 字数统计口径，对应 Rust `CountMode`。
@@ -38,7 +42,8 @@ export const CHAPTER_STATUSES: readonly ChapterStatus[] = ["draft", "done", "rev
  * 但 Front Matter 里用的是小写（`ChapterStatus` 用 `rename_all = "lowercase"`）。
  * 两者不一致是有意的：前者走 IPC，后者进用户可读的文件。
  */
-export type CountMode = "withPunctuation" | "withoutPunctuation" | "wordsForEnglish";
+export type CountMode =
+  "withPunctuation" | "withoutPunctuation" | "wordsForEnglish";
 
 /** 默认口径：不含标点。与 Rust 侧 `CountMode::default()` 一致。 */
 export const DEFAULT_COUNT_MODE: CountMode = "withoutPunctuation";
@@ -329,21 +334,37 @@ export interface WorkspaceSummary {
   available: boolean;
 }
 
-/** 云盘冲突副本，对应 Rust `DetectedConflict`。 */
-export interface DetectedConflict {
-  /** 冲突副本的绝对路径。 */
-  path: string;
+/**
+ * 云盘冲突副本，对应 Rust `commands::ConflictDto`。
+ *
+ * ## 为什么字段名与 Rust 的领域结构 `DetectedConflict` 不同
+ *
+ * 因为走 IPC 的是 `ConflictDto`，不是领域结构：
+ * `DetectedConflict.path` 是绝对路径（不给出工作区之外的绝对路径）、
+ * `pattern` 是枚举（前端只该看到一个中文标签）。
+ * 命令层刻意把它们折算掉，前端**必须照着折算后的形状写**。
+ *
+ * 这条注释是 `check:ipc` 的结构体字段比对逼出来的：此前这里叫
+ * `DetectedConflict` 且多了一个 `path`、少了一个 `patternLabel`，
+ * 前端拿到的一直是 `{ path: undefined, pattern: undefined }`。
+ */
+export interface ConflictDto {
   /** 相对工作区根的路径。 */
   relativePath: string;
   /** 文件名。 */
   fileName: string;
-  /** 推测它对应哪一章。 */
+  /** 推测对应的原始文件名。 */
   originalFileName: string;
-  /** 命中的云盘命名习惯。 */
-  pattern: string;
+  /** 命中的命名模式说明（用户可读）。 */
+  patternLabel: string;
 }
 
-/** 崩溃恢复报告，对应 Rust `RecoveryReport`。 */
+/**
+ * 崩溃恢复报告，对应 Rust `commands::RecoveryReportDto`。
+ *
+ * 字段名与 Rust 的 `rename_all = "camelCase"` 逐字对齐，由
+ * `pnpm check:ipc` 的结构体字段比对保证。
+ */
 export interface RecoveryReport {
   /** 清理的临时文件数。 */
   sweptTempFiles: number;
@@ -354,7 +375,7 @@ export interface RecoveryReport {
   /** 清理的过期回收站条目数。 */
   purgedTrashItems: number;
   /** 发现的云盘冲突副本（只报告，绝不自动删除）。 */
-  conflicts: DetectedConflict[];
+  conflicts: ConflictDto[];
 }
 
 /** 回收站条目，对应 Rust `TrashEntry`。 */
@@ -373,7 +394,23 @@ export interface TrashEntry {
   kind: string;
 }
 
-/** 整本文稿的内存视图，对应 Rust `Document`。 */
+/**
+ * 整本文稿的内存视图。
+ *
+ * ## ⚠️ 已知缺口：`book` 的元数据在「打开工作区」这条路径上不可得
+ *
+ * `Book` 需要 `author` / `description` / `created` / `updated` 四个字段，
+ * 但 `open_workspace` 返回的 `OpenResult` 里**只有**
+ * `WorkspaceSummary`（内含 `title`）与 `outline`。作者、简介与
+ * 书级更新时间在后端此刻没有任何一条命令会返回。
+ *
+ * 因此前端只能用一个最小占位（`id` 取 `workspace.workspaceId`、
+ * `title` 取 `workspace.title`，其余空串），**不能伪造**作者或简介 ——
+ * 界面上显示一个假作者名比显示空白更糟。
+ *
+ * 这是一条**待办**：要真正填上，需要后端新增一条返回书级元数据的
+ * 命令（或在 `OpenResult` 上加字段）。本次修复刻意不扩契约。
+ */
 export interface WorkspaceDocument {
   /** 书。 */
   book: Book;
@@ -385,12 +422,36 @@ export interface WorkspaceDocument {
   recovery: RecoveryReport;
 }
 
-/** 打开工作区后的完整载荷。 */
+/**
+ * 打开工作区后的完整载荷，精确镜像 Rust `commands::OpenResult`。
+ *
+ * ## 为什么这里没有 `root` 与 `document`
+ *
+ * 因为 Rust 返回的就是 `{ workspace, outline, words, recovery }`。
+ * 此前这里写的是 `{ root, document }`，于是
+ * `workspace-store` 的 `result.document` 恒为 `undefined` ——
+ * 真实 Tauri 路径一打开工作区就抛错，而全部测试都是绿的
+ * （jsdom 下 `isTauri()` 恒为 false，测试只走 mock 分支）。
+ *
+ * 现在这份定义由 `pnpm check:ipc` 与 `commands.rs` 逐字段双向比对，
+ * 再写出 `root` 这种后端不返回的字段会直接让检查失败。
+ *
+ * ## 形状差异由前端折算
+ *
+ * 界面需要的是 {@link WorkspaceDocument}（书 + 卷 + 章摘要），
+ * 而这里是「工作区摘要 + 大纲 + 全书字数 + 恢复报告」。两者缺的
+ * `volumes` 从 `outline` 取，`book` 见下面的**已知缺口**。
+ * 折算逻辑收敛在 `workspace-store` 的纯函数里（便于单测）。
+ */
 export interface OpenWorkspaceResult {
-  /** 工作区根路径。 */
-  root: string;
-  /** 文稿结构。 */
-  document: WorkspaceDocument;
+  /** 工作区摘要。 */
+  workspace: WorkspaceSummary;
+  /** 文稿大纲（卷 + 卷内章节摘要）。 */
+  outline: OutlineNode[];
+  /** 全书字数统计。 */
+  words: WordStats;
+  /** 崩溃恢复报告：需要提示用户时非空。 */
+  recovery: RecoveryReport;
 }
 
 /**
@@ -467,7 +528,10 @@ export interface UpdateChapterMetaInput {
  * 直接拿字节下标去 `String.prototype.slice` 会把汉字切成半个。
  * 这里按片段文本重建「字节位置 → 字符位置」映射。
  */
-export function byteRangesToCharRanges(text: string, byteRanges: ReadonlyArray<readonly [number, number]>): Array<[number, number]> {
+export function byteRangesToCharRanges(
+  text: string,
+  byteRanges: ReadonlyArray<readonly [number, number]>,
+): Array<[number, number]> {
   if (byteRanges.length === 0) return [];
 
   // 先建一次映射表，避免每个区间都重扫全文

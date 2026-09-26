@@ -4,6 +4,11 @@
 不绑定任何云服务，工作区就是一个可以直接放进网盘的普通文件夹。
 
 > 当前版本 `v0.1.0-alpha.0`，处于第一阶段开发中。
+>
+> ⚠️ **导出功能当前不可达**：`yuhua-export` 的六种渲染器（TXT / Markdown /
+> HTML / DOCX / EPUB / PDF）都已实现并有集成测试，但**还没有任何 IPC 命令
+> 调用它**，界面上也没有导出入口。这是「写完能交稿」这一目标剩下的最后一段路。
+> 详见 [docs/done-list.md](./docs/done-list.md) 的「已知缺口汇总」。
 
 ## 这是什么
 
@@ -54,7 +59,13 @@ cargo test --workspace     # Rust 领域层全部测试
 pnpm test                  # 前端单元测试
 pnpm typecheck             # TypeScript 类型检查
 cargo clippy --workspace --all-targets -- -D warnings
+pnpm check:ipc             # IPC 契约一致性（前后端字段 / 命令 / 错误码）
+pnpm build && pnpm check:kit   # 组件预览页未泄漏进生产产物
 ```
+
+> `pnpm check:ipc` 与 `pnpm check:kit` 已接入 CI，改 IPC 相关代码时请本地先跑。
+> 前者能拦住「前端字段名与 Rust 不一致」这类**在浏览器里看不出来、
+> 到 Tauri 里功能全坏**的漂移。
 
 ### 构建
 
@@ -124,6 +135,10 @@ tags: []
 
 正文内容……
 ```
+
+**卷的名字与顺序存在 `.yuhua/workspace.json` 的 `volumes` 字段里**，
+不从目录名反推。这样重命名卷只写一次配置，不会让云盘 / Git 看到
+「目录被删除又新建」。详见 [docs/workspace-format.md](./docs/workspace-format.md)。
 
 ## 云盘同步
 

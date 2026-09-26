@@ -15,7 +15,12 @@
 
 import { beforeEach, describe, expect, it } from "vitest";
 
-import { createMockBackend, MockError, findOccurrences, type MockBackend } from "./index";
+import {
+  createMockBackend,
+  MockError,
+  findOccurrences,
+  type MockBackend,
+} from "./index";
 import { countWords } from "./count";
 
 let backend: MockBackend;
@@ -55,43 +60,51 @@ function chaptersIn(volumeId: string) {
 describe("示例数据", () => {
   it("打开返回至少两卷，且有章", () => {
     const result = backend.openWorkspace("C:/x");
-    expect(result.document.volumes.length).toBeGreaterThanOrEqual(2);
-    expect(result.document.chapters.length).toBeGreaterThan(0);
+    expect(result.outline.length).toBeGreaterThanOrEqual(2);
+    expect(allChapters().length).toBeGreaterThan(0);
+  });
+
+  it("openWorkspace 返回的键与 Rust OpenResult 一致", () => {
+    // mock 是行为镜像：它的返回值形状必须与 commands.rs 的 OpenResult
+    // 逐键相同。此前它返回 { root, document }，于是前端读 result.document
+    // 在浏览器里能跑通、到 Tauri 里拿到 undefined —— 那正是这一层
+    // 存在的意义所要防止的事故。
+    const result = backend.openWorkspace("C:/x");
+    expect(Object.keys(result).sort()).toEqual([
+      "outline",
+      "recovery",
+      "words",
+      "workspace",
+    ]);
   });
 
   it("文稿结构里的章节**不含正文**（内存指标要求）", () => {
-    const result = backend.openWorkspace("C:/x");
-    for (const chapter of result.document.chapters) {
+    for (const chapter of allChapters()) {
       expect(chapter).not.toHaveProperty("body");
     }
   });
 
   it("每章的 volumeId 都指向真实存在的卷", () => {
-    const result = backend.openWorkspace("C:/x");
-    const ids = new Set(result.document.volumes.map((v) => v.id));
-    for (const chapter of result.document.chapters) {
+    const ids = new Set(backend.getOutline().map((n) => n.volumeId));
+    for (const chapter of allChapters()) {
       expect(ids.has(chapter.volumeId)).toBe(true);
     }
   });
 
   it("同一卷内的 sort 恰好是 0..n-1", () => {
-    const result = backend.openWorkspace("C:/x");
-    for (const volume of result.document.volumes) {
-      const sorts = result.document.chapters
-        .filter((c) => c.volumeId === volume.id)
-        .map((c) => c.sort)
-        .sort((a, b) => a - b);
+    for (const node of backend.getOutline()) {
+      const sorts = node.chapters.map((c) => c.sort).sort((a, b) => a - b);
       expect(sorts).toEqual(sorts.map((_, i) => i));
     }
   });
 
   it("卷的 sort 恰好是 0..m-1", () => {
-    const sorts = backend.openWorkspace("C:/x").document.volumes.map((v) => v.sort);
+    const sorts = backend.getOutline().map((n) => n.sort);
     expect(sorts).toEqual(sorts.map((_, i) => i));
   });
 
   it("卷名互不相同（示例数据要能区分）", () => {
-    const titles = backend.openWorkspace("C:/x").document.volumes.map((v) => v.title);
+    const titles = backend.getOutline().map((n) => n.title);
     expect(new Set(titles).size).toBe(titles.length);
   });
 });
@@ -111,7 +124,9 @@ describe("新建卷", () => {
   });
 
   it("空卷名被拒绝", () => {
-    expect(() => backend.createVolume({ title: "   " })).toThrowError(MockError);
+    expect(() => backend.createVolume({ title: "   " })).toThrowError(
+      MockError,
+    );
     try {
       backend.createVolume({ title: "" });
     } catch (err) {
@@ -121,12 +136,16 @@ describe("新建卷", () => {
   });
 
   it("超长卷名被拒绝", () => {
-    expect(() => backend.createVolume({ title: "字".repeat(201) })).toThrowError(MockError);
+    expect(() =>
+      backend.createVolume({ title: "字".repeat(201) }),
+    ).toThrowError(MockError);
   });
 
   it("中文卷名可以完整取回", () => {
     backend.createVolume({ title: "第四卷 惊蛰之末" });
-    expect(backend.getOutline().some((n) => n.title === "第四卷 惊蛰之末")).toBe(true);
+    expect(
+      backend.getOutline().some((n) => n.title === "第四卷 惊蛰之末"),
+    ).toBe(true);
   });
 });
 
@@ -134,7 +153,9 @@ describe("重命名卷", () => {
   it("改名成功", () => {
     const id = firstVolumeId();
     backend.renameVolume(id, "第一卷 重命名");
-    expect(backend.getOutline().find((n) => n.volumeId === id)?.title).toBe("第一卷 重命名");
+    expect(backend.getOutline().find((n) => n.volumeId === id)?.title).toBe(
+      "第一卷 重命名",
+    );
   });
 
   it("改名后其下章节的路径跟着更新", () => {
@@ -150,7 +171,9 @@ describe("重命名卷", () => {
     const id = firstVolumeId();
     const before = backend.getOutline().find((n) => n.volumeId === id)?.title;
     expect(() => backend.renameVolume(id, "  ")).toThrowError(MockError);
-    expect(backend.getOutline().find((n) => n.volumeId === id)?.title).toBe(before);
+    expect(backend.getOutline().find((n) => n.volumeId === id)?.title).toBe(
+      before,
+    );
   });
 
   it("重命名不存在的卷报 NOT_FOUND", () => {
@@ -210,7 +233,9 @@ describe("新建章", () => {
   });
 
   it("往不存在的卷里新建章报错", () => {
-    expect(() => backend.createChapter({ volumeId: "vol_无" })).toThrowError(MockError);
+    expect(() => backend.createChapter({ volumeId: "vol_无" })).toThrowError(
+      MockError,
+    );
   });
 });
 
@@ -220,14 +245,20 @@ describe("读取与保存正文", () => {
     if (!first) throw new Error("没有章节");
     const content = backend.readChapter(first.id);
     expect(content.body.length).toBeGreaterThan(0);
-    expect(content.words.withoutPunctuation).toBe(countWords(content.body).withoutPunctuation);
+    expect(content.words.withoutPunctuation).toBe(
+      countWords(content.body).withoutPunctuation,
+    );
   });
 
   it("保存后字数与哈希都更新", () => {
     const first = allChapters()[0];
     if (!first) throw new Error("没有章节");
     const before = backend.readChapter(first.id);
-    const saved = backend.saveChapter(first.id, "新的正文内容，一共十五个字。", before.contentHash);
+    const saved = backend.saveChapter(
+      first.id,
+      "新的正文内容，一共十五个字。",
+      before.contentHash,
+    );
     expect(saved.contentHash).not.toBe(before.contentHash);
     expect(saved.body).toBe("新的正文内容，一共十五个字。");
     // 逐字核对：新(1)的(2)正(3)文(4)内(5)容(6)一(7)共(8)十(9)五(10)个(11)字(12)
@@ -291,7 +322,9 @@ describe("重命名章", () => {
   it("空标题被拒绝", () => {
     const first = allChapters()[0];
     if (!first) throw new Error("没有章节");
-    expect(() => backend.renameChapter(first.id, "   ")).toThrowError(MockError);
+    expect(() => backend.renameChapter(first.id, "   ")).toThrowError(
+      MockError,
+    );
   });
 });
 
@@ -425,7 +458,9 @@ describe("重排（与后端 reorder 契约一致）", () => {
     if (!second) throw new Error("示例数据不足");
     // 只提及一章：其余两章必须仍然存在
     backend.reorderChapters(id, [second]);
-    const after = chaptersIn(id).slice().sort((a, b) => a.sort - b.sort);
+    const after = chaptersIn(id)
+      .slice()
+      .sort((a, b) => a.sort - b.sort);
     expect(after.length).toBe(3);
     expect(after[0]?.id).toBe(second);
     expect(after.map((c) => c.sort)).toEqual([0, 1, 2]);
@@ -454,7 +489,9 @@ describe("重排（与后端 reorder 契约一致）", () => {
   });
 
   it("重排不存在的卷报 NOT_FOUND", () => {
-    expect(() => backend.reorderChapters("vol_无", ["ch_1"])).toThrowError(MockError);
+    expect(() => backend.reorderChapters("vol_无", ["ch_1"])).toThrowError(
+      MockError,
+    );
   });
 });
 
@@ -471,19 +508,35 @@ describe("字数统计", () => {
     expect(stats.volumeCount).toBe(backend.getOutline().length);
   });
 
-  it("指定章节时返回该章与所属卷的字数", () => {
+  it("同时给卷与章时，两个字段都算出来", () => {
     const id = firstVolumeId();
     const chapter = allChapters().find((c) => c.volumeId === id);
     if (!chapter) throw new Error("示例数据不足");
-    const stats = backend.getWordStats(chapter.id);
+    const stats = backend.getWordStats(id, chapter.id);
     expect(stats.chapter).toBe(chapter.wordCount);
-    const volumeSum = allChapters().filter((c) => c.volumeId === id).reduce((s, c) => s + c.wordCount, 0);
+    const volumeSum = allChapters()
+      .filter((c) => c.volumeId === id)
+      .reduce((s, c) => s + c.wordCount, 0);
     expect(stats.volume).toBe(volumeSum);
   });
 
+  it("只给章不给卷时 volume 为 0（与 Rust 语义一致）", () => {
+    // 这条钉的是 Rust `word_stats` 的真实语义：两个参数**各管一个字段**。
+    // 曾经 mock 会从 chapter 反推出它所属卷的数字，比真实后端"聪明" ——
+    // 那会掩盖调用方漏传 volumeId 这个真实缺陷（界面显示错误的"本卷 0 字"
+    // 反而看不出来）。mock 是行为镜像，必须照做。
+    const id = firstVolumeId();
+    const chapter = allChapters().find((c) => c.volumeId === id);
+    if (!chapter) throw new Error("示例数据不足");
+    const stats = backend.getWordStats(undefined, chapter.id);
+    expect(stats.chapter).toBe(chapter.wordCount);
+    expect(stats.volume).toBe(0);
+  });
+
   it("不存在的章节返回全 0 而不是抛错", () => {
-    const stats = backend.getWordStats("ch_无");
+    const stats = backend.getWordStats(undefined, "ch_无");
     expect(stats.chapter).toBe(0);
+    expect(stats.volume).toBe(0);
     expect(stats.book).toBeGreaterThan(0);
   });
 
@@ -491,7 +544,9 @@ describe("字数统计", () => {
     const first = allChapters()[0];
     if (!first) throw new Error("没有章节");
     const words = backend.getChapterWordCount(first.id);
-    expect(words.withPunctuation).toBeGreaterThanOrEqual(words.withoutPunctuation);
+    expect(words.withPunctuation).toBeGreaterThanOrEqual(
+      words.withoutPunctuation,
+    );
     expect(words.withoutPunctuation).toBeGreaterThanOrEqual(words.hanChars);
   });
 });
@@ -521,7 +576,9 @@ describe("检索", () => {
   it("标题命中的相关度高于仅正文命中", () => {
     const result = backend.search({ keyword: "落羽" });
     if (result.hits.length >= 2) {
-      expect(result.hits[0]?.score).toBeGreaterThanOrEqual(result.hits[1]?.score ?? 0);
+      expect(result.hits[0]?.score).toBeGreaterThanOrEqual(
+        result.hits[1]?.score ?? 0,
+      );
     } else {
       expect(result.hits.length).toBeGreaterThan(0);
     }
@@ -617,13 +674,14 @@ describe("findOccurrences", () => {
 describe("新建工作区", () => {
   it("新建后至少有一卷（章不能没有卷）", () => {
     const result = backend.createWorkspace("C:/新书", "新书");
-    expect(result.document.volumes.length).toBe(1);
-    expect(result.document.chapters.length).toBe(0);
+    expect(result.outline.length).toBe(1);
+    expect(result.outline[0]?.chapters.length).toBe(0);
+    expect(result.workspace.title).toBe("新书");
   });
 
   it("新建后书名跟随", () => {
     backend.createWorkspace("C:/新书", "我的新小说");
-    expect(backend.openWorkspace("C:/新书").document.book.title).toBe("我的新小说");
+    expect(backend.openWorkspace("C:/新书").workspace.title).toBe("我的新小说");
   });
 
   it("空书名被拒绝", () => {

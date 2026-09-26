@@ -25,7 +25,24 @@ cargo test --workspace                             # Rust 测试
 pnpm typecheck                                     # 类型检查
 pnpm lint                                          # ESLint
 pnpm test                                          # 前端测试
+pnpm check:ipc                                     # IPC 契约一致性
+pnpm build && pnpm check:kit                       # 预览页未进生产产物
 ```
+
+> **`pnpm check:ipc` 不可跳过。** 它校验前端 `src/lib/ipc/` 与 Rust
+> `src-tauri/src/` 的契约没有漂移，包括**结构体字段名、命令名、参数名、
+> 错误码与枚举取值**。这类漂移在浏览器里看不出来（`pnpm dev` 走 mock
+> 后端），到 Tauri 里就是功能全坏 —— 历史上已经发生过两次。
+>
+> **改了 IPC 相关的任一侧，两侧必须同时改**：`src/lib/ipc/types.ts`
+> 的字段名或 `src-tauri/src/commands.rs` 的参数名。`check:ipc` 会拦住
+> 忘了改的那一半。
+
+> ⚠️ **`pnpm format:check` 目前在未改动的 `main` 上就是失败的**
+> （218 个文件）。根因是仓库没有 `.prettierrc`，Prettier 默认值与既有
+> 代码风格不一致。这是待修的既有问题：在你改动的文件上跑
+> `pnpm exec prettier --check <你改的文件>` 即可，**不要**跑
+> `pnpm format`（它会重排全仓 200+ 个无关文件，把真正的改动淹没）。
 
 **完成定义**：一个改动算完成，当且仅当：
 
@@ -37,6 +54,16 @@ pnpm test                                          # 前端测试
 6. 涉及字体或资源的改动，已核对 OFL 合规与体积预算
 7. 涉及导出的改动，已在真实办公软件 / 阅读器上打开验证过产物
 8. 文档与 CHANGELOG 已同步更新
+
+第 2 条有两条本项目踩过的教训，值得单独写明：
+
+- **不能被测试触达的代码等于没有测试。** `save_chapter` 的并发覆盖防护
+  曾内联在 `#[tauri::command]` 函数里，而 `tauri::State<'_, T>` 无法在
+  单测中构造 —— 于是这段安全关键逻辑长期零覆盖，直到审查才发现它
+  在读失败时会反向放行一次覆盖。**把逻辑抽成不依赖 `State` 的纯函数再测。**
+- **测试的"判据"必须独立于被验证的实现。** IPC 契约测试若照着 mock
+  后端的形状写，就只能证明"前端和 mock 一致"，证明不了"前端和 Rust 一致"。
+  契约测试必须**照着 Rust 侧的真实形状**断言。
 
 ## 分支与提交
 
@@ -60,6 +87,15 @@ pnpm test                                          # 前端测试
 - 所有 `pub` 项必须有文档注释（`#![warn(missing_docs)]`）
 - 领域层（`yuhua-*` crate）**不依赖 Tauri**，保证可独立测试
 - 文件 IO 走 `yuhua_fs`，不要在别处直接 `std::fs::write` 写正文
+- **`.yuhua/workspace.json` 里记录的 `dirName` 是磁盘上的身份，只能从
+  磁盘读取或沿用，绝不能由 `sort` / `title` 这类可变字段现算。**
+  现算会在卷被重命名或重排后指向不存在的目录，导致该卷在下次扫描时
+  被丢弃并以新 ID 重建 —— 表现为「改个卷名，卷整个消失」。
+  这条规则是实际踩出来的，改动卷相关逻辑前先读
+  `yuhua-fs/src/workspace.rs` 里 `VolumeRecord` 的文档注释。
+- **给已有 JSON 结构体加字段时必须加 `#[serde(default)]`。** 否则旧文件
+  会因为缺字段而**整个解析失败**，用户的工作区直接打不开。这是往
+  `workspace.json` 加 `volumes` 时风险最高的一个决定。
 
 ### TypeScript / SolidJS
 

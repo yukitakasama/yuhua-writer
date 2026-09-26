@@ -35,7 +35,7 @@ import type {
   CountMode,
   CreateChapterInput,
   CreateVolumeInput,
-  DetectedConflict,
+  ConflictDto,
   IpcError,
   OpenWorkspaceResult,
   OutlineNode,
@@ -51,6 +51,7 @@ import type {
   Volume,
   WordCount,
   WordStats,
+  WorkspaceDocument,
   WorkspaceSummary,
 } from "../ipc/types";
 import { countWords } from "./count";
@@ -82,13 +83,17 @@ export interface MockBackend {
   createChapter(input: CreateChapterInput): OutlineNode[];
   reorderChapters(volumeId: string, orderedIds: string[]): OutlineNode[];
   readChapter(chapterId: string): ChapterContent;
-  saveChapter(chapterId: string, body: string, expectedHash?: string): ChapterContent;
+  saveChapter(
+    chapterId: string,
+    body: string,
+    expectedHash?: string,
+  ): ChapterContent;
   updateChapterMeta(input: UpdateChapterMetaInput): void;
   renameChapter(chapterId: string, title: string): OutlineNode[];
   setChapterStatus(chapterId: string, status: ChapterStatus): void;
   deleteChapter(chapterId: string): OutlineNode[];
   getOutline(): OutlineNode[];
-  getWordStats(chapterId?: string): WordStats;
+  getWordStats(volumeId?: string, chapterId?: string): WordStats;
   getStatsSummary(): StatsPayload;
   getChapterWordCount(chapterId: string): WordCount;
   search(query: SearchQuery): SearchResults;
@@ -152,7 +157,9 @@ export function createMockBackend(): MockBackend {
 
   /** 取某一卷下的章节，按 sort 升序。 */
   function chaptersOf(volumeId: string): ChapterSummary[] {
-    return chapters.filter((c) => c.volumeId === volumeId).sort((a, b) => a.sort - b.sort);
+    return chapters
+      .filter((c) => c.volumeId === volumeId)
+      .sort((a, b) => a.sort - b.sort);
   }
 
   /**
@@ -192,20 +199,32 @@ export function createMockBackend(): MockBackend {
       throw new MockError("INVALID_INPUT", `${what}不能为空`, true);
     }
     if (trimmed.length > 200) {
-      throw new MockError("INVALID_INPUT", `${what}过长（上限 200 字符）`, true);
+      throw new MockError(
+        "INVALID_INPUT",
+        `${what}过长（上限 200 字符）`,
+        true,
+      );
     }
     return trimmed;
   }
 
   /** 重算某一章的字数（正文变化后调用）。 */
-  function recount(chapter: ChapterSummary, body: string, mode: CountMode = "withoutPunctuation"): void {
+  function recount(
+    chapter: ChapterSummary,
+    body: string,
+    mode: CountMode = "withoutPunctuation",
+  ): void {
     chapter.wordCount = countByModeCompat(body, mode);
   }
 
   /** 取默认口径字数。 */
   function countByModeCompat(text: string, mode: CountMode): number {
     const c = countWords(text);
-    return mode === "withPunctuation" ? c.withPunctuation : mode === "withoutPunctuation" ? c.withoutPunctuation : c.wordsForEnglish;
+    return mode === "withPunctuation"
+      ? c.withPunctuation
+      : mode === "withoutPunctuation"
+        ? c.withoutPunctuation
+        : c.wordsForEnglish;
   }
 
   /** 生成章节的默认路径。 */
@@ -222,12 +241,12 @@ export function createMockBackend(): MockBackend {
       interruptedOperations: [],
       pendingPaths: [],
       purgedTrashItems: 0,
-      conflicts: [] as DetectedConflict[],
+      conflicts: [] as ConflictDto[],
     };
   }
 
-  /** 当前文稿快照，供打开/新建命令返回。 */
-  function document(): OpenWorkspaceResult["document"] {
+  /** 当前文稿快照。 */
+  function document(): WorkspaceDocument {
     return {
       book: { ...book },
       volumes: volumes.map((v) => ({ ...v })),
@@ -235,8 +254,46 @@ export function createMockBackend(): MockBackend {
       // 前端可以放心直接渲染，不需要再排一遍
       chapters: chapters
         .slice()
-        .sort((a, b) => (a.volumeId === b.volumeId ? a.sort - b.sort : compareVolumeOrder(a.volumeId, b.volumeId))),
+        .sort((a, b) =>
+          a.volumeId === b.volumeId
+            ? a.sort - b.sort
+            : compareVolumeOrder(a.volumeId, b.volumeId),
+        ),
       recovery: cleanReport(),
+    };
+  }
+
+  /**
+   * 组装 `open_workspace` / `create_workspace` 的返回值。
+   *
+   * ## 为什么这里要照着 Rust 的形状搭一遍
+   *
+   * 因为 mock 的职责是**行为镜像**，不是「让前端测试变绿的替身」。
+   * 此前 mock 返回 `{ root, document }`，正好与前端那份同样写错的类型
+   * 严丝合缝 —— 于是真实 Rust 返回 `{ workspace, outline, words, recovery }`
+   * 时前端读到的 `document` 是 `undefined`，而这个缺陷在 330 个前端
+   * 测试里一个都没暴露出来。
+   *
+   * 现在 mock 返回与 `commands::OpenResult` 逐字段相同的四个键，
+   * 于是「前端写了后端不返回的字段名」会**在浏览器里就崩**，
+   * 不必等 Tauri 编译。
+   */
+  function openResult(root: string): OpenWorkspaceResult {
+    const doc = document();
+    const outline = outlineSnapshot();
+    return {
+      workspace: {
+        root,
+        workspaceId:
+          recents.find((r) => r.root === root)?.workspaceId ?? "ws-demo-0000",
+        title: doc.book.title,
+        created: doc.book.created,
+        lastOpened: doc.book.updated,
+        available: true,
+      },
+      outline,
+      words: backend.getWordStats(undefined, undefined),
+      recovery: doc.recovery,
     };
   }
 
@@ -297,15 +354,19 @@ export function createMockBackend(): MockBackend {
         lastOpened: book.updated,
         available: true,
       });
-      return { root, document: document() };
+      return openResult(root);
     },
 
     openWorkspace(root) {
       const known = recents.find((r) => r.root === root);
       if (known && !known.available) {
-        throw new MockError("WORKSPACE_INVALID", `这个目录不是有效的工作区：${root}`, true);
+        throw new MockError(
+          "WORKSPACE_INVALID",
+          `这个目录不是有效的工作区：${root}`,
+          true,
+        );
       }
-      return { root, document: document() };
+      return openResult(root);
     },
 
     closeWorkspace() {
@@ -370,7 +431,13 @@ export function createMockBackend(): MockBackend {
       });
       // 删到一卷不剩也要留一个容器：章不能没有卷
       if (volumes.length === 0) {
-        volumes.push({ id: nextId("vol_"), bookId: book.id, title: "第一卷", sort: 0, created: mockTime(0) });
+        volumes.push({
+          id: nextId("vol_"),
+          bookId: book.id,
+          title: "第一卷",
+          sort: 0,
+          created: mockTime(0),
+        });
       }
       void volume;
       return outlineSnapshot();
@@ -420,7 +487,9 @@ export function createMockBackend(): MockBackend {
       const existing = chaptersOf(input.volumeId);
       const at = input.sort ?? existing.length;
       const index = Math.max(0, Math.min(at, existing.length));
-      const title = input.title?.trim() ? requireTitle(input.title, "章节标题") : `第${existing.length + 1}章`;
+      const title = input.title?.trim()
+        ? requireTitle(input.title, "章节标题")
+        : `第${existing.length + 1}章`;
       const summary: ChapterSummary = {
         id: nextId("ch_"),
         volumeId: volume.id,
@@ -520,9 +589,11 @@ export function createMockBackend(): MockBackend {
 
     updateChapterMeta(input) {
       const found = requireChapter(input.chapterId);
-      if (input.title !== undefined) found.title = requireTitle(input.title, "章节标题");
+      if (input.title !== undefined)
+        found.title = requireTitle(input.title, "章节标题");
       if (input.status !== undefined) found.status = input.status;
-      if (input.wordGoal !== undefined) found.wordGoal = Math.max(0, Math.floor(input.wordGoal));
+      if (input.wordGoal !== undefined)
+        found.wordGoal = Math.max(0, Math.floor(input.wordGoal));
       if (input.summary !== undefined) found.summary = input.summary;
       // notes（作者便签）不在摘要里：它属于 Front Matter 的正文侧，
       // 单独存一份，避免为了一个字段把正文带进列表载荷
@@ -578,9 +649,24 @@ export function createMockBackend(): MockBackend {
         });
     },
 
-    getWordStats(chapterId) {
-      const chapter = chapterId ? chapters.find((c) => c.id === chapterId) : undefined;
-      const volumeTotal = chapter ? chaptersOf(chapter.volumeId).reduce((s, c) => s + c.wordCount, 0) : 0;
+    /**
+     * 字数统计。
+     *
+     * ## 为什么 volumeId 与 chapterId 都要
+     *
+     * 与 Rust 的 `get_word_stats(volume_id, chapter_id)` 保持同形：
+     * 两个参数各管一个字段，只传 `chapterId` 时 `volume` 理应为 0
+     * （后端就是这么实现的）。**不要**在这里"顺手"从 chapter 反推卷 ——
+     * 那会让 mock 比真实后端更"聪明"，从而掩盖调用方漏传 volumeId
+     * 这个真实的缺陷。
+     */
+    getWordStats(volumeId, chapterId) {
+      const chapter = chapterId
+        ? chapters.find((c) => c.id === chapterId)
+        : undefined;
+      const volumeTotal = volumeId
+        ? chaptersOf(volumeId).reduce((s, c) => s + c.wordCount, 0)
+        : 0;
       return {
         chapter: chapter?.wordCount ?? 0,
         volume: volumeTotal,
@@ -615,7 +701,9 @@ export function createMockBackend(): MockBackend {
         if (query.volumeId && c.volumeId !== query.volumeId) continue;
         const body = bodies.get(c.id) ?? "";
         const titleMatch = c.title.includes(keyword);
-        const bodyMatches = query.titleOnly ? [] : findOccurrences(body, keyword);
+        const bodyMatches = query.titleOnly
+          ? []
+          : findOccurrences(body, keyword);
         if (!titleMatch && bodyMatches.length === 0) continue;
 
         hits.push({
@@ -703,7 +791,9 @@ export function createMockBackend(): MockBackend {
  * 分布刻意做成「工作日写得多、周末写得少、中间断过几天」，
  * 这样连续天数、最高单日、断档这几条规则都能在同一张图上被看到。
  */
-export function buildStatsPayload(chapters: readonly ChapterSummary[]): StatsPayload {
+export function buildStatsPayload(
+  chapters: readonly ChapterSummary[],
+): StatsPayload {
   const totalWords = chapters.reduce((sum, c) => sum + c.wordCount, 0);
   // 示例数据里的基准日：与 mock-data 的时间戳同源，随 seed 一起固定
   const anchor = new Date(2026, 0, 1);
@@ -735,7 +825,10 @@ export function buildStatsPayload(chapters: readonly ChapterSummary[]): StatsPay
       date: formatDayKey(date),
       words,
       minutes: Math.max(1, Math.round(words / 32)),
-      chapters: Math.max(1, Math.min(chapterCount, 1 + (offset % chapterCount))),
+      chapters: Math.max(
+        1,
+        Math.min(chapterCount, 1 + (offset % chapterCount)),
+      ),
     });
   }
 
@@ -746,8 +839,17 @@ export function buildStatsPayload(chapters: readonly ChapterSummary[]): StatsPay
     if (last) last.words += remaining;
   }
 
-  const summary = summarizeDays(days, formatDayKey(today), DEFAULT_STREAK_THRESHOLD);
-  return { days, summary, statsDir: ".yuhua/stats", streakThreshold: DEFAULT_STREAK_THRESHOLD };
+  const summary = summarizeDays(
+    days,
+    formatDayKey(today),
+    DEFAULT_STREAK_THRESHOLD,
+  );
+  return {
+    days,
+    summary,
+    statsDir: ".yuhua/stats",
+    streakThreshold: DEFAULT_STREAK_THRESHOLD,
+  };
 }
 
 /** 连续天数的默认阈值，与 Rust 侧 `DEFAULT_STREAK_THRESHOLD` 一致。 */
@@ -782,7 +884,11 @@ function weekdayOfKey(key: string): number {
  * **自然日**、今天没写不算断、并列时最高单日取更早的一天。
  * mock 是行为镜像，镜像得不像比不实现更危险。
  */
-function summarizeDays(days: readonly StatsDay[], today: string, threshold: number): StatsSummary {
+function summarizeDays(
+  days: readonly StatsDay[],
+  today: string,
+  threshold: number,
+): StatsSummary {
   const byDate = new Map(days.map((d) => [d.date, d]));
   const month = today.slice(0, 7);
   const weekStart = shiftDayKey(today, -weekdayOfKey(today));
@@ -809,10 +915,12 @@ function summarizeDays(days: readonly StatsDay[], today: string, threshold: numb
   }
 
   let window7 = 0;
-  for (let i = 6; i >= 0; i -= 1) window7 += byDate.get(shiftDayKey(today, -i))?.words ?? 0;
+  for (let i = 6; i >= 0; i -= 1)
+    window7 += byDate.get(shiftDayKey(today, -i))?.words ?? 0;
   const averagePerDay7 = Math.floor(window7 / 7);
 
-  const reached = (key: string): boolean => (byDate.get(key)?.words ?? 0) >= threshold;
+  const reached = (key: string): boolean =>
+    (byDate.get(key)?.words ?? 0) >= threshold;
   let cursor = reached(today) ? today : shiftDayKey(today, -1);
   let streak = 0;
   while (streak < 10_000 && reached(cursor)) {
@@ -826,7 +934,8 @@ function summarizeDays(days: readonly StatsDay[], today: string, threshold: numb
     thisWeek,
     today: byDate.get(today)?.words ?? 0,
     activeDays,
-    averagePerActiveDay: activeDays === 0 ? 0 : Math.floor(totalWords / activeDays),
+    averagePerActiveDay:
+      activeDays === 0 ? 0 : Math.floor(totalWords / activeDays),
     averagePerDay7,
     bestDay,
     bestDayDate,
@@ -860,8 +969,6 @@ export function findOccurrences(text: string, keyword: string): number[] {
   return out;
 }
 
-
-
 /**
  * 围绕命中位置截取上下文片段。
  *
@@ -878,7 +985,12 @@ export function findOccurrences(text: string, keyword: string): number[] {
  * 定位，遇到关键词跨换行会返回 -1，高亮直接丢失。因此这里一边压平
  * 一边记录"关键词起点之前被替换掉多少字符"，直接算出正确偏移。
  */
-function buildSnippets(body: string, keyword: string, occurrences: number[], max = 3): Array<{ text: string; ranges: Array<[number, number]> }> {
+function buildSnippets(
+  body: string,
+  keyword: string,
+  occurrences: number[],
+  max = 3,
+): Array<{ text: string; ranges: Array<[number, number]> }> {
   const context = 24;
   const snippets: Array<{ text: string; ranges: Array<[number, number]> }> = [];
   const used: Array<[number, number]> = [];
@@ -909,8 +1021,16 @@ function buildSnippets(body: string, keyword: string, occurrences: number[], max
     const charBegin = at - start - shiftBeforeStart;
     const charFinish = charBegin + keyword.length;
     const ranges: Array<[number, number]> =
-      charBegin >= 0 && charFinish <= flat.length && flat.slice(charBegin, charFinish).replace(/\s/g, "") === keyword.replace(/\s/g, "")
-        ? [[charOffsetToByte(flat, charBegin), charOffsetToByte(flat, charFinish)]]
+      charBegin >= 0 &&
+      charFinish <= flat.length &&
+      flat.slice(charBegin, charFinish).replace(/\s/g, "") ===
+        keyword.replace(/\s/g, "")
+        ? [
+            [
+              charOffsetToByte(flat, charBegin),
+              charOffsetToByte(flat, charFinish),
+            ],
+          ]
         : [];
 
     snippets.push({ text: flat, ranges });
@@ -918,18 +1038,29 @@ function buildSnippets(body: string, keyword: string, occurrences: number[], max
 
   // 兜底：正文里确实有这个词，但命中位置都在片段之外（理论上不会发生，
   // 但保留这条路径可以避免"搜到了却没有片段"的空结果）
-  if (snippets.length === 0 && occurrences.length === 0 && body.includes(keyword)) {
+  if (
+    snippets.length === 0 &&
+    occurrences.length === 0 &&
+    body.includes(keyword)
+  ) {
     const head = body.slice(0, 60).replace(/\n+/g, " ");
     const rel = head.indexOf(keyword);
     // 定位不到关键词就不给高亮区间，绝不假定它从 0 开始
     snippets.push({
       text: head,
-      ranges: rel >= 0 ? [[charOffsetToByte(head, rel), charOffsetToByte(head, rel + keyword.length)]] : [],
+      ranges:
+        rel >= 0
+          ? [
+              [
+                charOffsetToByte(head, rel),
+                charOffsetToByte(head, rel + keyword.length),
+              ],
+            ]
+          : [],
     });
   }
   return snippets;
 }
-
 
 /**
  * 把片段内的字符下标换成 UTF-8 字节下标。
@@ -949,4 +1080,3 @@ function charOffsetToByte(text: string, charOffset: number): number {
   }
   return bytes;
 }
-

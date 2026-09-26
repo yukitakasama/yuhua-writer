@@ -32,6 +32,35 @@ use yuhua_core::{Result, YuhuaError};
 
 use crate::layout::{WorkspaceLayout, CONFIG_FILE, FORMAT_VERSION};
 
+/// 一个卷在配置文件里的持久化形态。
+///
+/// ## 为什么卷名要进 workspace.json
+///
+/// 卷名此前只存在于目录名（`001-第一卷 风起`），而目录名一旦改动，
+/// 云盘与 Git 会看到「删除 + 新增」两个事件。把标题与排序持久化到
+/// 配置里，重命名就只是一次配置写入 —— 磁盘目录名退化为**纯哈希键**，
+/// 不再承载语义。
+///
+/// 这也是「重命名被静默丢弃」这个缺陷的根因修复：`scan_workspace`
+/// 每次都从目录名重建卷，于是 `rename_volume` 只改内存的做法在紧接着的
+/// 重扫里被整体覆盖。有了这份清单，扫描就变成「配置优先、目录名兜底」。
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct VolumeRecord {
+    /// 卷 ID。
+    pub id: String,
+    /// 卷名。
+    pub title: String,
+    /// 排序序号。
+    pub sort: i32,
+    /// 对应的磁盘目录名（相对 `manuscript/`）。
+    ///
+    /// 这个字段是 `delete_volume` 能**准确定位**目录的前提：
+    /// 用内存里的 `volume_dir_name(vol.sort, &vol.title)` 现拼，
+    /// 在卷被重命名或重排之后就指向了别的目录（甚至不存在的目录）。
+    pub dir_name: String,
+}
+
 /// 工作区配置文件的内容（`.yuhua/workspace.json`）。
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -48,6 +77,16 @@ pub struct WorkspaceConfig {
     /// 书名（冗余存储，便于不解析 manuscript 就能显示）。
     #[serde(default)]
     pub title: String,
+    /// 卷清单。
+    ///
+    /// 空表示这是一个**尚未记录卷信息的旧工作区**，由扫描流程
+    /// 从目录名回填（见 `scan` 模块与 `AppState::open`）。
+    ///
+    /// `#[serde(default)]` 是这里唯一不能省的东西：没有它，旧
+    /// `workspace.json` 会因为缺字段而**整个解析失败**，
+    /// 用户的工作区将直接打不开 —— 这是本任务风险最高的一个决定。
+    #[serde(default)]
+    pub volumes: Vec<VolumeRecord>,
 }
 
 impl WorkspaceConfig {
@@ -60,6 +99,11 @@ impl WorkspaceConfig {
             created: now,
             last_opened: Some(now),
             title: title.into(),
+            // 新工作区还没有卷：第一条卷由 scan 的兜底逻辑产出。
+            // 这里刻意不放一个默认卷 —— 磁盘上稿件目录的真实内容是
+            // 唯一权威，配置里凭空写一个「第一卷」会让首次扫描产生
+            // 一个配置有、磁盘没有的幽灵目录。
+            volumes: Vec::new(),
         }
     }
 }
@@ -177,7 +221,7 @@ impl Workspace {
             return Err(YuhuaError::InvalidWorkspace {
                 path: layout.root().to_path_buf(),
                 reason: format!(
-                    "工作区格式版本为 {}，高于本软件支持的 {}。请升级羽化写作后再打开，                     以免丢失新格式中的数据。",
+                    "工作区格式版本为 {}，高于本软件支持的 {}。请升级羽化写作后再打开，以免丢失新格式中的数据。",
                     config.format_version, FORMAT_VERSION
                 ),
             });
@@ -274,6 +318,53 @@ impl Workspace {
     /// 索引库路径（工作区之外）。
     pub fn index_db_path(&self) -> PathBuf {
         self.layout.index_db_path()
+    }
+
+    /// 配置里的卷清单。
+    pub fn volumes(&self) -> &[VolumeRecord] {
+        &self.config.volumes
+    }
+
+    /// 持久化卷清单。
+    ///
+    /// ## 为什么走 `write_config` 而不是自己 `fs::write`
+    ///
+    /// 因为配置是**工作区身份**的载体（`workspaceId` / `formatVersion`），
+    /// 写坏一半会让整个工作区打不开。`write_config` 内部走
+    /// `atomic::atomic_write`（先写同目录临时文件再 rename），
+    /// 断电或崩溃时磁盘上要么是旧内容、要么是新内容，不会出现半截 JSON。
+    ///
+    /// ## 为什么只改 `volumes` 一个字段
+    ///
+    /// 这里重新读一遍磁盘上的配置再合并，而不是拿 `self.config` 整体覆盖：
+    /// 用户可能在别处（或另一个进程）改过 `title` / `last_opened`，
+    /// 整体覆盖会把那些改动抹掉。只动自己负责的那一段是最小惊扰。
+    ///
+    /// 读不到磁盘配置时退回用内存里那一份（例如配置文件刚被删掉），
+    /// 此时以内存为准比直接失败更符合用户的预期 —— 卷清单本来就在内存里。
+    ///
+    /// ## 为什么必须同时更新内存里的 `self.config.volumes`
+    ///
+    /// 这是本函数**唯一容易漏掉、漏掉就前功尽弃**的一点。
+    /// `scan_workspace` 读的是 `workspace.volumes()`，也就是
+    /// `self.config.volumes` —— 它是 [`Workspace::open`] 那一刻的快照，
+    /// 之后不会自己刷新。
+    ///
+    /// 若这里只写盘不同步内存，那么「改内存 → 写配置 → 重扫」这条链路里
+    /// **重扫读到的仍是旧清单**，于是扫描退化成从目录名兜底、
+    /// 新的卷名当场被覆盖 —— 与修复前完全一样的症状，
+    /// 而磁盘上却留着一份正确的新配置，排查起来会更绕。
+    pub fn save_volumes(&mut self, volumes: &[VolumeRecord]) -> Result<()> {
+        let mut config = std::fs::read_to_string(self.layout.config_path())
+            .ok()
+            .and_then(|t| serde_json::from_str::<WorkspaceConfig>(&t).ok())
+            .unwrap_or_else(|| self.config.clone());
+        config.volumes = volumes.to_vec();
+        write_config(&self.layout, &config)?;
+        // 写盘成功之后才改内存：反过来会让"写盘失败但内存已变"
+        // 制造出内存与磁盘不一致的窗口
+        self.config.volumes = config.volumes;
+        Ok(())
     }
 }
 
