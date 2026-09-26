@@ -87,6 +87,11 @@ function isDevKit(): boolean {
  * 固化下来，可以挂进 CI。
  */
 async function mount(): Promise<void> {
+  // solid-js/web appends into a non-empty container. Clear the static boot
+  // screen first, otherwise the real app renders below it and the window
+  // appears to remain stuck on the initialization screen.
+  root!.replaceChildren();
+
   if (isDevKit()) {
     // 样式也一起动态加载：它同样不该进生产产物
     await import("./styles/devkit.css");
