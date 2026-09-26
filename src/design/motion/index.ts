@@ -36,3 +36,6 @@ export {
   fadeInContainer,
 } from "./primitives";
 export type { Animatable, Direction, MotionOptions } from "./primitives";
+
+export { FrameRateMonitor, frameMonitor, benchmarkMotionPrimitives, findMaxConcurrency } from "./performance";
+export type { PerformanceReport } from "./performance";
