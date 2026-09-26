@@ -41,14 +41,6 @@ export interface PerformanceReport {
   passed: boolean;
 }
 
-/** 一个 1 秒滑动窗口内的帧数据。 */
-interface WindowData {
-  /** 窗口起始时间戳（ms）。 */
-  start: number;
-  /** 窗口内的帧数。 */
-  count: number;
-}
-
 /**
  * 帧率监控器。
  *
@@ -62,9 +54,6 @@ export class FrameRateMonitor {
   private lastFrameTime = 0;
   private frameTimestamps: number[] = [];
   private droppedCount = 0;
-
-  /** 60fps 的理想帧间隔（约 16.67ms）。 */
-  private static readonly IDEAL_FRAME_INTERVAL = 1000 / 60;
 
   /** 掉帧判定阈值（18ms ≈ 55fps）。 */
   private static readonly DROP_THRESHOLD = 18;
@@ -152,12 +141,14 @@ export class FrameRateMonitor {
 
     for (let i = 0; i < this.frameTimestamps.length; i += 1) {
       const windowStart = this.frameTimestamps[i];
+      if (windowStart === undefined) continue;
       const windowEnd = windowStart + FrameRateMonitor.WINDOW_SIZE;
 
       // 统计窗口内的帧数
       let count = 0;
       for (let j = i; j < this.frameTimestamps.length; j += 1) {
-        if (this.frameTimestamps[j] <= windowEnd) count += 1;
+        const timestamp = this.frameTimestamps[j];
+        if (timestamp !== undefined && timestamp <= windowEnd) count += 1;
         else break;
       }
 

@@ -20,7 +20,7 @@
  * 本文件里的 `.skip` 测试提供了自动化的骨架，将来接入 E2E 时取消 skip 即可。
  */
 
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { beforeEach, describe, expect, it } from "vitest";
 
 import { benchmarkMotionPrimitives, findMaxConcurrency, FrameRateMonitor } from "./performance";
 import { fadeIn, fadeOut, scaleIn, slideIn, collapse, flip, pressFeedback, rollNumber } from "./primitives";
@@ -270,9 +270,9 @@ describe("benchmarkMotionPrimitives 批量测试", () => {
 
     const results = await benchmarkMotionPrimitives(tests);
     expect(results).toHaveLength(2);
-    expect(results[0].name).toBe("test-1");
-    expect(results[1].name).toBe("test-2");
-    expect(results[0].report).toHaveProperty("avgFps");
+    expect(results[0]?.name).toBe("test-1");
+    expect(results[1]?.name).toBe("test-2");
+    expect(results[0]?.report).toHaveProperty("avgFps");
   });
 
   it("测试之间有冷却间隔，避免前一个测试污染下一个", async () => {
@@ -295,7 +295,7 @@ describe("benchmarkMotionPrimitives 批量测试", () => {
     await benchmarkMotionPrimitives(tests);
     expect(timestamps).toHaveLength(2);
     // 冷却间隔是 100ms，实际间隔应 >= 100ms
-    const gap = timestamps[1] - timestamps[0];
+    const gap = (timestamps[1] ?? 0) - (timestamps[0] ?? 0);
     expect(gap).toBeGreaterThanOrEqual(90); // 留 10ms 余量
   });
 });
