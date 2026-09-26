@@ -1,6 +1,6 @@
 {
   "name": "yuhua-writer",
-  "version": "0.1.0",
+  "version": "0.1.0-alpha.2",
   "description": "羽化写作 — 面向长篇小说的本地优先 Markdown 写作软件",
   "private": true,
   "type": "module",

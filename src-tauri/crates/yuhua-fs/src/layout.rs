@@ -241,6 +241,11 @@ impl WorkspaceLayout {
         format!("{:03}-{}.md", sort + 1, sanitize_file_name(title))
     }
 
+    /// Generates the directory that owns a chapter's manuscript and notes.
+    pub fn chapter_dir_name(sort: i32, title: &str) -> String {
+        sanitize_file_name(Self::chapter_file_name(sort, title).trim_end_matches(".md"))
+    }
+
     /// 生成卷目录名：`001-第一卷 风起`
     pub fn volume_dir_name(sort: i32, title: &str) -> String {
         format!("{:03}-{}", sort + 1, sanitize_file_name(title))
@@ -587,6 +592,14 @@ mod tests {
         assert_eq!(
             WorkspaceLayout::chapter_file_name(9, "第十章"),
             "010-第十章.md"
+        );
+    }
+
+    #[test]
+    fn chapter_dir_name_matches_chapter_file_stem() {
+        assert_eq!(
+            WorkspaceLayout::chapter_dir_name(0, "第一章 落羽"),
+            "001-第一章 落羽"
         );
     }
 

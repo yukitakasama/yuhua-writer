@@ -18,7 +18,7 @@
  * 浏览器模式本来就是开发预览，能走通流程就够了。
  */
 
-import { Show, createSignal, type JSX } from "solid-js";
+import { Show, createSignal, onMount, type JSX } from "solid-js";
 
 import { t } from "@/strings";
 import { Button } from "@/app/ui/Button";
@@ -39,9 +39,28 @@ export interface NewWorkspaceProps {
 /** 新建工作区引导。 */
 export function NewWorkspace(props: NewWorkspaceProps): JSX.Element {
   const [title, setTitle] = createSignal("");
-  const [root, setRoot] = createSignal(props.defaultRoot ?? "");
+  const [root, setRoot] = createSignal(props.defaultRoot ?? "./novel");
   const [busy, setBusy] = createSignal(false);
   const [error, setError] = createSignal<string | null>(null);
+
+  let defaultBase = props.defaultRoot ?? "./novel";
+
+  onMount(() => {
+    if (props.defaultRoot !== undefined || !isTauri()) return;
+    void import("@tauri-apps/api/path")
+      .then(async ({ executableDir, join }) => {
+        defaultBase = await join(await executableDir(), "novel");
+        setRoot(
+          title().trim() ? `${defaultBase}/${sanitize(title())}` : defaultBase,
+        );
+      })
+      .catch(() => {
+        defaultBase = "./novel";
+        setRoot(
+          title().trim() ? `${defaultBase}/${sanitize(title())}` : defaultBase,
+        );
+      });
+  });
 
   /** 目录名由书名推导，用户改书名时路径跟着变（除非已经手改过）。 */
   let rootTouched = false;
@@ -52,7 +71,11 @@ export function NewWorkspace(props: NewWorkspaceProps): JSX.Element {
       // 动态 import：dialog 插件只在点了按钮时才需要，
       // 顶层 import 会把它打进首屏 chunk
       const { open } = await import("@tauri-apps/plugin-dialog");
-      const picked = await open({ directory: true, multiple: false, title: t("library.openDirectory") });
+      const picked = await open({
+        directory: true,
+        multiple: false,
+        title: t("library.openDirectory"),
+      });
       if (typeof picked === "string") {
         rootTouched = true;
         setRoot(picked);
@@ -64,7 +87,9 @@ export function NewWorkspace(props: NewWorkspaceProps): JSX.Element {
 
   const submit = async (): Promise<void> => {
     const name = title().trim();
-    const path = root().trim().replace(/[\\/]+$/, "");
+    const path = root()
+      .trim()
+      .replace(/[\\/]+$/, "");
     if (name.length === 0) {
       setError(t("error.generic"));
       return;
@@ -76,7 +101,10 @@ export function NewWorkspace(props: NewWorkspaceProps): JSX.Element {
     setBusy(true);
     setError(null);
     // 工作区根 = 用户选的目录 / 书名，与文件管理器里的习惯一致
-    const ok = await props.onCreate(`${path}/${sanitize(name)}`, name);
+    // The recommended path already includes the workspace name; a manually
+    // selected location is treated as the parent directory.
+    const workspacePath = rootTouched ? `${path}/${sanitize(name)}` : path;
+    const ok = await props.onCreate(workspacePath, name);
     setBusy(false);
     if (!ok) setError(t("error.generic"));
   };
@@ -100,8 +128,10 @@ export function NewWorkspace(props: NewWorkspaceProps): JSX.Element {
             onInput={(event) => {
               setTitle(event.currentTarget.value);
               if (!rootTouched) {
-                const base = props.defaultRoot ?? "";
-                setRoot(base ? `${base}/${sanitize(event.currentTarget.value)}` : "");
+                const base = defaultBase;
+                setRoot(
+                  base ? `${base}/${sanitize(event.currentTarget.value)}` : "",
+                );
               }
             }}
             onKeyDown={(event) => {
@@ -155,10 +185,12 @@ export function NewWorkspace(props: NewWorkspaceProps): JSX.Element {
  * 否则同一个书名在不同系统上会生成不同的目录名，工作区就搬不了家。
  */
 export function sanitize(name: string): string {
-  return name
-    .trim()
-    .replace(/[\\/:*?"<>|]/g, "-")
-    .replace(/\s+/g, " ")
-    .replace(/[. ]+$/, "")
-    .slice(0, 80) || "未命名";
+  return (
+    name
+      .trim()
+      .replace(/[\\/:*?"<>|]/g, "-")
+      .replace(/\s+/g, " ")
+      .replace(/[. ]+$/, "")
+      .slice(0, 80) || "未命名"
+  );
 }

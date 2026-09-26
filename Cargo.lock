@@ -5193,7 +5193,7 @@ dependencies = [
 
 [[package]]
 name = "yuhua-core"
-version = "0.1.0-alpha.0"
+version = "0.1.0-alpha.2"
 dependencies = [
  "chrono",
  "serde",
@@ -5204,7 +5204,7 @@ dependencies = [
 
 [[package]]
 name = "yuhua-export"
-version = "0.1.0-alpha.0"
+version = "0.1.0-alpha.2"
 dependencies = [
  "chrono",
  "pulldown-cmark",
@@ -5219,7 +5219,7 @@ dependencies = [
 
 [[package]]
 name = "yuhua-fs"
-version = "0.1.0-alpha.0"
+version = "0.1.0-alpha.2"
 dependencies = [
  "blake3",
  "chrono",
@@ -5235,7 +5235,7 @@ dependencies = [
 
 [[package]]
 name = "yuhua-stats"
-version = "0.1.0-alpha.0"
+version = "0.1.0-alpha.2"
 dependencies = [
  "blake3",
  "chrono",
@@ -5250,7 +5250,7 @@ dependencies = [
 
 [[package]]
 name = "yuhua-store"
-version = "0.1.0-alpha.0"
+version = "0.1.0-alpha.2"
 dependencies = [
  "blake3",
  "chrono",
@@ -5265,7 +5265,7 @@ dependencies = [
 
 [[package]]
 name = "yuhua-writer"
-version = "0.1.0-alpha.0"
+version = "0.1.0-alpha.2"
 dependencies = [
  "chrono",
  "dirs",

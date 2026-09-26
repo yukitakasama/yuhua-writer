@@ -400,7 +400,7 @@ describe("RangeField 无障碍", () => {
 describe("关于页（T9.8）", () => {
   it("展示版本号（来自 package.json，不是手抄）", () => {
     const { container } = render(() => <AboutPanel />);
-    expect(container.textContent).toContain("0.1.0-alpha.0");
+    expect(container.textContent).toContain("0.1.0-alpha.2");
   });
 
   it("展示构建通道", () => {

@@ -44,17 +44,34 @@ use tauri::State;
 
 use yuhua_core::model::{ChapterSummary, Document, OutlineNode};
 use yuhua_core::{ChapterId, CountMode, VolumeId};
+use yuhua_export::{ExportFormat, ExportScope};
 use yuhua_fs::conflict::DetectedConflict;
 use yuhua_fs::workspace::WorkspaceSummary;
 use yuhua_store::search::{SearchQuery, SearchResults};
 use yuhua_store::stats::WordStats;
-use yuhua_export::{ExportFormat, ExportScope};
 
 use crate::error::CommandError;
 use crate::state::{poisoned, AppState, SessionHandle, WorkspaceSession};
 
 /// 命令层统一的 Result。
 type CmdResult<T> = std::result::Result<T, CommandError>;
+
+/// Returns the on-disk object that owns a chapter. New workspaces store the
+/// manuscript in a chapter directory; legacy workspaces still store a single
+/// markdown file directly under the volume directory.
+fn chapter_storage_path(path: &str) -> String {
+    let p = std::path::Path::new(path);
+    let Some(parent) = p.parent() else {
+        return path.to_string();
+    };
+    // manuscript/<volume>/<chapter>/<chapter>.md is the new layout.
+    // Legacy files have only manuscript/<volume>/<chapter>.md.
+    if p.components().count() >= 4 {
+        parent.to_string_lossy().replace('\\', "/")
+    } else {
+        path.to_string()
+    }
+}
 
 /// 取当前会话句柄，未打开时报错。
 ///
@@ -484,13 +501,18 @@ fn create_chapter_impl(
             yuhua_fs::layout::WorkspaceLayout::volume_dir_name(vol.sort, &vol.title)
         });
     let file_name = yuhua_fs::layout::WorkspaceLayout::chapter_file_name(next_sort, &title);
-    let rel = format!("manuscript/{dir_name}/{file_name}");
+    let chapter_dir = yuhua_fs::layout::WorkspaceLayout::chapter_dir_name(next_sort, &title);
+    let rel = format!("manuscript/{dir_name}/{chapter_dir}/{file_name}");
 
     // 先写文件（真源），再更新内存与索引
     let now = now_local();
     let chapter =
         yuhua_core::model::Chapter::new(&doc_before.book.id, &vid, &title, &rel, next_sort, now);
     let abs = lock_session(&s)?.layout().resolve(&rel)?;
+    if let Some(parent) = abs.parent() {
+        std::fs::create_dir_all(parent)
+            .map_err(|e| CommandError::Domain(yuhua_core::YuhuaError::io(parent, e)))?;
+    }
     let cf = yuhua_fs::chapter_io::ChapterFile {
         meta: chapter.meta.clone(),
         body: String::new(),
@@ -560,7 +582,10 @@ pub fn delete_chapter(
 
     let layout = lock_session(&s)?.layout().clone();
     let trash = yuhua_fs::trash::TrashManager::new(layout);
-    trash.move_to_trash(&chapter.path, &chapter.meta.title, cid.as_str(), "chapter")?;
+    // New chapters are directories containing the manuscript and optional
+    // `tips.md`. Move the directory as a unit so notes are not orphaned.
+    let source = chapter_storage_path(&chapter.path);
+    trash.move_to_trash(&source, &chapter.meta.title, cid.as_str(), "chapter")?;
 
     reload_and_sync(&state)?;
     Ok(state.document()?.outline())
@@ -1276,8 +1301,12 @@ pub fn export_document(
             ExportScope::Single(cid)
         }
         ExportScopeDto::Selected { chapter_ids } => {
-            let ids: Result<Vec<_>, _> = chapter_ids.into_iter().map(|s| ChapterId::parse(s)).collect();
-            let ids = ids.map_err(|e| CommandError::Domain(yuhua_core::YuhuaError::InvalidInput(e)))?;
+            let ids: Result<Vec<_>, _> = chapter_ids
+                .into_iter()
+                .map(|s| ChapterId::parse(s))
+                .collect();
+            let ids =
+                ids.map_err(|e| CommandError::Domain(yuhua_core::YuhuaError::InvalidInput(e)))?;
             ExportScope::Selected(ids)
         }
         ExportScopeDto::Volume { volume_id } => {

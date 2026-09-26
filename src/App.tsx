@@ -265,7 +265,6 @@ export function App(): JSX.Element {
               <NewWorkspace
                 onCreate={handleCreateWorkspace}
                 onCancel={() => setCreatingWorkspace(false)}
-                defaultRoot="C:/Users/示例/Documents"
               />
             }
           >

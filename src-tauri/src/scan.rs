@@ -176,7 +176,7 @@ pub fn scan_workspace_with_dirs(workspace: &Workspace) -> Result<(Document, Volu
         let Some(volume_id) = volume_by_dir.get(dir_name) else {
             continue;
         };
-        let files = read_markdown_files(dir_path);
+        let files = read_chapter_files(dir_path);
         for (sort, file) in files.iter().enumerate() {
             let rel = layout.to_relative_str(file);
             if let Some(ch) = load_chapter(file, &book.id, volume_id, sort as i32, &rel) {
@@ -257,6 +257,42 @@ fn load_chapter(
     })
 }
 
+/// Returns manuscript files from a volume, supporting both the legacy flat
+/// layout and the chapter-directory layout. tips.md is deliberately ignored.
+fn read_chapter_files(volume_dir: &Path) -> Vec<std::path::PathBuf> {
+    let mut files = read_markdown_files(volume_dir);
+    let Ok(entries) = std::fs::read_dir(volume_dir) else {
+        return files;
+    };
+    let mut chapter_dirs: Vec<std::path::PathBuf> = entries
+        .flatten()
+        .map(|e| e.path())
+        .filter(|p| p.is_dir())
+        .collect();
+    chapter_dirs.sort_by(|a, b| {
+        natural_cmp(
+            &a.file_name().unwrap_or_default().to_string_lossy(),
+            &b.file_name().unwrap_or_default().to_string_lossy(),
+        )
+    });
+    for dir in chapter_dirs {
+        let Some(dir_name) = dir.file_name().map(|n| n.to_string_lossy().to_string()) else {
+            continue;
+        };
+        let canonical = dir.join(format!("{dir_name}.md"));
+        if canonical.is_file() {
+            files.push(canonical);
+            continue;
+        }
+        let fallback = read_markdown_files(&dir);
+        if let Some(file) = fallback.into_iter().next() {
+            files.push(file);
+        }
+    }
+    files.sort_by(|a, b| natural_cmp(&a.to_string_lossy(), &b.to_string_lossy()));
+    files
+}
+
 /// 列出 manuscript 下的卷目录，返回 `(目录名, 绝对路径)`。
 fn read_volume_dirs(manuscript: &Path) -> Vec<(String, std::path::PathBuf)> {
     let Ok(entries) = std::fs::read_dir(manuscript) else {
@@ -287,6 +323,11 @@ fn read_markdown_files(dir: &Path) -> Vec<std::path::PathBuf> {
                 .extension()
                 .map(|ext| ext.eq_ignore_ascii_case("md"))
                 .unwrap_or(false)
+        })
+        .filter(|e| {
+            !e.file_name()
+                .to_string_lossy()
+                .eq_ignore_ascii_case("tips.md")
         })
         .map(|e| e.path())
         .collect();
@@ -523,6 +564,23 @@ mod tests {
             std::fs::write(vol_dir.join("001-第一章.md"), "正文").unwrap();
         }
         (dir, ws)
+    }
+
+    #[test]
+    fn scan_reads_chapter_directories_and_ignores_tips() {
+        let (_dir, ws) = workspace_with_volumes(&[]);
+        let volume_dir = ws.layout.manuscript_dir().join("001-第一卷");
+        let chapter_dir = volume_dir.join("001-第一章 落羽");
+        std::fs::create_dir_all(&chapter_dir).unwrap();
+        std::fs::write(chapter_dir.join("001-第一章 落羽.md"), "正文").unwrap();
+        std::fs::write(chapter_dir.join("tips.md"), "写作提示").unwrap();
+
+        let doc = scan_workspace(&ws).unwrap();
+
+        assert_eq!(doc.chapters.len(), 1);
+        assert!(doc.chapters[0]
+            .path
+            .ends_with("manuscript/001-第一卷/001-第一章 落羽/001-第一章 落羽.md"));
     }
 
     #[test]
