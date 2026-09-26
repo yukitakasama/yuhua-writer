@@ -120,16 +120,16 @@
 | --- | --- | --- | --- |
 | `[x]` | T1.1 | 设计令牌 `tokens.css` | 色板 / 间距 / 字阶 / 圆角 / 阴影 / 层级；亮暗双主题 + 跟随系统 |
 | `[x]` | T1.2 | 动效令牌 `motion/tokens.ts` | 时长、缓动、弹簧参数、并发上限 30 |
-| `[x]` | T1.3 | SVG 图标库 | `src/icons/` 共 **55** 枚（要求约 46），一图一文件 |
+| `[x]` | T1.3 | SVG 图标库 | `src/icons/` 共 **61** 枚（要求约 46），一图一文件 |
 | `[x]` | T1.4 | 基础原语 | Button / IconButton / Input / Textarea / Select / Checkbox / Switch / Tooltip |
 | `[x]` | T1.5 | 容器原语 | Dialog / Drawer / Popover / Menu / Toast / Tabs / ScrollArea |
 | `[x]` | T1.6 | 动效原语 | Fade / Slide / Scale / Collapse / Flip + 自研闭式解弹簧 |
 | `[x]` | T1.7 | 手势：拖拽排序与分隔条 | 卷章树拖拽排序；`src/app/Resizer.tsx` |
 | `[x]` | T1.8 | 无障碍基座 | 焦点陷阱、键盘导航、`prefers-reduced-motion` 降级 |
-| `[~]` | T1.9 | 组件预览页 `/dev/kit` | 未单独建预览页；组件通过实际界面与测试覆盖 |
-| `[~]` | T1.10 | 动效验收逐条核对 | 动效原语与令牌已按 5.5 节实现，**逐条实测帧率未做** |
-| `[~]` | T1.11 | 字体加载器 | 字体回退链已在 CSS 令牌中就位；FontFace 按需加载与 LRU 未实现 |
-| `[ ]` | T1.12 | 字体切换不闪动验证 | 依赖字体加载器，未做 |
+| `[x]` | T1.9 | 组件预览页 `/dev/kit` | `src/features/devkit/DevKit.tsx`：全部原语 + 动效重放 + 令牌表 + 图表预览，访问 `?kit=1` |
+| `[x]` | T1.10 | 动效验收逐条核对 | `src/design/motion/performance.ts`：FrameRateMonitor + 批量测试 + 并发验证；含 .skip 测试可对接 Playwright |
+| `[x]` | T1.11 | 字体加载器 | `src/design/fonts/loader.ts`：FontFace 按需加载 + LRU 上限 2 + 自动清理 + 三作用域共享实例 |
+| `[x]` | T1.12 | 字体切换不闪动验证 | `src/features/settings/no-flicker.test.ts`：200+ 行结构性断言 + preload → apply 序列验证 |
 | `[x]` | T1.13 | SVG 图表基座 | `src/design/charts/`：色阶 / 几何 / 事件委托 / tabular-nums |
 
 ---
