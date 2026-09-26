@@ -43,7 +43,12 @@ import { Resizer } from "./app/Resizer";
 import { LibraryToolbar, Toolbar, type SaveState } from "./app/Toolbar";
 import { IconClose, IconWarning } from "./app/ui/icons";
 import { IconButton } from "./app/ui/IconButton";
-import { SEARCH_HINT, SETTINGS_HINT } from "./app/placeholders";
+import { SearchPanel } from "@/features/search/SearchPanel";
+import { CommandPalette, type CommandItem } from "@/features/command/CommandPalette";
+import { StatsView } from "@/features/stats/StatsView";
+import { ShortcutPanel } from "@/features/editor/ShortcutPanel";
+import { useShortcuts } from "@/features/editor/shortcut-bindings";
+import { focusMode, toggleFocusMode } from "@/features/editor/focus";
 import {
   LEFT_MAX,
   LEFT_MIN,
@@ -53,6 +58,8 @@ import {
   setLeftWidth,
   setRightWidth,
   setView,
+  toggleLeft,
+  toggleRight,
 } from "./app/layout-store";
 import {
   addVolume as addVolumeRemote,
@@ -62,21 +69,56 @@ import {
   hasOpenWorkspace,
   openWorkspace,
   refreshRecents,
+  selectedChapterId,
+  selectChapter,
   workspaceState,
   createFirstChapter,
   volumes,
 } from "./app/workspace-store";
-import { defaultVolumeTitle } from "@/features/chapters/tree-ops";
+import { allChaptersInOrder, defaultVolumeTitle } from "@/features/chapters/tree-ops";
+import { FirstRunWizard, SettingsPanel, hasCompletedOnboarding, useAppearance } from "@/features/settings";
 
 /** 应用外壳。 */
 export function App(): JSX.Element {
+  // 检索面板（M6）与命令面板（T5.7）是两个独立的东西：
+  // 前者找"内容在哪"，后者找"功能在哪"。合用一个开关会让
+  // Ctrl+F 与 Ctrl+K 变成同一个入口，用户就失去了对"我要做什么"的表达能力
   const [searchOpen, setSearchOpen] = createSignal(false);
+  const [commandOpen, setCommandOpen] = createSignal(false);
   const [settingsOpen, setSettingsOpen] = createSignal(false);
   const [creatingWorkspace, setCreatingWorkspace] = createSignal(false);
+  const [shortcutsOpen, setShortcutsOpen] = createSignal(false);
+  // 首次启动向导（T9.7）：只在「从未引导过」时展示，走完或跳过都会写标记
+  const [wizardOpen, setWizardOpen] = createSignal(!hasCompletedOnboarding());
+
+  // 把生效的外观设置写进 CSS 变量与 html[data-theme]。
+  // 必须在应用根部调用且只调用一次：多个 effect 争相写同一批变量时行为不确定。
+  useAppearance();
 
   onMount(() => {
     void refreshRecents();
   });
+
+  /**
+   * 应用级快捷键（T4.9）。
+   *
+   * 这里只注册**真正是全局**的那些：命令面板、搜索、快捷键面板、
+   * 保存、专注模式、折叠面板、新建章。
+   * 与编辑器强相关的（查找替换、撤销重做）由 CodeMirror 自己的
+   * keymap 处理 —— 它们依赖编辑器的选区状态，在这里处理会拿不到。
+   */
+  useShortcuts(() => [
+    { id: "commandPalette", run: () => setCommandOpen(true) },
+    { id: "search", run: () => setSearchOpen(true) },
+    { id: "shortcutPanel", run: () => setShortcutsOpen(true) },
+    { id: "focusMode", run: toggleFocusMode, enabled: () => layout.view === "workspace" },
+    { id: "toggleLeft", run: toggleLeft, enabled: () => layout.view === "workspace" },
+    { id: "toggleRight", run: toggleRight, enabled: () => layout.view === "workspace" },
+    { id: "newChapter", run: () => void createFirstChapter(), enabled: () => hasOpenWorkspace() },
+    // 「下一章 / 上一章」按顺序在卷章树里走
+    { id: "nextChapter", run: () => stepChapter(1), enabled: () => hasOpenWorkspace() },
+    { id: "prevChapter", run: () => stepChapter(-1), enabled: () => hasOpenWorkspace() },
+  ]);
 
   // 有打开的章节就切到写作台，否则停在书架。
   // 用 createEffect 而不是 onMount：工作区可能在会话中途被打开
@@ -105,9 +147,92 @@ export function App(): JSX.Element {
     return ok;
   };
 
+  /** 在卷章树里按扁平顺序前后移动一章。 */
+  const stepChapter = (delta: number): void => {
+    const list = allChaptersInOrder(workspaceState.document);
+    if (list.length === 0) return;
+    const currentId = selectedChapterId();
+    const at = currentId === null ? -1 : list.findIndex((c) => c.id === currentId);
+    // 没选中时：往后走取第一章，往前走取最后一章。
+    // 这样两个方向都不会"按了没反应"
+    const nextIndex = at < 0 ? (delta > 0 ? 0 : list.length - 1) : at + delta;
+    const clamped = Math.max(0, Math.min(list.length - 1, nextIndex));
+    const target = list[clamped];
+    if (target) selectChapter(target.id);
+  };
+
   const handleLibrary = (): void => {
     void closeWorkspace().then(() => setView("library"));
   };
+
+  /**
+   * 命令面板的命令表（T5.7）。
+   *
+   * 放在组件里而不是模块顶层：`enabled` 要读 store 的实时状态，
+   * 而 store 是模块级单例 —— 写成模块常量的话，判断会在导入那一刻
+   * 就被求值一次并永远固定下来。
+   */
+  const commands = (): CommandItem[] => [
+    {
+      id: "search",
+      label: t("command.openSearch"),
+      group: t("command.groupNavigate"),
+      run: () => setSearchOpen(true),
+    },
+    {
+      id: "stats",
+      label: t("command.openStats"),
+      group: t("command.groupNavigate"),
+      run: () => setView("stats"),
+      enabled: () => hasOpenWorkspace(),
+    },
+    {
+      id: "library",
+      label: t("command.openLibrary"),
+      group: t("command.groupNavigate"),
+      run: handleLibrary,
+    },
+    {
+      id: "newChapter",
+      label: t("command.newChapter"),
+      group: t("command.groupWrite"),
+      run: () => void createFirstChapter(),
+      enabled: () => hasOpenWorkspace(),
+    },
+    {
+      id: "newVolume",
+      label: t("command.newVolume"),
+      group: t("command.groupWrite"),
+      run: handleNewVolume,
+      enabled: () => hasOpenWorkspace(),
+    },
+    {
+      id: "toggleLeft",
+      label: t("command.toggleLeft"),
+      group: t("command.groupView"),
+      run: toggleLeft,
+      enabled: () => layout.view === "workspace",
+    },
+    {
+      id: "toggleRight",
+      label: t("command.toggleRight"),
+      group: t("command.groupView"),
+      run: toggleRight,
+      enabled: () => layout.view === "workspace",
+    },
+    {
+      id: "shortcuts",
+      label: t("shortcuts.title"),
+      group: t("command.groupView"),
+      run: () => setShortcutsOpen(true),
+    },
+    {
+      id: "settings",
+      label: t("settings.title"),
+      group: t("command.groupView"),
+      run: () => setSettingsOpen(true),
+    },
+  ];
 
   return (
     <div class="app">
@@ -122,6 +247,12 @@ export function App(): JSX.Element {
       </Show>
 
       <Switch>
+        {/* 写作统计（M8）：独立的一屏，因为它有六个分区与两张整幅的图，
+            塞进三栏布局里的任何一栏都放不下 */}
+        <Match when={layout.view === "stats" && !creatingWorkspace()}>
+          <StatsView onBack={() => setView(hasOpenWorkspace() ? "workspace" : "library")} />
+        </Match>
+
         <Match when={layout.view === "library" || creatingWorkspace()}>
           <LibraryToolbar
             onSearch={() => setSearchOpen(true)}
@@ -152,6 +283,8 @@ export function App(): JSX.Element {
             onSearch={() => setSearchOpen(true)}
             onSettings={() => setSettingsOpen(true)}
             onLibrary={handleLibrary}
+            onStats={() => setView("stats")}
+            onCommands={() => setCommandOpen(true)}
           />
 
           <div
@@ -160,6 +293,7 @@ export function App(): JSX.Element {
               "shell--left-collapsed": layout.leftCollapsed,
               "shell--right-collapsed": layout.rightCollapsed,
             }}
+            data-focus-mode={focusMode() ? "on" : undefined}
             style={{
               "--left-w": `${layout.leftWidth}px`,
               "--right-w": `${layout.rightWidth}px`,
@@ -186,17 +320,20 @@ export function App(): JSX.Element {
         </Match>
       </Switch>
 
-      {/* 搜索与设置：本阶段是占位面板，但入口与键盘可达性已经就位 */}
-      <Show when={searchOpen()}>
-        <Overlay title={t("search.title")} hint={SEARCH_HINT} onClose={() => setSearchOpen(false)}>
-          <p class="overlay__placeholder">{t("search.empty")}</p>
-        </Overlay>
-      </Show>
+      {/* 检索与大纲面板（M6）：关键词高亮、点击跳转并闪烁 */}
+      <SearchPanel open={searchOpen()} onClose={() => setSearchOpen(false)} />
 
-      <Show when={settingsOpen()}>
-        <Overlay title={t("settings.title")} hint={SETTINGS_HINT} onClose={() => setSettingsOpen(false)}>
-          <p class="overlay__placeholder">{t("settings.placeholder")}</p>
-        </Overlay>
+      {/* 命令面板（T5.7）：Ctrl/Cmd + K */}
+      <CommandPalette open={commandOpen()} onClose={() => setCommandOpen(false)} commands={commands()} />
+
+      {/* 设置面板（M9）：外观 / 字体 / 排版 / 关于四个分区，全部即时生效 */}
+      <SettingsPanel open={settingsOpen()} onClose={() => setSettingsOpen(false)} />
+
+      {/* 首次启动向导：可跳过，跳过与走完的效果完全相同 */}
+      <FirstRunWizard open={wizardOpen()} onFinish={() => setWizardOpen(false)} />
+
+      <Show when={shortcutsOpen()}>
+        <ShortcutPanel onClose={() => setShortcutsOpen(false)} />
       </Show>
     </div>
   );
@@ -239,29 +376,3 @@ function ErrorBanner(props: { onDismiss: () => void }): JSX.Element {
   );
 }
 
-/** 一个简单的模态浮层。 */
-function Overlay(props: { title: string; hint: string; onClose: () => void; children: JSX.Element }): JSX.Element {
-  return (
-    <div
-      class="overlay"
-      role="dialog"
-      aria-modal="true"
-      aria-label={props.title}
-      onClick={(event) => {
-        // 只有点在遮罩本身（不是内容）上才关闭
-        if (event.target === event.currentTarget) props.onClose();
-      }}
-    >
-      <div class="overlay__panel">
-        <header class="overlay__head">
-          <h2 class="overlay__title">{props.title}</h2>
-          <IconButton label={t("action.close")} onClick={props.onClose}>
-            <IconClose size={15} />
-          </IconButton>
-        </header>
-        <div class="overlay__body">{props.children}</div>
-        <p class="overlay__hint">{props.hint}</p>
-      </div>
-    </div>
-  );
-}

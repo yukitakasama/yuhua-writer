@@ -14,6 +14,7 @@ import type { SvgIconProps } from "./base";
 export { iconProps, ICON_VIEW_BOX, ICON_STROKE_WIDTH } from "./base";
 export type { SvgIconProps } from "./base";
 
+import { AlignLeftIcon } from "./align-left";
 import { ArrowDownIcon } from "./arrow-down";
 import { ArrowLeftIcon } from "./arrow-left";
 import { ArrowRightIcon } from "./arrow-right";
@@ -46,6 +47,7 @@ import { FullscreenIcon } from "./fullscreen";
 import { GoalIcon } from "./goal";
 import { HeadingIcon } from "./heading";
 import { ImageIcon } from "./image";
+import { InfoIcon } from "./info";
 import { ItalicIcon } from "./italic";
 import { LinkIcon } from "./link";
 import { ListIcon } from "./list";
@@ -53,6 +55,7 @@ import { ListOrderedIcon } from "./list-ordered";
 import { MinusIcon } from "./minus";
 import { MoonIcon } from "./moon";
 import { MoreIcon } from "./more";
+import { OutlineIcon } from "./outline";
 import { PanelLeftIcon } from "./panel-left";
 import { PanelRightIcon } from "./panel-right";
 import { PlusIcon } from "./plus";
@@ -62,8 +65,11 @@ import { ReplaceIcon } from "./replace";
 import { SaveIcon } from "./save";
 import { SearchIcon } from "./search";
 import { SettingsIcon } from "./settings";
+import { StatsIcon } from "./stats";
 import { SunIcon } from "./sun";
+import { TargetIcon } from "./target";
 import { TrashIcon } from "./trash";
+import { TypeIcon } from "./type";
 import { UndoIcon } from "./undo";
 import { VolumeIcon } from "./volume";
 import { WordCountIcon } from "./word-count";
@@ -74,6 +80,7 @@ import { WorldIcon } from "./world";
  * 常规业务代码请按名导入，保持依赖关系清晰。
  */
 export const ALL_ICONS = {
+  "align-left": AlignLeftIcon,
   "arrow-down": ArrowDownIcon,
   "arrow-left": ArrowLeftIcon,
   "arrow-right": ArrowRightIcon,
@@ -106,6 +113,7 @@ export const ALL_ICONS = {
   "goal": GoalIcon,
   "heading": HeadingIcon,
   "image": ImageIcon,
+  "info": InfoIcon,
   "italic": ItalicIcon,
   "link": LinkIcon,
   "list": ListIcon,
@@ -113,6 +121,7 @@ export const ALL_ICONS = {
   "minus": MinusIcon,
   "moon": MoonIcon,
   "more": MoreIcon,
+  "outline": OutlineIcon,
   "panel-left": PanelLeftIcon,
   "panel-right": PanelRightIcon,
   "plus": PlusIcon,
@@ -122,8 +131,11 @@ export const ALL_ICONS = {
   "save": SaveIcon,
   "search": SearchIcon,
   "settings": SettingsIcon,
+  "stats": StatsIcon,
   "sun": SunIcon,
+  "target": TargetIcon,
   "trash": TrashIcon,
+  "type": TypeIcon,
   "undo": UndoIcon,
   "volume": VolumeIcon,
   "word-count": WordCountIcon,
@@ -133,13 +145,20 @@ export const ALL_ICONS = {
 /** 图标名称联合类型。 */
 export type IconName = keyof typeof ALL_ICONS;
 
-/** 图标数量。开发预览页与测试用它做完整性断言。 */
-export const ICON_COUNT = 54;
+/**
+ * 图标数量。开发预览页与测试用它做完整性断言。
+ *
+ * 这个数必须与 `src/icons/` 下的图标文件数一致（`base.tsx` 是共享的
+ * 基础组件，不是图标，不计入）。测试 `icons.test.tsx` 会钉死这一点 ——
+ * 加了图标却忘了改这里，测试就会红。
+ */
+export const ICON_COUNT = 60;
 
 /** 品牌标记（羽毛）的别名，便于调用处语义化。 */
 export const BrandIcon = FeatherIcon;
 
 export {
+  AlignLeftIcon,
   ArrowDownIcon,
   ArrowLeftIcon,
   ArrowRightIcon,
@@ -172,6 +191,7 @@ export {
   GoalIcon,
   HeadingIcon,
   ImageIcon,
+  InfoIcon,
   ItalicIcon,
   LinkIcon,
   ListIcon,
@@ -179,6 +199,7 @@ export {
   MinusIcon,
   MoonIcon,
   MoreIcon,
+  OutlineIcon,
   PanelLeftIcon,
   PanelRightIcon,
   PlusIcon,
@@ -188,8 +209,11 @@ export {
   SaveIcon,
   SearchIcon,
   SettingsIcon,
+  StatsIcon,
   SunIcon,
+  TargetIcon,
   TrashIcon,
+  TypeIcon,
   UndoIcon,
   VolumeIcon,
   WordCountIcon,

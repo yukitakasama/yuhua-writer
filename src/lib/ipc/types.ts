@@ -243,6 +243,76 @@ export interface SearchQuery {
   volumeId?: string;
 }
 
+/**
+ * 某一天的写作统计，对应 Rust `DayRecord` 的展示投影。
+ *
+ * 刻意**不含章节明细**：日历与热力图只需要「那天写了多少字」，
+ * 把章节映射一起传过来会让 365 天的载荷膨胀上百倍（T8.9 的 M8 预算）。
+ */
+export interface StatsDay {
+  /** 日期，`YYYY-MM-DD`。 */
+  date: string;
+  /** 当日新增字数。 */
+  words: number;
+  /** 当日累计写作时长（分钟）。 */
+  minutes: number;
+  /** 当日涉及的章节数。 */
+  chapters: number;
+}
+
+/**
+ * 汇总统计，对应 Rust `yuhua_stats::summary::Summary`。
+ *
+ * 字段名与 Rust 的 `rename_all = "camelCase"` 逐字对齐。
+ */
+export interface StatsSummary {
+  /** 全部历史累计字数。 */
+  totalWords: number;
+  /** 本月字数。 */
+  thisMonth: number;
+  /** 本周字数（周一起算）。 */
+  thisWeek: number;
+  /** 今日字数。 */
+  today: number;
+  /** 有记录的天数。 */
+  activeDays: number;
+  /** 平均日更（总字数除以有记录的天数）。 */
+  averagePerActiveDay: number;
+  /** 近 7 个自然日的平均日更（含今天，无记录的日子算 0）。 */
+  averagePerDay7: number;
+  /** 最高单日字数。 */
+  bestDay: number;
+  /** 最高单日是哪一天；无记录时为 null。 */
+  bestDayDate: string | null;
+  /** 累计写作时长（分钟）。 */
+  totalMinutes: number;
+  /** 连续码字天数。 */
+  streak: number;
+  /** 计算连续天数时使用的阈值。 */
+  streakThreshold: number;
+  /** 预计完稿日；无法估算时为 null。 */
+  estimatedCompletion: string | null;
+  /** 预计还需多少天；无法估算时为 null。 */
+  remainingDays: number | null;
+}
+
+/**
+ * `get_stats_summary` 的完整返回值。
+ *
+ * days 直接给数组（而不是对象）是因为后端按日期排序输出是确定的，
+ * 前端拿到即可用，不必再排一遍。
+ */
+export interface StatsPayload {
+  /** 全部按天记录（按日期升序）。 */
+  days: StatsDay[];
+  /** 汇总。 */
+  summary: StatsSummary;
+  /** 统计分片文件所在目录（相对工作区根）。 */
+  statsDir: string;
+  /** 连续天数阈值，后端配置优先。 */
+  streakThreshold: number;
+}
+
 /** 工作区摘要，对应 Rust `WorkspaceSummary`。 */
 export interface WorkspaceSummary {
   /** 工作区根路径（绝对路径）。 */

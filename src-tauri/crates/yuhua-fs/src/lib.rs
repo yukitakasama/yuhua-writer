@@ -19,6 +19,7 @@
 //! | [`trash`]     | 回收站：软删除 / 恢复 / 过期清理 | 4.4 / T2.7 |
 //! | [`conflict`]  | 云盘冲突副本识别（只提示不删除） | 4.5 / T2.13 |
 //! | [`watch`]     | 文件监听与外部改动事件 | 4.5 / T2.8 |
+//! | [`archive`]   | 工作区打包成 zip / 解包（带 Zip Slip 防护） | T2.14 |
 //!
 //! ## 一条贯穿全层的原则
 //!
@@ -30,6 +31,7 @@
 #![forbid(unsafe_code)]
 #![warn(missing_docs)]
 
+pub mod archive;
 pub mod atomic;
 pub mod backup;
 pub mod chapter_io;
@@ -40,6 +42,10 @@ pub mod trash;
 pub mod watch;
 pub mod workspace;
 
+pub use archive::{
+    archive_workspace, extract_archive, read_manifest, ArchiveManifest, ArchiveOptions,
+    ArchiveStats, ExtractedArchive,
+};
 pub use atomic::{atomic_write, atomic_write_bytes};
 pub use chapter_io::{read_chapter, split_front_matter, write_chapter, ChapterFile};
 pub use conflict::{detect_conflicts, is_conflict_copy, DetectedConflict};

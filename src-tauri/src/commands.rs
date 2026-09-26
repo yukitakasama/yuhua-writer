@@ -804,6 +804,102 @@ pub fn search_chapters(
 }
 
 // ============================================================================
+//  写作统计（M8）
+// ============================================================================
+
+/// 按天统计记录（IPC 形状）。
+///
+/// ## 为什么单独建一个 DTO 而不是直接序列化 `DayRecord`
+///
+/// `DayRecord` 里的 `chapters` 是「章节 ID → 当日新增字数」的映射、
+/// `peaks` 是「章节 ID → 当日峰值」的基线。这两个字段是**采集用的
+/// 内部状态**，前端一个都不需要 —— 日历与热力图只关心"这一天写了多少字"。
+///
+/// 直接把内部结构发过去有三个代价：载荷随章节数增长、把内部字段变成
+/// 事实上的公开契约（以后不能自由改）、以及迫使前端理解"peaks 是什么"。
+/// 因此在这里折算成前端真正需要的四个数。
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct StatsDayDto {
+    /// 日期，`YYYY-MM-DD`。
+    pub date: String,
+    /// 当日新增字数。
+    pub words: u64,
+    /// 当日写作时长（分钟）。
+    pub minutes: u64,
+    /// 当日涉及的章节数。
+    pub chapters: usize,
+}
+
+/// `get_stats_summary` 的完整返回值。
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct StatsPayloadDto {
+    /// 全部按天记录，按日期升序。
+    pub days: Vec<StatsDayDto>,
+    /// 汇总。
+    pub summary: yuhua_stats::summary::Summary,
+    /// 统计分片目录（相对工作区根的路径）。
+    pub stats_dir: String,
+    /// 计算连续天数时使用的阈值。
+    pub streak_threshold: u32,
+}
+
+/// 取写作统计的完整视图（T8.6）。
+///
+/// ## 为什么一口气返回全部按天记录
+///
+/// 因为前端的年热力图需要**一整年 365 格**的数据才能一次画出来
+/// （计划书要求 365 格放在同一个 SVG 里、P11 ≤ 200 ms、逐格不动画）。
+/// 分页取会让热力图必须发多次请求再拼，那既慢又让"某一天的格子
+/// 是空的还是没加载"变得不可区分。
+///
+/// 代价是载荷大小。一条记录约 40 字节，十年也不过 ~150 KB，
+/// 而这是**低频且用户主动打开**的页面 —— 可以接受。
+///
+/// ## 为什么在这里折算而不是让前端算
+///
+/// 汇总口径（连续天数阈值、平均日更的分母、近 7 日是否含今天）
+/// 在 `yuhua-stats` 里已经有测试钉死。前端再算一遍必然会在
+/// 某个边界上与后端漂移，而那种漂移表现为"统计数字对不上"，
+/// 用户看到会直接怀疑数据丢了。
+#[tauri::command]
+pub fn get_stats_summary(state: State<'_, AppState>) -> CmdResult<StatsPayloadDto> {
+    let s = session(&state)?;
+    let store = yuhua_stats::StatsStore::new(lock_session(&s)?.layout().clone());
+
+    // 读全部月份并合并。`load_all_days` 内部会处理冲突副本的单调合并，
+    // 因此这里拿到的是"两台设备都算上"的正确结果（T8.4）
+    let days = store.load_all_days()?;
+    let today = now_local().date_naive();
+    let summary = yuhua_stats::summary::summarize(&days, today);
+
+    let list: Vec<StatsDayDto> = days
+        .iter()
+        .map(|(date, record)| StatsDayDto {
+            date: date.format("%Y-%m-%d").to_string(),
+            // 两个访问器返回 u32（单日增量不可能触及 42 亿），
+            // 这里提升成 u64 以匹配 DTO —— 前端统一用 number，
+            // 不必关心后端用的是哪个整型宽度
+            words: u64::from(record.words()),
+            minutes: u64::from(record.minutes()),
+            chapters: record.chapters.len(),
+        })
+        .collect();
+
+    Ok(StatsPayloadDto {
+        days: list,
+        streak_threshold: summary.streak_threshold,
+        summary,
+        stats_dir: format!(
+            "{}/{}",
+            yuhua_fs::layout::ENGINE_DIR,
+            yuhua_fs::layout::STATS_DIR
+        ),
+    })
+}
+
+// ============================================================================
 //  数据安全
 // ============================================================================
 

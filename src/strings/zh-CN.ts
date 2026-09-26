@@ -37,6 +37,8 @@ const zhCN = {
     search: "搜索",
     settings: "设置",
     library: "书架",
+    stats: "写作统计",
+    commands: "命令面板",
     toggleLeft: "折叠左侧栏",
     toggleRight: "折叠右侧栏",
     /** 工具栏按钮的 title 后缀，用于无障碍朗读。 */
@@ -142,6 +144,22 @@ const zhCN = {
     averageChapter: "平均每章",
     /** 未选中章节时的占位。 */
     noSelection: "未选中章节",
+    /** 本章目标环（T5.5）。 */
+    chapterGoal: "本章目标",
+    /** 今日目标环（T5.5）。 */
+    todayGoal: "今日目标",
+    /** 没有设置目标时环的说明。 */
+    goalUnset: "未设目标",
+    /** 目标达成率，例如「已完成 42%」。 */
+    goalRatio: "已完成 {percent}",
+    /** 目标已达成。 */
+    goalReached: "已达成",
+    /** 目标完成度的无障碍描述。 */
+    goalA11y: "{label}：已写 {done} 字，目标 {goal} 字，已完成 {percent}",
+    /** 进度环 SVG 的无障碍标签。 */
+    ringLabel: "{label} 进度环",
+    /** 今日字数的口径说明。 */
+    todayHint: "今日字数来自本地写作统计，只记字数与时间",
   },
 
   /** 右侧元数据面板（T5.4 的占位骨架）。 */
@@ -162,7 +180,7 @@ const zhCN = {
     noSelection: "在左侧选择一章查看信息",
   },
 
-  /** 搜索入口（T5.7 的占位）。 */
+  /** 检索与大纲（M6）。 */
   search: {
     placeholder: "搜索正文、标题",
     title: "搜索",
@@ -170,13 +188,327 @@ const zhCN = {
     noResult: "没有找到匹配的内容",
     resultCount: "找到 {count} 条结果",
     hint: "支持中文二字组检索，无需分词",
+    /** 两个标签页。 */
+    tabSearch: "检索",
+    tabOutline: "大纲",
+    /** 检索框的无障碍标签。 */
+    inputLabel: "检索关键词",
+    /** 只搜标题开关。 */
+    titleOnly: "只搜标题",
+    /** 检索结果列表的无障碍标签。 */
+    resultList: "检索结果",
+    /** 结果条的章节路径。 */
+    hitPath: "路径",
+    /** 命中片段的分隔说明。 */
+    snippetLabel: "匹配片段",
+    /** 关键词被识别出的 token 提示。 */
+    tokens: "已拆分：{tokens}",
+    /** 输入过程中的提示。 */
+    searching: "正在检索",
+    /** 跳转后的提示。 */
+    jumped: "已跳到「{title}」，匹配位置已高亮",
+    /** 大纲视图。 */
+    outline: "大纲",
+    outlineEmpty: "还没有可展示的大纲",
+    outlineVolumeMeta: "{chapters} 章 · {words} 字",
+    outlineChapterMeta: "{words} 字",
+    outlineExpand: "展开本卷",
+    outlineCollapse: "收起本卷",
+    /** 键盘操作提示。 */
+    keyboardHint: "↑↓ 移动，回车跳转，Esc 关闭",
   },
 
-  /** 设置入口（M9 的占位）。 */
+  /** 命令面板（T5.7）。 */
+  command: {
+    title: "命令面板",
+    placeholder: "输入命令名称",
+    empty: "没有匹配的命令",
+    /** 列表的无障碍标签。 */
+    listLabel: "可用命令",
+    /** 快捷键提示。 */
+    hint: "↑↓ 选择，回车执行，Esc 关闭",
+    /** 分组名。 */
+    groupNavigate: "导航",
+    groupWrite: "写作",
+    groupView: "视图",
+    /** 命令名。 */
+    openSearch: "全文检索",
+    openOutline: "大纲视图",
+    openStats: "写作统计",
+    openLibrary: "回到书架",
+    newChapter: "新建一章",
+    newVolume: "新建一卷",
+    toggleLeft: "折叠 / 展开左栏",
+    toggleRight: "折叠 / 展开右栏",
+    closeWorkspace: "关闭当前工作区",
+  },
+
+  /** 快捷键面板（T4.9）。 */
+  shortcuts: {
+    title: "快捷键",
+    /** 面板底部的说明。 */
+    hint: "快捷键可在设置中自定义。标红的键位有冲突。",
+    /** 冲突标注。 */
+    conflict: "这个键位被多个动作占用",
+  },
+
+  /** 组件预览页 /dev/kit（T1.9）。 */
+  kit: {
+    title: "组件预览",
+    note: "这是开发用的组件与动效预览页，不在正式界面中出现。用于 G1 评审门逐条核对。",
+    /** 减少动态效果的状态播报。 */
+    reducedMotionOn: "当前系统开启了「减少动态效果」，动效已降级。",
+    reducedMotionOff: "当前系统未开启「减少动态效果」，动效正常播放。",
+    buttons: "按钮",
+    buttonsNote:
+      "四种变体 × 三种尺寸 × 禁用 / 载入中 / 图标按钮。并排放在一起才能看出危险态与主态是不是太像了。",
+    inputs: "输入",
+    containers: "容器与弹层",
+    containersNote:
+      "对话框、抽屉、浮层、菜单、提示、吐司、标签页、滚动区。逐个打开确认焦点陷阱与 Esc 关闭。",
+    motion: "动效",
+    motionNote: "计划书 5.5 节要求逐条核对时长与缓动。点「重放」可反复看同一条曲线。",
+    charts: "图表基座",
+    chartsNote: "五档色阶与进度环。M8 的日历与热力图直接复用这里的色阶。",
+    footer: "组件预览页 · 仅在开发环境可达",
+  },
+
+  /** 编辑器（M4）。 */
+  editorM4: {
+    /** 专注模式。 */
+    focusOn: "进入专注模式",
+    focusOff: "退出专注模式",
+    /** 查找与替换。 */
+    find: "查找",
+    replace: "替换",
+    /** 自动保存状态。 */
+    autosaved: "已自动保存",
+    saving: "正在保存",
+    saveFailed: "保存失败，请检查磁盘空间",
+  },
+
+  /** 设置（M9）。 */
   settings: {
     title: "设置",
     placeholder: "外观、字号、保存间隔等设置将在后续里程碑中提供。",
     about: "关于羽化写作",
+    /** 分区标签。 */
+    tabs: {
+      appearance: "外观",
+      fonts: "字体",
+      typography: "排版",
+      about: "关于",
+    },
+    /** 设置面板的整体说明，挂在 tablist 上供读屏朗读。 */
+    panelLabel: "设置分区",
+    /** 三个作用域的名称与说明。 */
+    scope: {
+      body: "正文",
+      heading: "标题",
+      ui: "界面",
+      bodyHint: "编辑区正文的字体与行距",
+      headingHint: "书名、卷名、章节标题",
+      uiHint: "侧栏、工具栏、按钮等界面文字",
+    },
+    /** 全局级 / 工作区级（T9.4）。 */
+    level: {
+      label: "生效范围",
+      global: "全局",
+      workspace: "本书",
+      globalHint: "对所有作品生效，换书也保持",
+      workspaceHint: "只对当前作品生效，覆盖全局设置",
+      /** 未打开工作区时工作区级的禁用原因。 */
+      noWorkspace: "打开一本书后可以为它单独设置字体",
+      /** 某一项已被本书覆盖的标记。 */
+      overridden: "本书已覆盖",
+      /** 恢复继承全局。 */
+      inherit: "跟随全局",
+      resetWorkspace: "清除本书的外观设置",
+      resetWorkspaceDone: "本书外观已恢复为跟随全局",
+    },
+    /** 主题。 */
+    theme: {
+      label: "主题",
+      light: "亮色",
+      dark: "暗色",
+      system: "跟随系统",
+      systemResolvedLight: "跟随系统（当前为亮色）",
+      systemResolvedDark: "跟随系统（当前为暗色）",
+    },
+    /** 字体选择（T9.2）。 */
+    font: {
+      label: "字体族",
+      /** 分组标题。 */
+      bundledGroup: "内置字体",
+      systemGroup: "系统字体",
+      /** 内置字体说明。 */
+      bundledNote: "随应用分发，离线可用；生僻字自动回退系统字体",
+      /** 预览区标题。 */
+      previewTitle: "预览",
+      /** 预览用的样例文本 —— 刻意混入生僻字，用来暴露回退链是否生效。 */
+      previewBody:
+        "江南的雨总是下得很轻，落在屋檐上只听见一层细细的沙沙声。他提笔写下第一行字，墨迹在纸上慢慢洇开。",
+      previewHeading: "第一章·落羽",
+      previewUi: "字数 12,480 · 今日 1,206 · 连续 23 天",
+      /** 生僻字回退说明。 */
+      fallbackNote: "预览中的字若显示为系统字体，说明内置字体缺少该字形，这是预期行为。",
+      /** 缺字回退链的展示标题。 */
+      fallbackChain: "回退链",
+      /** 加载失败提示（多半是没跑 fonts:fetch）。 */
+      loadFailed: "{name}尚未生成，当前使用回退字体",
+    },
+    /** 排版（T9.5）。 */
+    typography: {
+      size: "字号",
+      lineHeight: "行距",
+      paragraphGap: "段距",
+      measure: "正文宽度",
+      /** 数值单位后缀。 */
+      px: "px",
+      em: "em",
+      /** 恢复本分区的默认值。 */
+      reset: "恢复默认排版",
+      resetDone: "排版已恢复默认",
+      /** 预览提示。 */
+      livePreview: "调整即时生效，无需保存",
+    },
+    /** 关于页（T9.8）。 */
+    aboutPage: {
+      version: "版本",
+      buildChannel: "构建通道",
+      licenseTitle: "开源许可",
+      /** 本项目自身许可。 */
+      selfLicense: "羽化写作自身代码",
+      fontLicenseTitle: "字体署名",
+      fontLicenseIntro: "随应用分发的字体各自受 SIL Open Font License 1.1 约束，不因本项目采用 MIT 而改变。",
+      /** 许可文件路径说明。 */
+      licenseFile: "许可全文随包分发于",
+      acknowledgements: "致谢",
+      acknowledgementsBody:
+        "感谢 Adobe 与 Google 发布思源宋体，感谢 LXGW 发布霞鹜文楷。这些高质量的开源中文字体是本项目能够做到「离线可用 + 排版一致」的前提。",
+      /** 技术栈说明。 */
+      stack: "技术栈",
+      stackBody: "Tauri 2 · Rust · SolidJS · TypeScript",
+      /** 无外链说明。 */
+      offlineNote: "本页所有信息来自随包的许可文件，不依赖网络。",
+    },
+    /** 首次启动向导（T9.7）。 */
+    wizard: {
+      title: "欢迎使用羽化写作",
+      /** 三步的标题与说明。 */
+      stepTheme: "选择主题",
+      stepThemeBody: "随时可以在设置里改。",
+      stepFont: "选择字体",
+      stepFontBody: "正文、标题、界面可以分别选择，之后也能单独调整。",
+      stepDone: "可以开始了",
+      stepDoneBody: "新建一个工作区，羽化写作会在你选择的文件夹里生成书稿结构。",
+      /** 进度朗读文案。 */
+      stepIndicator: "第 {current} 步，共 {total} 步",
+      next: "下一步",
+      back: "上一步",
+      finish: "开始写作",
+      /** 跳过：必须是一等公民，不能藏起来。 */
+      skip: "跳过引导",
+      skipHint: "跳过也可以，所有设置都能在设置面板里找到。",
+    },
+  },
+
+  /** 写作统计（M8）。 */
+  stats: {
+    title: "写作统计",
+    /** 导航里的分区名。 */
+    navOverview: "总览",
+    navCalendar: "码字日历",
+    navHeatmap: "年热力图",
+    navGoal: "目标",
+    navBreakdown: "分章分卷",
+    navPrivacy: "隐私",
+    /** 概览卡片。 */
+    cardTotal: "累计码字",
+    cardThisMonth: "本月",
+    cardThisWeek: "本周",
+    cardToday: "今日",
+    cardAverage7: "近 7 日平均",
+    cardBestDay: "最高单日",
+    cardMinutes: "累计时长",
+    cardActiveDays: "写作天数",
+    cardStreak: "连续天数",
+    /** 概览里的次要说明。 */
+    unitWords: "字",
+    unitDays: "天",
+    /** 预计完稿。 */
+    estimateLabel: "预计完稿",
+    estimateNone: "暂无数据，写几天就能估算",
+    estimateDays: "还需约 {days} 天",
+    estimateReached: "已达成总目标",
+    /** 连续天数（T8.10）。 */
+    streakTitle: "连续码字",
+    streakBody: "每天写满 {threshold} 字即算一天。今天还没写不算断。",
+    streakZero: "今天与昨天都还没写够，连续记录已经断了",
+    streakDays: "连续 {days} 天",
+    /** 码字日历（T8.7）。 */
+    calendarTitle: "码字日历",
+    calendarPrev: "上个月",
+    calendarNext: "下个月",
+    calendarToday: "回到本月",
+    calendarMonthTotal: "本月共 {words} 字",
+    calendarDayDetail: "单日明细",
+    calendarNoRecord: "这一天没有记录",
+    calendarDayWords: "新增 {words} 字",
+    calendarDayMinutes: "写作 {minutes}",
+    calendarDayChapters: "涉及 {count} 章",
+    calendarGrid: "{month} 的码字日历",
+    /** 热力图（T8.8）。 */
+    heatmapTitle: "年热力图",
+    heatmapPrev: "上一年",
+    heatmapNext: "下一年",
+    heatmapTotal: "全年共 {words} 字",
+    heatmapActiveDays: "有 {days} 天在写",
+    heatmapBestDay: "最高单日 {words} 字",
+    heatmapLegend: "色阶",
+    heatmapLess: "少",
+    heatmapMore: "多",
+    heatmapCellA11y: "{date}，{words} 字",
+    heatmapGrid: "{year} 年的码字热力图",
+    /** 目标设置（T8.11）。 */
+    goalTitle: "写作目标",
+    goalDaily: "每日目标",
+    goalWeekly: "每周目标",
+    goalUnit: "字",
+    goalPlaceholder: "例如 2000",
+    goalSave: "保存目标",
+    goalSaved: "目标已保存",
+    goalInvalid: "请输入 0 到 1000000 之间的整数",
+    goalClear: "清除目标",
+    goalDailyHint: "每天的目标字数，热力图的色阶以它为基准",
+    goalWeeklyHint: "一周的目标字数，周一起算",
+    goalStreakThreshold: "连续天数阈值",
+    goalStreakHint: "当天字数达到这个值才算「写了这一天」",
+    goalProgressTitle: "今日进度",
+    goalProgressWeek: "本周进度",
+    /** 分章分卷（T8.12）。 */
+    breakdownTitle: "分章分卷",
+    breakdownByVolume: "按卷",
+    breakdownByChapter: "按章",
+    breakdownVolume: "卷",
+    breakdownChapter: "章",
+    breakdownWords: "字数",
+    breakdownShare: "占比",
+    breakdownGoal: "目标",
+    breakdownEmpty: "还没有章节数据",
+    breakdownChart: "字数分布的条形图",
+    /** 统计页空状态。 */
+    emptyTitle: "还没有可统计的数据",
+    emptyBody: "统计只在你写作之后才有意义。开始写第一章，这里就会亮起来。",
+    /** 隐私说明（T8.14）。 */
+    privacyTitle: "统计与隐私",
+    privacyBody:
+      "统计文件只记录字数与时间，绝不记录正文、标题或文件路径，也不联网、不上报。数据保存在你自己的工作区里，随时可以删除。",
+    privacyWordsOnly: "只记字数与时长",
+    privacyNoProse: "不记正文、标题与路径",
+    privacyOffline: "不联网、不上报",
+    privacyLocalOnly: "数据留在你的工作区内",
+    privacyPath: "统计文件位置",
   },
 
   /** 错误提示。 */

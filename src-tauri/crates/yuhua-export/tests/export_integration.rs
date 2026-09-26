@@ -264,20 +264,44 @@ fn all_implemented_formats_render_non_empty_and_readable() {
                 let joined: String = parts.values().cloned().collect::<Vec<_>>().join("\n");
                 assert!(joined.contains("正文里有"), "{format:?} 缺少正文");
             }
-            ExportFormat::Pdf => unreachable!("PDF 不可用，已在上面跳过"),
+            ExportFormat::Pdf => {
+                // PDF 是二进制容器，不能按 UTF-8 解；这里校验的是
+                // 「它是一个结构完整、带内嵌字体的 PDF 字节流」。
+                assert_eq!(&bytes[..8], b"%PDF-1.7", "PDF 文件头不对");
+                assert!(bytes.ends_with(b"%%EOF\n"), "PDF 必须以 %%EOF 收尾");
+                let raw = String::from_utf8_lossy(&bytes);
+                assert!(raw.contains("/Type /Catalog"), "缺少文档目录");
+                assert!(raw.contains("xref"), "缺少 xref 表");
+                assert!(raw.contains("/Subtype /Type0"), "中文字体不是 CID 字体");
+                assert!(
+                    raw.contains("/ToUnicode"),
+                    "缺少 ToUnicode（正文将无法搜索复制）"
+                );
+                assert!(raw.contains("/FontFile2"), "字体没有内嵌");
+            }
         }
     }
 }
 
 #[test]
-fn pdf_is_explicitly_unimplemented_not_silently_wrong() {
+fn pdf_either_renders_or_reports_a_missing_font_but_never_garbage() {
+    // 这条用例替代了旧的「PDF 必须是 Unimplemented」：
+    // PDF 已经实现，但**依赖本机中文字体**。允许的结局只有两种 ——
+    // 产出结构合法的 PDF，或者报一个 FONT_UNAVAILABLE 的可恢复错误。
+    // 任何第三种结局（空文件、乱码、别的错误码）都算失败。
     let ir = sample_ir();
-    let err = render(ExportFormat::Pdf, &ir).unwrap_err();
-    assert!(matches!(err, yuhua_export::ExportError::Unimplemented(_)));
-    assert_eq!(err.code(), "UNIMPLEMENTED");
-    // 未实现必须能被翻译回领域统一错误，供 IPC 返回前端
-    let core: yuhua_core::YuhuaError = err.into();
-    assert_eq!(core.code(), "UNIMPLEMENTED");
+    match render(ExportFormat::Pdf, &ir) {
+        Ok(bytes) => {
+            assert_eq!(&bytes[..8], b"%PDF-1.7");
+            assert!(bytes.len() > 1000, "PDF 小得不正常：{} 字节", bytes.len());
+        }
+        Err(err) => {
+            assert_eq!(err.code(), "FONT_UNAVAILABLE", "缺字体的错误码不对：{err}");
+            // 错误必须能翻译回领域统一错误，供 IPC 返回前端
+            let core: yuhua_core::YuhuaError = err.into();
+            assert_eq!(core.code(), "EXPORT_ERROR");
+        }
+    }
 }
 
 #[test]

@@ -82,6 +82,8 @@ pub fn run() {
             commands::update_chapter_meta,
             // ---- 检索 ----
             commands::search_chapters,
+            // ---- 写作统计（M8）----
+            commands::get_stats_summary,
             // ---- 数据安全 ----
             commands::rebuild_index,
             commands::rescan_workspace,

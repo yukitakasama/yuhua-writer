@@ -31,6 +31,27 @@ function firstVolumeId(): string {
   return volume.volumeId;
 }
 
+/**
+ * 取全部章节（拉平大纲）。
+ *
+ * ## 为什么 mock 不再提供 `listChapters`
+ *
+ * 真实后端没有这个命令：**大纲就是章节列表**（`get_outline` 按卷
+ * 聚合）。mock 曾经提供它，于是前端代码里出现了一堆"只在浏览器里
+ * 能用"的调用。删掉它，让 mock 与后端保持同一份接口。
+ *
+ * 测试需要拉平的列表时由这个本地辅助函数提供 —— 这是**测试侧**
+ * 的便利，不是接口的一部分。
+ */
+function allChapters() {
+  return backend.getOutline().flatMap((node) => node.chapters);
+}
+
+/** 取某一卷的章节。 */
+function chaptersIn(volumeId: string) {
+  return allChapters().filter((c) => c.volumeId === volumeId);
+}
+
 describe("示例数据", () => {
   it("打开返回至少两卷，且有章", () => {
     const result = backend.openWorkspace("C:/x");
@@ -118,9 +139,9 @@ describe("重命名卷", () => {
 
   it("改名后其下章节的路径跟着更新", () => {
     const id = firstVolumeId();
-    const before = backend.listChapters().find((c) => c.volumeId === id)?.path ?? "";
+    const before = chaptersIn(id)[0]?.path ?? "";
     backend.renameVolume(id, "新卷名");
-    const after = backend.listChapters().find((c) => c.volumeId === id)?.path ?? "";
+    const after = chaptersIn(id)[0]?.path ?? "";
     expect(after).not.toBe(before);
     expect(after).toContain("新卷名");
   });
@@ -143,41 +164,49 @@ describe("重命名卷", () => {
 });
 
 describe("新建章", () => {
+  /** 取某一卷的最后一章（新建默认追加到末尾）。 */
+  function lastChapterIn(volumeId: string) {
+    const list = chaptersIn(volumeId);
+    return list[list.length - 1];
+  }
+
   it("追加到卷末尾并自动编号", () => {
     const id = firstVolumeId();
-    const created = backend.createChapter({ volumeId: id });
-    expect(created.sort).toBe(3); // 示例第一卷有 3 章
-    expect(created.status).toBe("draft");
-    expect(created.wordCount).toBe(0);
+    backend.createChapter({ volumeId: id });
+    const created = lastChapterIn(id);
+    expect(created?.sort).toBe(3); // 示例第一卷原有 3 章
+    expect(created?.status).toBe("draft");
+    expect(created?.wordCount).toBe(0);
   });
 
   it("新章必须有归属卷", () => {
     const id = firstVolumeId();
-    const created = backend.createChapter({ volumeId: id });
-    expect(created.volumeId).toBe(id);
+    backend.createChapter({ volumeId: id });
+    expect(lastChapterIn(id)?.volumeId).toBe(id);
   });
 
   it("可以指定标题", () => {
-    const created = backend.createChapter({ volumeId: firstVolumeId(), title: "第六章 归途" });
-    expect(created.title).toBe("第六章 归途");
+    const id = firstVolumeId();
+    backend.createChapter({ volumeId: id, title: "第六章 归途" });
+    expect(lastChapterIn(id)?.title).toBe("第六章 归途");
   });
 
   it("卷内序号保持连续", () => {
     const id = firstVolumeId();
     backend.createChapter({ volumeId: id });
     backend.createChapter({ volumeId: id });
-    const sorts = backend
-      .listChapters()
-      .filter((c) => c.volumeId === id)
+    const sorts = chaptersIn(id)
       .map((c) => c.sort)
       .sort((a, b) => a - b);
     expect(sorts).toEqual(sorts.map((_, i) => i));
   });
 
   it("新章有可用的路径", () => {
-    const created = backend.createChapter({ volumeId: firstVolumeId(), title: "新章" });
-    expect(created.path).toMatch(/^manuscript\//);
-    expect(created.path.endsWith(".md")).toBe(true);
+    const id = firstVolumeId();
+    backend.createChapter({ volumeId: id, title: "新章" });
+    const created = lastChapterIn(id);
+    expect(created?.path).toMatch(/^manuscript\//);
+    expect(created?.path.endsWith(".md")).toBe(true);
   });
 
   it("往不存在的卷里新建章报错", () => {
@@ -187,7 +216,7 @@ describe("新建章", () => {
 
 describe("读取与保存正文", () => {
   it("读回来的正文非空，且统计口径与内容一致", () => {
-    const first = backend.listChapters()[0];
+    const first = allChapters()[0];
     if (!first) throw new Error("没有章节");
     const content = backend.readChapter(first.id);
     expect(content.body.length).toBeGreaterThan(0);
@@ -195,7 +224,7 @@ describe("读取与保存正文", () => {
   });
 
   it("保存后字数与哈希都更新", () => {
-    const first = backend.listChapters()[0];
+    const first = allChapters()[0];
     if (!first) throw new Error("没有章节");
     const before = backend.readChapter(first.id);
     const saved = backend.saveChapter(first.id, "新的正文内容，一共十五个字。", before.contentHash);
@@ -208,15 +237,15 @@ describe("读取与保存正文", () => {
   });
 
   it("保存后列表里的字数同步更新", () => {
-    const first = backend.listChapters()[0];
+    const first = allChapters()[0];
     if (!first) throw new Error("没有章节");
     const content = backend.readChapter(first.id);
     backend.saveChapter(first.id, "短", content.contentHash);
-    expect(backend.listChapters().find((c) => c.id === first.id)?.wordCount).toBe(1);
+    expect(allChapters().find((c) => c.id === first.id)?.wordCount).toBe(1);
   });
 
   it("哈希对不上时拒绝保存（乐观并发）", () => {
-    const first = backend.listChapters()[0];
+    const first = allChapters()[0];
     if (!first) throw new Error("没有章节");
     try {
       backend.saveChapter(first.id, "不该被写入", "过期的哈希");
@@ -228,7 +257,7 @@ describe("读取与保存正文", () => {
   });
 
   it("拒绝后正文保持原样，没有被静默覆盖", () => {
-    const first = backend.listChapters()[0];
+    const first = allChapters()[0];
     if (!first) throw new Error("没有章节");
     const original = backend.readChapter(first.id).body;
     try {
@@ -240,7 +269,7 @@ describe("读取与保存正文", () => {
   });
 
   it("保存空正文是合法的（清空一章）", () => {
-    const first = backend.listChapters()[0];
+    const first = allChapters()[0];
     if (!first) throw new Error("没有章节");
     const content = backend.readChapter(first.id);
     const saved = backend.saveChapter(first.id, "", content.contentHash);
@@ -251,16 +280,16 @@ describe("读取与保存正文", () => {
 
 describe("重命名章", () => {
   it("改名成功且路径同步", () => {
-    const first = backend.listChapters()[0];
+    const first = allChapters()[0];
     if (!first) throw new Error("没有章节");
     backend.renameChapter(first.id, "改名后的一章");
-    const after = backend.listChapters().find((c) => c.id === first.id);
+    const after = allChapters().find((c) => c.id === first.id);
     expect(after?.title).toBe("改名后的一章");
     expect(after?.path).toContain("改名后的一章");
   });
 
   it("空标题被拒绝", () => {
-    const first = backend.listChapters()[0];
+    const first = allChapters()[0];
     if (!first) throw new Error("没有章节");
     expect(() => backend.renameChapter(first.id, "   ")).toThrowError(MockError);
   });
@@ -268,32 +297,32 @@ describe("重命名章", () => {
 
 describe("章节状态", () => {
   it("可以设置为已完成", () => {
-    const first = backend.listChapters()[0];
+    const first = allChapters()[0];
     if (!first) throw new Error("没有章节");
     backend.setChapterStatus(first.id, "done");
-    expect(backend.listChapters().find((c) => c.id === first.id)?.status).toBe("done");
+    expect(allChapters().find((c) => c.id === first.id)?.status).toBe("done");
   });
 
   it("三种状态都能设置", () => {
-    const first = backend.listChapters()[0];
+    const first = allChapters()[0];
     if (!first) throw new Error("没有章节");
     for (const status of ["draft", "revising", "done"] as const) {
       backend.setChapterStatus(first.id, status);
-      expect(backend.listChapters().find((c) => c.id === first.id)?.status).toBe(status);
+      expect(allChapters().find((c) => c.id === first.id)?.status).toBe(status);
     }
   });
 });
 
 describe("删除与回收站", () => {
   it("删除章节后列表不再包含它", () => {
-    const first = backend.listChapters()[0];
+    const first = allChapters()[0];
     if (!first) throw new Error("没有章节");
     backend.deleteChapter(first.id);
-    expect(backend.listChapters().some((c) => c.id === first.id)).toBe(false);
+    expect(allChapters().some((c) => c.id === first.id)).toBe(false);
   });
 
   it("删除后进入回收站而不是消失（可恢复）", () => {
-    const first = backend.listChapters()[0];
+    const first = allChapters()[0];
     if (!first) throw new Error("没有章节");
     backend.deleteChapter(first.id);
     const trash = backend.listTrash();
@@ -305,20 +334,18 @@ describe("删除与回收站", () => {
 
   it("删除后同卷序号重新连续", () => {
     const id = firstVolumeId();
-    const chapters = backend.listChapters().filter((c) => c.volumeId === id);
+    const chapters = allChapters().filter((c) => c.volumeId === id);
     const middle = chapters[1];
     if (!middle) throw new Error("示例数据不足");
     backend.deleteChapter(middle.id);
-    const sorts = backend
-      .listChapters()
-      .filter((c) => c.volumeId === id)
+    const sorts = chaptersIn(id)
       .map((c) => c.sort)
       .sort((a, b) => a - b);
     expect(sorts).toEqual(sorts.map((_, i) => i));
   });
 
   it("从回收站恢复会移除该条目", () => {
-    const first = backend.listChapters()[0];
+    const first = allChapters()[0];
     if (!first) throw new Error("没有章节");
     backend.deleteChapter(first.id);
     const entry = backend.listTrash()[0];
@@ -328,7 +355,7 @@ describe("删除与回收站", () => {
   });
 
   it("清空回收站返回清掉的条数", () => {
-    const chapters = backend.listChapters();
+    const chapters = allChapters();
     backend.deleteChapter(chapters[0]?.id ?? "");
     backend.deleteChapter(chapters[1]?.id ?? "");
     expect(backend.emptyTrash()).toBe(2);
@@ -341,10 +368,10 @@ describe("删除与回收站", () => {
 
   it("删除整卷时其下章节一并进回收站", () => {
     const id = firstVolumeId();
-    const count = backend.listChapters().filter((c) => c.volumeId === id).length;
+    const count = allChapters().filter((c) => c.volumeId === id).length;
     backend.deleteVolume(id);
     expect(backend.listTrash().length).toBe(count);
-    expect(backend.listChapters().some((c) => c.volumeId === id)).toBe(false);
+    expect(allChapters().some((c) => c.volumeId === id)).toBe(false);
   });
 
   it("删光所有卷后自动补一个空卷（章不能没有卷）", () => {
@@ -357,80 +384,100 @@ describe("删除与回收站", () => {
   });
 });
 
-describe("移动与排序", () => {
-  it("同卷内移动章节", () => {
+describe("重排（与后端 reorder 契约一致）", () => {
+  /** 取某一卷章节的 ID 顺序。 */
+  function orderIn(volumeId: string): string[] {
+    return chaptersIn(volumeId)
+      .slice()
+      .sort((a, b) => a.sort - b.sort)
+      .map((c) => c.id);
+  }
+
+  it("同卷内重排：把最后一章挪到最前", () => {
     const id = firstVolumeId();
-    const chapters = backend.listChapters().filter((c) => c.volumeId === id);
-    const last = chapters[2];
+    const order = orderIn(id);
+    const last = order[2];
     if (!last) throw new Error("示例数据不足");
-    backend.moveChapter(last.id, id, 0);
-    const after = backend.listChapters().filter((c) => c.volumeId === id).sort((a, b) => a.sort - b.sort);
-    expect(after[0]?.id).toBe(last.id);
+    backend.reorderChapters(id, [last, ...order.slice(0, 2)]);
+
+    const after = chaptersIn(id)
+      .slice()
+      .sort((a, b) => a.sort - b.sort);
+    expect(after[0]?.id).toBe(last);
+    // 序号必须重新收敛成 0..n-1，不能留空洞
     expect(after.map((c) => c.sort)).toEqual([0, 1, 2]);
   });
 
-  it("跨卷移动章节，两卷序号都连续", () => {
-    const outline = backend.getOutline();
-    const from = outline[0];
-    const to = outline[1];
-    if (!from || !to) throw new Error("示例数据不足");
-    const moving = from.chapters[1];
-    if (!moving) throw new Error("示例数据不足");
-    backend.moveChapter(moving.id, to.volumeId, 0);
-
-    const afterFrom = backend.listChapters().filter((c) => c.volumeId === from.volumeId).sort((a, b) => a.sort - b.sort);
-    const afterTo = backend.listChapters().filter((c) => c.volumeId === to.volumeId).sort((a, b) => a.sort - b.sort);
-    expect(afterFrom.map((c) => c.sort)).toEqual(afterFrom.map((_, i) => i));
-    expect(afterTo.map((c) => c.sort)).toEqual(afterTo.map((_, i) => i));
-    expect(afterTo[0]?.id).toBe(moving.id);
+  it("重排后路径里的编号跟着更新", () => {
+    const id = firstVolumeId();
+    const order = orderIn(id);
+    const last = order[order.length - 1];
+    if (!last) throw new Error("示例数据不足");
+    backend.reorderChapters(id, [last, ...order.slice(0, -1)]);
+    const moved = chaptersIn(id).find((c) => c.id === last);
+    expect(moved?.path).toContain("001-");
   });
 
-  it("移动后章节的 volumeId 更新", () => {
-    const outline = backend.getOutline();
-    const from = outline[0];
-    const to = outline[2];
-    if (!from || !to) throw new Error("示例数据不足");
-    const moving = from.chapters[0];
-    if (!moving) throw new Error("示例数据不足");
-    backend.moveChapter(moving.id, to.volumeId, 0);
-    expect(backend.listChapters().find((c) => c.id === moving.id)?.volumeId).toBe(to.volumeId);
+  it("顺序里漏掉的章节保留在末尾（不丢数据）", () => {
+    const id = firstVolumeId();
+    const order = orderIn(id);
+    const second = order[1];
+    if (!second) throw new Error("示例数据不足");
+    // 只提及一章：其余两章必须仍然存在
+    backend.reorderChapters(id, [second]);
+    const after = chaptersIn(id).slice().sort((a, b) => a.sort - b.sort);
+    expect(after.length).toBe(3);
+    expect(after[0]?.id).toBe(second);
+    expect(after.map((c) => c.sort)).toEqual([0, 1, 2]);
   });
 
-  it("移动卷改变卷的顺序", () => {
+  it("重排卷改变卷的顺序", () => {
     const outline = backend.getOutline();
     const first = outline[0];
-    if (!first) throw new Error("示例数据不足");
-    backend.moveVolume(first.volumeId, 1);
+    const second = outline[1];
+    if (!first || !second) throw new Error("示例数据不足");
+    backend.reorderVolumes([second.volumeId, first.volumeId]);
     const after = backend.getOutline();
+    expect(after[0]?.volumeId).toBe(second.volumeId);
     expect(after[1]?.volumeId).toBe(first.volumeId);
     expect(after.map((n) => n.sort)).toEqual(after.map((_, i) => i));
   });
 
-  it("移动不存在的章节报 NOT_FOUND", () => {
-    expect(() => backend.moveChapter("ch_无", firstVolumeId(), 0)).toThrowError(MockError);
+  it("重排卷时漏掉的卷保留在末尾（不丢数据）", () => {
+    const outline = backend.getOutline();
+    const first = outline[0];
+    if (!first) throw new Error("示例数据不足");
+    const before = outline.length;
+    backend.reorderVolumes([first.volumeId]);
+    expect(backend.getOutline().length).toBe(before);
+    expect(backend.getOutline()[0]?.volumeId).toBe(first.volumeId);
+  });
+
+  it("重排不存在的卷报 NOT_FOUND", () => {
+    expect(() => backend.reorderChapters("vol_无", ["ch_1"])).toThrowError(MockError);
   });
 });
 
 describe("字数统计", () => {
   it("全书字数是各章之和", () => {
     const stats = backend.getWordStats();
-    const sum = backend.listChapters().reduce((s, c) => s + c.wordCount, 0);
+    const sum = allChapters().reduce((s, c) => s + c.wordCount, 0);
     expect(stats.book).toBe(sum);
   });
 
   it("章数与卷数正确", () => {
     const stats = backend.getWordStats();
-    expect(stats.chapterCount).toBe(backend.listChapters().length);
+    expect(stats.chapterCount).toBe(allChapters().length);
     expect(stats.volumeCount).toBe(backend.getOutline().length);
   });
 
   it("指定章节时返回该章与所属卷的字数", () => {
     const id = firstVolumeId();
-    const chapter = backend.listChapters().find((c) => c.volumeId === id);
+    const chapter = allChapters().find((c) => c.volumeId === id);
     if (!chapter) throw new Error("示例数据不足");
     const stats = backend.getWordStats(chapter.id);
     expect(stats.chapter).toBe(chapter.wordCount);
-    const volumeSum = backend.listChapters().filter((c) => c.volumeId === id).reduce((s, c) => s + c.wordCount, 0);
+    const volumeSum = allChapters().filter((c) => c.volumeId === id).reduce((s, c) => s + c.wordCount, 0);
     expect(stats.volume).toBe(volumeSum);
   });
 
@@ -441,7 +488,7 @@ describe("字数统计", () => {
   });
 
   it("三口径统计彼此关系正确（含标点 >= 不含标点）", () => {
-    const first = backend.listChapters()[0];
+    const first = allChapters()[0];
     if (!first) throw new Error("没有章节");
     const words = backend.getChapterWordCount(first.id);
     expect(words.withPunctuation).toBeGreaterThanOrEqual(words.withoutPunctuation);

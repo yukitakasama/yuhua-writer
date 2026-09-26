@@ -23,6 +23,12 @@ import { createSignal } from "solid-js";
 
 import * as ipc from "@/lib/ipc";
 import type { ChapterContent, ChapterStatus, ChapterSummary, Volume, WorkspaceDocument } from "@/lib/ipc";
+import {
+  chapterOrderOf,
+  moveChapter as moveChapterInTree,
+  moveVolume as moveVolumeInTree,
+  volumeOrderOf,
+} from "@/features/chapters/tree-ops";
 
 /** 工作区加载状态。 */
 export type WorkspaceStatus = "idle" | "loading" | "ready" | "error";
@@ -192,10 +198,28 @@ export async function renameVolumeLocal(volumeId: string, title: string): Promis
   }
 }
 
-/** 移动一卷到新位置。 */
+/**
+ * 移动一卷到新位置。
+ *
+ * ## 为什么先本地算出新顺序再发给后端
+ *
+ * 后端的 `reorder_volumes` 接受的是**完整顺序**，不是"移到第 N 位"
+ * （理由见 ipc/index.ts：`toIndex` 的语义取决于移除时机，
+ * 是反复出现的一处之差 bug 来源）。
+ *
+ * 本地用 `moveVolume` 这个**纯函数**算出新顺序，
+ * 与拖拽时用于渲染的那份计算是同一个 —— 界面看到的顺序
+ * 与发出去的顺序因此必然一致。若让调用方各自实现一遍排序，
+ * 两者迟早会分叉。
+ */
 export async function moveVolumeTo(volumeId: string, toIndex: number): Promise<boolean> {
+  const doc = state.document;
+  if (doc === null) return false;
+  const snapshot = { volumes: doc.volumes, chapters: doc.chapters };
+  const result = moveVolumeInTree(snapshot, volumeId, toIndex);
+  if (!result.changed) return true;
   try {
-    await ipc.moveVolume(volumeId, toIndex);
+    await ipc.reorderVolumes(volumeOrderOf(result.snapshot));
     await reloadDocument();
     return true;
   } catch (err) {
@@ -220,14 +244,35 @@ export async function removeVolume(volumeId: string): Promise<boolean> {
 // 章的增删改
 // ---------------------------------------------------------------------------
 
-/** 新建一章，返回新章 ID（供界面自动选中并进入内联编辑）。 */
+/**
+ * 新建一章，返回新章的摘要（供界面自动选中并进入内联编辑）。
+ *
+ * ## 为什么要在返回的大纲里"找"新章
+ *
+ * 后端返回的是整份大纲（见 ipc/index.ts 的说明），不是新章本身。
+ * 找出新章的办法是**取该卷的最后一个**：新建默认追加到卷末，
+ * 因此末项就是刚建的那一章。
+ *
+ * 这里没有用"比较前后 ID 集合"那种更"严格"的做法 ——
+ * 它需要一次额外的 `getOutline`（多一次全量扫描），
+ * 而对一个低频操作换来的是更复杂的代码。追加到末尾是
+ * 后端 `create_chapter` 的既定行为（有测试钉住），依靠它比
+ * 每次多扫一遍更划算。
+ */
 export async function addChapter(volumeId: string, title?: string, sort?: number): Promise<ChapterSummary | null> {
   try {
     const input: ipc.CreateChapterInput = { volumeId };
     if (title !== undefined) input.title = title;
     if (sort !== undefined) input.sort = sort;
-    const created = await ipc.createChapter(input);
+    const outline = await ipc.createChapter(input);
     await reloadDocument();
+    const node = outline.find((n) => n.volumeId === volumeId);
+    const created = node?.chapters[node.chapters.length - 1] ?? null;
+    // 从大纲里拿不到时退回读一次列表：宁可多一次读，
+    // 也不要让"新建章之后没有自动选中"这种交互断裂
+    if (created === null) {
+      return state.document?.chapters.find((c) => c.volumeId === volumeId) ?? null;
+    }
     return created;
   } catch (err) {
     setState("error", ipc.toFailure(err).error);
@@ -284,10 +329,41 @@ export async function removeChapter(chapterId: string): Promise<boolean> {
   }
 }
 
-/** 移动一章到别的卷 / 别的次序。 */
+/**
+ * 移动一章到别的卷 / 别的次序。
+ *
+ * ## 为什么跨卷移动要发两次请求
+ *
+ * 后端的重排命令是**按卷**的（`reorder_chapters(volumeId, ids)`），
+ * 而跨卷移动同时改动了两个卷：源卷少一项、目标卷多一项。
+ * 因此拆成两步。
+ *
+ * ## 为什么先发源卷、再发目标卷
+ *
+ * 顺序不能反。若先往目标卷插入，中途失败（网络、磁盘满）时
+ * 就会存在**两份该章**：目标卷里有了，源卷里也还在。
+ * 反过来先删源卷，失败时是"这一章暂时不在任何卷里" ——
+ * 它仍然在结构里（`document.chapters` 按 volumeId 分组渲染），
+ * 重试一次即可恢复，而重复的两份需要作者手工分辨。
+ *
+ * 这是个真实取舍：两种失败都不好，但"少一份"比"多一份"好处理。
+ */
 export async function moveChapterTo(chapterId: string, toVolumeId: string, toIndex: number): Promise<boolean> {
+  const doc = state.document;
+  if (doc === null) return false;
+  const snapshot = { volumes: doc.volumes, chapters: doc.chapters };
+  const result = moveChapterInTree(snapshot, chapterId, { volumeId: toVolumeId, index: toIndex });
+  if (!result.changed) return true;
+
+  const moving = doc.chapters.find((c) => c.id === chapterId);
+  if (moving === undefined) return false;
+
   try {
-    await ipc.moveChapter(chapterId, toVolumeId, toIndex);
+    // 源卷先重排（见上面的顺序说明）
+    await ipc.reorderChapters(moving.volumeId, chapterOrderOf(result.snapshot, moving.volumeId));
+    if (moving.volumeId !== toVolumeId) {
+      await ipc.reorderChapters(toVolumeId, chapterOrderOf(result.snapshot, toVolumeId));
+    }
     await reloadDocument();
     return true;
   } catch (err) {

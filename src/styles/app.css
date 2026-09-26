@@ -874,6 +874,66 @@ body.is-dragging {
 }
 
 /* --------------------------------------------------------------------------
+   CodeMirror 宿主（M4）
+   --------------------------------------------------------------------------
+   编辑器自己的颜色与字体在 features/editor/theme.ts 里由令牌生成，
+   这里只管"它在页面里占多大地方"。分开是因为前者随主题变、
+   后者随窗口布局变，两者的变化频率与原因都不同。 */
+
+.editor__cm {
+  /* 正文的字号与行距走变量：M9 的排版设置改这两个值即可，
+     不需要重建编辑器实例（T4.14 要求切字族不丢光标不跳滚动） */
+  font-size: var(--fs-body, 17px);
+  line-height: var(--lh-read);
+}
+
+.cm-host {
+  /* CodeMirror 需要一个有确定高度的容器才能正确算视口。
+     用 flex 撑满剩余空间而不是写死高度，这样窗口缩放时不用重算 */
+  min-height: 0;
+  flex: 1;
+}
+
+.cm-host .cm-editor {
+  height: 100%;
+}
+
+.cm-host .cm-scroller {
+  /* 键盘焦点在编辑器里时不该出现第二个滚动条 */
+  overflow: visible;
+}
+
+/* 检索跳转的闪烁高亮（T6.2）。
+   用背景色而不是描边：描边会让行高发生像素级变化，正文会抖一下。
+   动画结束后 class 被 JS 摘掉，颜色自然回落。 */
+.cm-reveal-flash {
+  animation: reveal-flash 1.2s var(--e-standard);
+}
+
+@keyframes reveal-flash {
+  0%,
+  100% {
+    background-color: transparent;
+  }
+  15%,
+  60% {
+    background-color: var(--c-accent-subtle);
+  }
+}
+
+/* 专注模式（T4.10）：只留正文。
+   这里是**加宽正文并放松行距**，不是逐段变暗 ——
+   理由见 features/editor/focus.ts 的说明。 */
+.editor--focus .editor__page {
+  max-width: 860px;
+  padding-top: 12vh;
+}
+
+.editor--focus .cm-content {
+  line-height: 2;
+}
+
+/* --------------------------------------------------------------------------
    右侧元数据面板
    -------------------------------------------------------------------------- */
 
@@ -1372,6 +1432,81 @@ body.is-dragging {
   padding-top: var(--sp-3);
 }
 
+/* 宽面板：快捷键表是两列信息，560px 会折行折得很难读 */
+.overlay__panel--wide {
+  width: min(680px, 94vw);
+}
+
+/* --------------------------------------------------------------------------
+   快捷键面板（T4.9）
+   -------------------------------------------------------------------------- */
+
+.shortcut-group + .shortcut-group {
+  margin-top: var(--sp-5);
+}
+
+.shortcut-group__title {
+  margin: 0 0 var(--sp-2);
+  font-size: var(--fs-xs);
+  font-weight: 600;
+  color: var(--c-text-muted);
+  letter-spacing: 0.04em;
+}
+
+.shortcut-list {
+  margin: 0;
+  display: grid;
+  gap: 1px;
+}
+
+.shortcut-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--sp-4);
+  padding: var(--sp-2) var(--sp-2);
+  border-radius: var(--r-sm);
+}
+
+/* 交替底色：一屏十几行时肉眼更容易横向对齐 */
+.shortcut-row:nth-child(odd) {
+  background: var(--c-bg-subtle);
+}
+
+.shortcut-row__label {
+  margin: 0;
+  font-size: var(--fs-sm);
+}
+
+.shortcut-row__keys {
+  margin: 0;
+  display: flex;
+  gap: var(--sp-1);
+}
+
+.kbd {
+  display: inline-block;
+  min-width: 24px;
+  padding: 2px var(--sp-2);
+  font-family: var(--font-mono);
+  font-size: var(--fs-xs);
+  text-align: center;
+  color: var(--c-text);
+  background: var(--c-surface);
+  border: 1px solid var(--c-border);
+  border-bottom-width: 2px;
+  border-radius: var(--r-sm);
+  white-space: nowrap;
+}
+
+/* 冲突键位：加底纹与危险色，颜色之外还有 title 文本，
+   满足"动效/颜色永不作为唯一反馈"的要求 */
+.kbd--conflict {
+  color: var(--c-danger);
+  background: var(--c-danger-subtle);
+  border-color: var(--c-danger);
+}
+
 /* --------------------------------------------------------------------------
    无障碍降级（计划书 5.6 节）
    -------------------------------------------------------------------------- */
@@ -1390,5 +1525,947 @@ body.is-dragging {
   /* 呼吸动效在减弱模式下完全停掉：它是纯装饰 */
   .empty__art {
     animation: none !important;
+  }
+}
+
+/* --------------------------------------------------------------------------
+   检索与大纲面板（M6）
+   -------------------------------------------------------------------------- */
+
+.search-panel .yh-dialog__body {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-3);
+  min-height: 0;
+}
+
+.search-panel__tabs {
+  display: flex;
+  gap: var(--sp-1);
+  border-bottom: 1px solid var(--c-border);
+}
+
+.search-panel__tab {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--sp-1);
+  padding: var(--sp-2) var(--sp-3);
+  border: none;
+  border-bottom: 2px solid transparent;
+  background: transparent;
+  color: var(--c-text-muted);
+  font-family: inherit;
+  font-size: var(--fs-sm);
+  cursor: pointer;
+  transition: color var(--d-fast) var(--e-standard);
+}
+
+.search-panel__tab.is-active {
+  color: var(--c-accent);
+  border-bottom-color: var(--c-accent);
+}
+
+.search-panel__field {
+  display: flex;
+  gap: var(--sp-2);
+  align-items: center;
+}
+
+.search-panel__input {
+  flex: 1;
+  min-width: 0;
+}
+
+.search-panel__meta {
+  margin: 0;
+  min-height: 18px;
+  font-size: var(--fs-xs);
+  color: var(--c-text-muted);
+}
+
+.search-panel__tokens {
+  opacity: 0.8;
+}
+
+.search-panel__results {
+  max-height: 46vh;
+}
+
+.search-panel__hint,
+.search-panel__empty {
+  margin: 0;
+  padding: var(--sp-6) 0;
+  text-align: center;
+  color: var(--c-text-muted);
+  font-size: var(--fs-sm);
+}
+
+.search-panel__keyboard,
+.search-panel__foot {
+  margin: 0;
+  padding-top: var(--sp-2);
+  border-top: 1px dashed var(--c-border);
+  font-size: var(--fs-xs);
+  color: var(--c-text-muted);
+}
+
+.hits {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.hit {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  width: 100%;
+  padding: var(--sp-2) var(--sp-3);
+  border: 1px solid transparent;
+  border-radius: var(--r-md);
+  background: transparent;
+  color: inherit;
+  font-family: inherit;
+  text-align: left;
+  cursor: pointer;
+  transition: background-color var(--d-fast) var(--e-standard);
+}
+
+.hit:hover,
+.hit.is-active {
+  background: var(--c-hover);
+}
+
+.hit[aria-current="true"] {
+  border-color: color-mix(in srgb, var(--c-accent) 45%, transparent);
+}
+
+.hit__title {
+  font-size: var(--fs-sm);
+  color: var(--c-text);
+}
+
+.hit__path {
+  font-family: var(--font-mono);
+  font-size: var(--fs-xs);
+  color: var(--c-text-muted);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.hit__line {
+  font-size: var(--fs-xs);
+  color: var(--c-text-muted);
+  line-height: 1.6;
+}
+
+.hit__mark {
+  /* 命中高亮：底色 + 加粗，两个通道。只靠颜色对色觉障碍用户不可读 */
+  background: color-mix(in srgb, var(--c-accent) 22%, transparent);
+  color: var(--c-text);
+  font-weight: 600;
+  border-radius: 2px;
+  padding: 0 1px;
+}
+
+.outline {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.outline__volume + .outline__volume {
+  margin-top: var(--sp-3);
+}
+
+.outline__volume-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--sp-2);
+  padding: var(--sp-1) var(--sp-2);
+  color: var(--c-text-muted);
+  font-size: var(--fs-xs);
+  font-weight: 600;
+  letter-spacing: 0.06em;
+}
+
+.outline__chapters {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.outline__chapter {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--sp-2);
+  width: 100%;
+  padding: var(--sp-1) var(--sp-3);
+  border: none;
+  border-radius: var(--r-sm);
+  background: transparent;
+  color: var(--c-text);
+  font-family: inherit;
+  font-size: var(--fs-sm);
+  text-align: left;
+  cursor: pointer;
+  transition: background-color var(--d-fast) var(--e-standard);
+}
+
+.outline__chapter:hover {
+  background: var(--c-hover);
+}
+
+.outline__chapter[aria-current="true"] {
+  background: var(--c-accent-subtle);
+}
+
+.outline__chapter-title {
+  flex: 1;
+  min-width: 0;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.outline__meta {
+  flex: 0 0 auto;
+  font-size: var(--fs-xs);
+  color: var(--c-text-muted);
+}
+
+/* --------------------------------------------------------------------------
+   命令面板（T5.7）
+   -------------------------------------------------------------------------- */
+
+.cmd .yh-dialog__body {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-2);
+}
+
+.cmd__input {
+  width: 100%;
+}
+
+.cmd__list {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  max-height: 44vh;
+  overflow-y: auto;
+}
+
+.cmd__item {
+  display: flex;
+  align-items: baseline;
+  gap: var(--sp-3);
+  width: 100%;
+  padding: var(--sp-2) var(--sp-3);
+  border: none;
+  border-radius: var(--r-md);
+  background: transparent;
+  color: var(--c-text);
+  font-family: inherit;
+  font-size: var(--fs-sm);
+  text-align: left;
+  cursor: pointer;
+  transition: background-color var(--d-fast) var(--e-standard);
+}
+
+.cmd__item.is-active {
+  background: var(--c-accent-subtle);
+}
+
+.cmd__item.is-disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+.cmd__group {
+  flex: 0 0 auto;
+  min-width: 3.5em;
+  font-size: var(--fs-xs);
+  color: var(--c-text-muted);
+}
+
+.cmd__label {
+  flex: 1;
+  min-width: 0;
+}
+
+.cmd__empty,
+.cmd__hint {
+  margin: 0;
+  font-size: var(--fs-xs);
+  color: var(--c-text-muted);
+}
+
+.cmd__empty {
+  padding: var(--sp-4) 0;
+  text-align: center;
+}
+
+.cmd__hint {
+  padding-top: var(--sp-2);
+  border-top: 1px dashed var(--c-border);
+}
+
+/* --------------------------------------------------------------------------
+   进度环（T5.5 / T8.11）
+   -------------------------------------------------------------------------- */
+
+.ring {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.ring__svg {
+  display: block;
+}
+
+.ring__track {
+  stroke: var(--c-border);
+}
+
+.ring__value {
+  stroke: var(--c-accent);
+  /* 环的进度值是低频变化（保存时跳一次），因此**不做补间**：
+     transition 只会让"我以为存完了"这种瞬间反馈变得迟滞 */
+}
+
+.ring__value.is-reached {
+  stroke: var(--c-accent-strong);
+}
+
+.ring__center {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 1px;
+  pointer-events: none;
+}
+
+.ring__text {
+  font-size: var(--fs-sm);
+  color: var(--c-text);
+}
+
+.ring__text--muted {
+  font-size: var(--fs-xs);
+  color: var(--c-text-muted);
+}
+
+.ring__caption {
+  font-size: 10px;
+  color: var(--c-text-muted);
+  white-space: nowrap;
+}
+
+.meta__rings {
+  display: flex;
+  align-items: center;
+  justify-content: space-around;
+  gap: var(--sp-2);
+  padding: var(--sp-2) 0 var(--sp-3);
+}
+
+/* --------------------------------------------------------------------------
+   写作统计（M8）
+   -------------------------------------------------------------------------- */
+
+.stats {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  background: var(--c-bg);
+}
+
+.stats__head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--sp-3);
+  padding: var(--sp-3) var(--sp-6);
+  border-bottom: 1px solid var(--c-border);
+  background: var(--c-bg-subtle);
+}
+
+.stats__title {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--sp-2);
+  margin: 0;
+  font-family: var(--font-heading);
+  font-size: var(--fs-lg);
+  font-weight: 600;
+}
+
+.stats__error {
+  margin: 0;
+  padding: var(--sp-2) var(--sp-6);
+  color: var(--c-danger);
+  font-size: var(--fs-sm);
+}
+
+.stats__body {
+  flex: 1;
+  min-height: 0;
+  display: grid;
+  grid-template-columns: 168px 1fr;
+  overflow: hidden;
+}
+
+.stats__nav {
+  border-right: 1px solid var(--c-border);
+  background: var(--c-bg-subtle);
+  overflow-y: auto;
+  padding: var(--sp-3) var(--sp-2);
+}
+
+.stats__nav-list {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.stats__nav-item {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-2);
+  width: 100%;
+  height: 30px;
+  padding: 0 var(--sp-2);
+  border: 1px solid transparent;
+  border-radius: var(--r-md);
+  background: transparent;
+  color: var(--c-text-muted);
+  font-family: inherit;
+  font-size: var(--fs-sm);
+  text-align: left;
+  cursor: pointer;
+  transition: background-color var(--d-fast) var(--e-standard);
+}
+
+.stats__nav-item:hover {
+  background: var(--c-hover);
+}
+
+.stats__nav-item.is-active {
+  background: var(--c-accent-subtle);
+  color: var(--c-accent);
+  border-color: color-mix(in srgb, var(--c-accent) 30%, transparent);
+}
+
+.stats__panel {
+  min-width: 0;
+  overflow-y: auto;
+  padding: var(--sp-6);
+}
+
+/* ---- 总览 ---- */
+
+.stats-cards {
+  margin: var(--sp-4) 0 0;
+  padding: 0;
+  list-style: none;
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+  gap: var(--sp-2);
+}
+
+.stats-card {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: var(--sp-3);
+  border: 1px solid var(--c-border);
+  border-radius: var(--r-lg);
+  background: var(--c-surface);
+}
+
+.stats-card__label {
+  font-size: var(--fs-xs);
+  color: var(--c-text-muted);
+}
+
+.stats-card__value {
+  font-size: var(--fs-xl);
+  color: var(--c-text);
+}
+
+.stats-card__note {
+  font-size: var(--fs-xs);
+  color: var(--c-text-muted);
+}
+
+.stats-streak {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-4);
+  padding: var(--sp-4);
+  border: 1px solid var(--c-border);
+  border-radius: var(--r-lg);
+  background: var(--c-surface);
+}
+
+.stats-streak__flame {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 48px;
+  height: 48px;
+  flex: 0 0 auto;
+  color: var(--c-accent);
+}
+
+.stats-streak__cold {
+  display: block;
+  width: 14px;
+  height: 14px;
+  border-radius: var(--r-full);
+  border: 2px solid var(--c-border);
+}
+
+.stats-streak__title {
+  margin: 0;
+  font-size: var(--fs-xs);
+  font-weight: 600;
+  color: var(--c-text-muted);
+  letter-spacing: 0.08em;
+}
+
+.stats-streak__value {
+  margin: var(--sp-1) 0 0;
+  font-size: var(--fs-xl);
+}
+
+.stats-streak__note {
+  margin: 2px 0 0;
+  font-size: var(--fs-xs);
+  color: var(--c-text-muted);
+}
+
+.stats-estimate {
+  margin-top: var(--sp-4);
+  padding: var(--sp-4);
+  border: 1px solid var(--c-border);
+  border-radius: var(--r-lg);
+  background: var(--c-surface);
+}
+
+.stats-estimate__title {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-1);
+  margin: 0;
+  font-size: var(--fs-xs);
+  font-weight: 600;
+  color: var(--c-text-muted);
+  letter-spacing: 0.08em;
+}
+
+.stats-estimate__value {
+  display: flex;
+  align-items: baseline;
+  gap: var(--sp-2);
+  margin: var(--sp-2) 0 0;
+  font-size: var(--fs-lg);
+}
+
+.stats-estimate__days,
+.stats-estimate__hint,
+.stats-estimate__meta {
+  margin: 0;
+  font-size: var(--fs-xs);
+  color: var(--c-text-muted);
+}
+
+.stats-estimate__meta {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-1);
+  margin-top: var(--sp-2);
+}
+
+/* ---- 日历与热力图 ---- */
+
+.stats-cal__head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--sp-4);
+  flex-wrap: wrap;
+}
+
+.stats-cal__total {
+  margin: 0;
+  font-size: var(--fs-base);
+}
+
+.stats-cal__nav {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-2);
+  margin-top: var(--sp-3);
+}
+
+.stats-cal__month {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--sp-1);
+  font-size: var(--fs-sm);
+  color: var(--c-text);
+}
+
+.stats-nav-btn {
+  height: 26px;
+  padding: 0 var(--sp-2);
+  border: 1px solid var(--c-border);
+  border-radius: var(--r-md);
+  background: var(--c-surface);
+  color: var(--c-text);
+  font-family: inherit;
+  font-size: var(--fs-xs);
+  cursor: pointer;
+  transition: border-color var(--d-fast) var(--e-standard);
+}
+
+.stats-nav-btn:hover {
+  border-color: color-mix(in srgb, var(--c-accent) 45%, var(--c-border));
+  color: var(--c-accent);
+}
+
+.stats-nav-btn[aria-pressed="true"],
+.stats-nav-btn[aria-selected="true"] {
+  background: var(--c-accent-subtle);
+  border-color: var(--c-accent);
+  color: var(--c-accent);
+}
+
+.stats-nav-btn--quiet {
+  border-color: transparent;
+  background: transparent;
+  color: var(--c-text-muted);
+}
+
+.stats-cal__body {
+  position: relative;
+  margin-top: var(--sp-4);
+}
+
+.stats-cal__weekdays {
+  display: grid;
+  gap: 5px;
+  margin-bottom: var(--sp-1);
+  font-size: var(--fs-xs);
+  color: var(--c-text-muted);
+  text-align: center;
+}
+
+.stats-grid {
+  position: relative;
+}
+
+.stats-grid__svg {
+  display: block;
+  max-width: 100%;
+  height: auto;
+}
+
+/* 逐格不动画（T8.9）：热力图有 371 格，任何逐格过渡都会让
+   统计页首次渲染掉出 200ms 预算。交互反馈（浮层）才是该花成本的地方。 */
+.stats-cell {
+  shape-rendering: crispEdges;
+}
+
+.stats-cell.is-outside {
+  opacity: 0.35;
+}
+
+.stats-cell__num {
+  font-size: 11px;
+  fill: var(--c-text-muted);
+  pointer-events: none;
+}
+
+.stats-cell__num.is-outside {
+  opacity: 0.35;
+}
+
+.stats-pop {
+  position: absolute;
+  top: 0;
+  left: 0;
+  z-index: var(--z-dropdown);
+  padding: var(--sp-1) var(--sp-2);
+  border: 1px solid var(--c-border);
+  border-radius: var(--r-md);
+  background: var(--c-surface);
+  box-shadow: var(--shadow-md);
+  font-size: var(--fs-xs);
+  white-space: nowrap;
+  pointer-events: none;
+}
+
+.stats-pop__date {
+  margin: 0;
+  color: var(--c-text-muted);
+}
+
+.stats-pop__value {
+  margin: 0;
+  color: var(--c-text);
+}
+
+.stats-pop__muted {
+  margin: 0;
+  color: var(--c-text-muted);
+}
+
+.stats-legend {
+  display: flex;
+  align-items: center;
+  gap: 3px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  font-size: var(--fs-xs);
+  color: var(--c-text-muted);
+}
+
+.stats-legend__swatch {
+  width: 12px;
+  height: 12px;
+  border-radius: 2px;
+}
+
+.stats-legend__text {
+  padding: 0 var(--sp-1);
+}
+
+.stats-heat__meta {
+  margin: var(--sp-3) 0 0;
+  font-size: var(--fs-xs);
+  color: var(--c-text-muted);
+}
+
+.stats-heat__wrap {
+  margin-top: var(--sp-2);
+  overflow-x: auto;
+}
+
+.stats-heat__axis,
+.stats-heat__labels {
+  display: block;
+}
+
+.stats-heat__row {
+  display: flex;
+  align-items: flex-start;
+}
+
+.stats-heat__month,
+.stats-heat__weekday {
+  font-size: 10px;
+  fill: var(--c-text-muted);
+}
+
+/* ---- 目标 ---- */
+
+.stats-goal__rings {
+  display: flex;
+  gap: var(--sp-6);
+  padding: var(--sp-4);
+  border: 1px solid var(--c-border);
+  border-radius: var(--r-lg);
+  background: var(--c-surface);
+}
+
+.stats-goal__form {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-4);
+  margin-top: var(--sp-4);
+  max-width: 360px;
+}
+
+.stats-goal__actions {
+  display: flex;
+  gap: var(--sp-2);
+}
+
+.stats-goal__saved {
+  margin: 0;
+  font-size: var(--fs-xs);
+  color: var(--c-accent);
+}
+
+.stats-goal__limit {
+  margin: 0;
+  font-size: var(--fs-xs);
+  color: var(--c-text-muted);
+}
+
+/* ---- 分章分卷 ---- */
+
+.stats-breakdown__tabs {
+  display: flex;
+  gap: var(--sp-1);
+  margin-bottom: var(--sp-3);
+}
+
+.stats-bars {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+
+.stats-bar {
+  display: grid;
+  grid-template-columns: minmax(0, 180px) 1fr 64px 48px;
+  align-items: center;
+  gap: var(--sp-2);
+  font-size: var(--fs-xs);
+}
+
+.stats-bar--is-chapter,
+.stats-bar.is-chapter {
+  padding-left: var(--sp-4);
+}
+
+.stats-bar__label {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  color: var(--c-text);
+}
+
+.stats-bar__track {
+  height: 10px;
+  border-radius: var(--r-full);
+  background: var(--c-bg-subtle);
+  overflow: hidden;
+}
+
+.stats-bar__fill {
+  display: block;
+  height: 100%;
+  border-radius: var(--r-full);
+  background: var(--c-accent);
+  /* 用 scaleX 而不是 width：宽度会触发重排，而计划书 5.4 只允许
+     动画 transform 与 opacity。origin 定在左端，条形才从左边长出来 */
+  transform-origin: left center;
+}
+
+.stats-bar__value,
+.stats-bar__share {
+  text-align: right;
+  color: var(--c-text-muted);
+}
+
+.stats-empty-inline {
+  margin: 0;
+  padding: var(--sp-6) 0;
+  color: var(--c-text-muted);
+  font-size: var(--fs-sm);
+}
+
+/* ---- 隐私 ---- */
+
+.stats-privacy {
+  max-width: 46em;
+  padding: var(--sp-4);
+  border: 1px solid var(--c-border);
+  border-radius: var(--r-lg);
+  background: var(--c-surface);
+}
+
+.stats-privacy__title {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-1);
+  margin: 0;
+  font-size: var(--fs-base);
+  font-weight: 600;
+}
+
+.stats-privacy__body {
+  margin: var(--sp-2) 0 var(--sp-3);
+  font-size: var(--fs-sm);
+  color: var(--c-text-muted);
+  line-height: 1.75;
+}
+
+.stats-privacy__list {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--sp-2);
+}
+
+.stats-privacy__item {
+  padding: 2px var(--sp-2);
+  border-radius: var(--r-full);
+  background: var(--c-accent-subtle);
+  color: var(--c-accent-strong);
+  font-size: var(--fs-xs);
+}
+
+.stats-privacy__path {
+  display: flex;
+  align-items: baseline;
+  gap: var(--sp-2);
+  margin: var(--sp-4) 0 0;
+  padding-top: var(--sp-2);
+  border-top: 1px dashed var(--c-border);
+  font-size: var(--fs-xs);
+  color: var(--c-text-muted);
+}
+
+.stats-privacy__path code {
+  font-family: var(--font-mono);
+}
+
+/* 窄窗口：侧边导航横过来，否则 168px 会把图压得没法看 */
+@media (max-width: 720px) {
+  .stats__body {
+    grid-template-columns: 1fr;
+    grid-template-rows: auto 1fr;
+  }
+
+  .stats__nav {
+    border-right: none;
+    border-bottom: 1px solid var(--c-border);
+    padding: var(--sp-2);
+  }
+
+  .stats__nav-list {
+    flex-direction: row;
+    overflow-x: auto;
+  }
+
+  .stats__nav-item {
+    width: auto;
+    flex: 0 0 auto;
+    padding: 0 var(--sp-3);
   }
 }

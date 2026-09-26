@@ -52,7 +52,36 @@ pub enum ExportError {
     #[error("打包失败：{0}")]
     Package(String),
 
-    /// 目标格式尚未实现（PDF 需要 WebView 接线）。
+    /// 找不到或无法使用 PDF 需要的内嵌字体。
+    ///
+    /// ## 为什么单列一个变体而不是复用 `Io`
+    ///
+    /// 「找不到中文字体」是**用户可修正**的问题：装一个字体、
+    /// 把字体文件丢进 assets/fonts/、或设一个环境变量即可。
+    /// 而 `Io` 的语义是「磁盘出问题了」，前端只会提示「重试」。
+    /// 单列之后错误码是 FONT_UNAVAILABLE，前端可以据此给出
+    /// 「请安装中文字体」这类**带操作指引**的提示。
+    ///
+    /// 更关键的是：它保证了「绝不静默产出乱码 PDF」这条约束
+    /// 在类型层面就成立 —— 没有字体就走这个分支，产不出字节。
+    #[error("找不到可用的中文字体：{hint}")]
+    FontUnavailable {
+        /// 依次尝试过的路径（按搜索顺序）。
+        searched: Vec<String>,
+        /// 给用户的可操作提示。
+        hint: String,
+    },
+
+    /// 字体文件存在但无法使用（损坏、被截断、是 CFF/OTF 轮廓）。
+    #[error("字体文件不可用：{path}（{detail}）")]
+    Font {
+        /// 字体路径。
+        path: String,
+        /// 具体原因。
+        detail: String,
+    },
+
+    /// 目标格式尚未实现。
     #[error("功能尚未实现：{0}")]
     Unimplemented(&'static str),
 }
@@ -82,6 +111,9 @@ impl ExportError {
             Self::Parse { .. } => "PARSE_ERROR",
             Self::Io { .. } => "IO_ERROR",
             Self::Package(_) => "EXPORT_ERROR",
+            // 字体缺失是独立错误码：它是唯一一个「换个环境就能修好」的
+            // 导出失败，前端要能把它和磁盘错误区分开。
+            Self::FontUnavailable { .. } | Self::Font { .. } => "FONT_UNAVAILABLE",
             Self::Unimplemented(_) => "UNIMPLEMENTED",
         }
     }
@@ -100,6 +132,16 @@ impl From<ExportError> for YuhuaError {
             },
             ExportError::Io { path, source } => YuhuaError::Io { path, source },
             ExportError::Package(msg) => YuhuaError::Export(msg),
+            // 收敛成 YuhuaError::Export(String) 而不是 Unimplemented：
+            // YuhuaError 这一层没有「字体」这个细分，而 Export 的分类是
+            // 「环境/资源问题，用户可干预」，语义比 Unimplemented 准确得多
+            // （PDF 已经不是未实现了，是这台机器上没有中文字体）。
+            ExportError::FontUnavailable { searched, hint } => {
+                YuhuaError::Export(format!("{}（已尝试 {} 个路径）", hint, searched.len()))
+            }
+            ExportError::Font { path, detail } => {
+                YuhuaError::Export(format!("字体不可用 {path}：{detail}"))
+            }
             ExportError::Unimplemented(what) => YuhuaError::Unimplemented(what),
         }
     }

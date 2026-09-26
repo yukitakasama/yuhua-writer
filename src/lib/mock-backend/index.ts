@@ -43,6 +43,9 @@ import type {
   SearchHit,
   SearchQuery,
   SearchResults,
+  StatsDay,
+  StatsPayload,
+  StatsSummary,
   TrashEntry,
   UpdateChapterMetaInput,
   Volume,
@@ -72,21 +75,21 @@ export interface MockBackend {
   openWorkspace(root: string): OpenWorkspaceResult;
   closeWorkspace(): void;
   hasWorkspace(): boolean;
-  createVolume(input: CreateVolumeInput): Volume;
-  renameVolume(volumeId: string, title: string): void;
-  deleteVolume(volumeId: string): void;
-  moveVolume(volumeId: string, toIndex: number): void;
-  createChapter(input: CreateChapterInput): ChapterSummary;
-  listChapters(): ChapterSummary[];
+  createVolume(input: CreateVolumeInput): OutlineNode[];
+  renameVolume(volumeId: string, title: string): OutlineNode[];
+  deleteVolume(volumeId: string): OutlineNode[];
+  reorderVolumes(orderedIds: string[]): OutlineNode[];
+  createChapter(input: CreateChapterInput): OutlineNode[];
+  reorderChapters(volumeId: string, orderedIds: string[]): OutlineNode[];
   readChapter(chapterId: string): ChapterContent;
   saveChapter(chapterId: string, body: string, expectedHash?: string): ChapterContent;
   updateChapterMeta(input: UpdateChapterMetaInput): void;
-  renameChapter(chapterId: string, title: string): void;
+  renameChapter(chapterId: string, title: string): OutlineNode[];
   setChapterStatus(chapterId: string, status: ChapterStatus): void;
-  deleteChapter(chapterId: string): void;
-  moveChapter(chapterId: string, toVolumeId: string, toIndex: number): void;
+  deleteChapter(chapterId: string): OutlineNode[];
   getOutline(): OutlineNode[];
   getWordStats(chapterId?: string): WordStats;
+  getStatsSummary(): StatsPayload;
   getChapterWordCount(chapterId: string): WordCount;
   search(query: SearchQuery): SearchResults;
   listTrash(): TrashEntry[];
@@ -244,6 +247,26 @@ export function createMockBackend(): MockBackend {
     return ia - ib;
   }
 
+  /**
+   * 当前大纲快照。
+   *
+   * ## 为什么所有结构改动都返回它
+   *
+   * 真实后端（commands.rs）的 create/rename/delete/reorder 系列
+   * 统一返回 Vec<OutlineNode>，而不是被改动的那一条 —— 因为
+   * 一次结构改动会连带改掉同卷内所有项的 sort 与路径。
+   * mock 是**行为镜像**，必须照做：否则前端会写出"拿返回值直接当
+   * 新章用"这种只在浏览器里成立的代码，到 Tauri 里就炸。
+   *
+   * ## 为什么直接复用取大纲的逻辑
+   *
+   * 两份实现必然会在某个字段上分叉，而那种分叉只会在界面里
+   * 以"某一列数值不对"的形式出现，极难定位到根因。
+   */
+  function outlineSnapshot(): OutlineNode[] {
+    return backend.getOutline();
+  }
+
   // ---- 实现 ----
 
   const backend: MockBackend = {
@@ -308,7 +331,7 @@ export function createMockBackend(): MockBackend {
       volumes.forEach((v, i) => {
         v.sort = i;
       });
-      return { ...volume };
+      return outlineSnapshot();
     },
 
     renameVolume(volumeId, title) {
@@ -319,6 +342,7 @@ export function createMockBackend(): MockBackend {
       chaptersOf(volumeId).forEach((c) => {
         c.path = chapterPath(volume, c.sort, c.title);
       });
+      return outlineSnapshot();
     },
 
     deleteVolume(volumeId) {
@@ -349,18 +373,46 @@ export function createMockBackend(): MockBackend {
         volumes.push({ id: nextId("vol_"), bookId: book.id, title: "第一卷", sort: 0, created: mockTime(0) });
       }
       void volume;
+      return outlineSnapshot();
     },
 
-    moveVolume(volumeId, toIndex) {
-      const from = volumes.findIndex((v) => v.id === volumeId);
-      if (from < 0) throw new MockError("NOT_FOUND", `找不到卷：${volumeId}`, true);
-      const [moved] = volumes.splice(from, 1);
-      if (!moved) return;
-      const clamped = Math.max(0, Math.min(toIndex, volumes.length));
-      volumes.splice(clamped, 0, moved);
+    /**
+     * 按给定的完整顺序重排卷。
+     *
+     * ## 为什么接受"完整顺序"而不是"移到第 N 位"
+     *
+     * 与后端的 reorder_volumes 保持一致（见 ipc/index.ts 的说明）。
+     * mock 是**行为镜像**，它的签名必须与真实后端相同 —— 否则前端
+     * 会在浏览器里跑通、到 Tauri 里失败，而那正是这一层存在的
+     * 意义所要防止的。
+     *
+     * ## 不在列表里的卷怎么处理
+     *
+     * 追加到末尾。这看起来"宽容"，但它防的是一类真实事故：
+     * 前端算顺序时用了过期的大纲（比如另一台设备刚加了一卷），
+     * 直接丢弃未知卷会让它在界面上**凭空消失**。保守地保留在
+     * 末尾，至少不会静默丢数据。
+     */
+    reorderVolumes(orderedIds) {
+      const byId = new Map(volumes.map((v) => [v.id, v]));
+      const next: Volume[] = [];
+      for (const id of orderedIds) {
+        const found = byId.get(id);
+        if (found) {
+          next.push(found);
+          byId.delete(id);
+        }
+      }
+      // 未被提及的卷保留在末尾（见上面的说明）
+      for (const leftover of volumes) {
+        if (byId.has(leftover.id)) next.push(leftover);
+      }
+      volumes.length = 0;
+      volumes.push(...next);
       volumes.forEach((v, i) => {
         v.sort = i;
       });
+      return outlineSnapshot();
     },
 
     createChapter(input) {
@@ -387,11 +439,43 @@ export function createMockBackend(): MockBackend {
       // 正文可以为空，但必须在表里占位，否则 readChapter 会误判为"文件不存在"
       bodies.set(summary.id, "");
       hashes.set(summary.id, "empty");
-      return { ...summary };
+      return outlineSnapshot();
     },
 
-    listChapters() {
-      return chapters.map((c) => ({ ...c }));
+    /**
+     * 按给定的完整顺序重排某一卷内的章节。
+     *
+     * 与 reorderVolumes 同理：整份顺序无歧义，而 toIndex 的语义
+     * 取决于"移除被移动项之前还是之后"—— 那是一个真实的、
+     * 反复出现的一处之差 bug 来源。
+     *
+     * 不在列表里的章节按原顺序追加到末尾（理由同 reorderVolumes）。
+     */
+    reorderChapters(volumeId, orderedIds) {
+      requireVolume(volumeId);
+      const siblings = chaptersOf(volumeId);
+      const byId = new Map(siblings.map((c) => [c.id, c]));
+      const next: ChapterSummary[] = [];
+      const seen = new Set<string>();
+      for (const id of orderedIds) {
+        const found = byId.get(id);
+        if (found && !seen.has(id)) {
+          next.push(found);
+          seen.add(id);
+        }
+      }
+      for (const leftover of siblings) {
+        if (!seen.has(leftover.id)) next.push(leftover);
+      }
+      next.forEach((c, i) => {
+        c.sort = i;
+      });
+      // 序号变了，路径里的编号也要跟着变（后端同样会重命名文件）
+      const volume = requireVolume(volumeId);
+      next.forEach((c) => {
+        c.path = chapterPath(volume, c.sort, c.title);
+      });
+      return outlineSnapshot();
     },
 
     readChapter(chapterId) {
@@ -452,6 +536,7 @@ export function createMockBackend(): MockBackend {
       const volume = requireVolume(found.volumeId);
       found.path = chapterPath(volume, found.sort, found.title);
       found.updated = mockTime(0);
+      return outlineSnapshot();
     },
 
     setChapterStatus(chapterId, status) {
@@ -473,33 +558,7 @@ export function createMockBackend(): MockBackend {
         kind: "chapter",
       });
       renumber(found.volumeId);
-    },
-
-    moveChapter(chapterId, toVolumeId, toIndex) {
-      const found = requireChapter(chapterId);
-      requireVolume(toVolumeId);
-      const fromVolume = found.volumeId;
-
-      // 先摘出来，避免它算进目标卷的位置计算里
-      const targetList = chaptersOf(toVolumeId).filter((c) => c.id !== chapterId);
-      const clamped = Math.max(0, Math.min(toIndex, targetList.length));
-      found.volumeId = toVolumeId;
-      // 用一个「排序权重」把新位置钉住，随后统一 renumber
-      const anchor = targetList[clamped];
-      const previous = clamped > 0 ? targetList[clamped - 1] : undefined;
-      if (anchor) {
-        found.sort = anchor.sort - 0.5;
-      } else if (previous) {
-        found.sort = previous.sort + 0.5;
-      } else {
-        found.sort = 0;
-      }
-      renumber(fromVolume);
-      if (fromVolume !== toVolumeId) renumber(toVolumeId);
-      else found.sort = clamped;
-
-      const volume = requireVolume(toVolumeId);
-      found.path = chapterPath(volume, found.sort, found.title);
+      return outlineSnapshot();
     },
 
     getOutline() {
@@ -534,6 +593,10 @@ export function createMockBackend(): MockBackend {
     getChapterWordCount(chapterId) {
       requireChapter(chapterId);
       return countWords(bodies.get(chapterId) ?? "");
+    },
+
+    getStatsSummary() {
+      return buildStatsPayload(chapters);
     },
 
     search(query) {
@@ -616,6 +679,164 @@ export function createMockBackend(): MockBackend {
   };
 
   return backend;
+}
+
+// ---------------------------------------------------------------------------
+// 写作统计（M8）
+// ---------------------------------------------------------------------------
+
+/**
+ * 由章节字数反推一份**确定性**的按天统计。
+ *
+ * ## 为什么不是随机数
+ *
+ * 统计页的测试要断言具体数字（「本周共 N 字」），随机数据没法断言。
+ * 这里用「章节序号 + 固定相位」的算术生成，同一份示例书在任何时候、
+ * 任何机器上都会得到完全一样的统计结果。
+ *
+ * ## 为什么要造这段数据
+ *
+ * 浏览器预览模式与组件测试都走这条路。如果 mock 返回一份空统计，
+ * 日历、热力图、连续天数、进度环在开发时永远是空的 ——
+ * 那些恰是最需要肉眼检查的界面。
+ *
+ * 分布刻意做成「工作日写得多、周末写得少、中间断过几天」，
+ * 这样连续天数、最高单日、断档这几条规则都能在同一张图上被看到。
+ */
+export function buildStatsPayload(chapters: readonly ChapterSummary[]): StatsPayload {
+  const totalWords = chapters.reduce((sum, c) => sum + c.wordCount, 0);
+  // 示例数据里的基准日：与 mock-data 的时间戳同源，随 seed 一起固定
+  const anchor = new Date(2026, 0, 1);
+  const today = new Date(anchor.getTime());
+  today.setDate(today.getDate() + 30);
+
+  const days: StatsDay[] = [];
+  const chapterCount = Math.max(1, Math.min(chapters.length, 8));
+  let remaining = totalWords;
+
+  // 从 90 天前开始铺：足以覆盖热力图的一整段，又不会让载荷变大
+  for (let offset = 90; offset >= 0; offset -= 1) {
+    const date = new Date(today.getTime());
+    date.setDate(date.getDate() - offset);
+    const weekday = (date.getDay() + 6) % 7;
+
+    // 每 9 天断一天：让「连续天数」有断点可看
+    if (offset % 9 === 4) continue;
+    // 未来日期不产出（今天之后的格子必须为空）
+    if (offset > 0 && weekday === 6 && offset % 3 === 0) continue;
+
+    const pulse = [1, 0.6, 0.85, 0.4, 0.7][offset % 5] ?? 1;
+    const weekendFactor = weekday >= 5 ? 0.35 : 1;
+    const words = Math.round(1600 * pulse * weekendFactor);
+    if (words <= 0) continue;
+
+    remaining -= words;
+    days.push({
+      date: formatDayKey(date),
+      words,
+      minutes: Math.max(1, Math.round(words / 32)),
+      chapters: Math.max(1, Math.min(chapterCount, 1 + (offset % chapterCount))),
+    });
+  }
+
+  // 总字数若明显大于铺出来的量，差额补到今天，
+  // 让「累计码字」与书架上的字数对得上（示例数据要自洽）
+  if (days.length > 0 && remaining > 0) {
+    const last = days[days.length - 1];
+    if (last) last.words += remaining;
+  }
+
+  const summary = summarizeDays(days, formatDayKey(today), DEFAULT_STREAK_THRESHOLD);
+  return { days, summary, statsDir: ".yuhua/stats", streakThreshold: DEFAULT_STREAK_THRESHOLD };
+}
+
+/** 连续天数的默认阈值，与 Rust 侧 `DEFAULT_STREAK_THRESHOLD` 一致。 */
+const DEFAULT_STREAK_THRESHOLD = 100;
+
+/** 把 Date 格式化成 YYYY-MM-DD（本地日历）。 */
+function formatDayKey(date: Date): string {
+  const y = date.getFullYear();
+  const m = String(date.getMonth() + 1).padStart(2, "0");
+  const d = String(date.getDate()).padStart(2, "0");
+  return `${y}-${m}-${d}`;
+}
+
+/** 在日期键上加减天数。 */
+function shiftDayKey(key: string, delta: number): string {
+  const [y, m, d] = key.split("-").map(Number);
+  const date = new Date(y ?? 1970, (m ?? 1) - 1, d ?? 1);
+  date.setDate(date.getDate() + delta);
+  return formatDayKey(date);
+}
+
+/** 某天在周几（0 为周一）。 */
+function weekdayOfKey(key: string): number {
+  const [y, m, d] = key.split("-").map(Number);
+  return (new Date(y ?? 1970, (m ?? 1) - 1, d ?? 1).getDay() + 6) % 7;
+}
+
+/**
+ * 汇总计算。
+ *
+ * 这份实现在语义上与 Rust 的 `summarize` 完全一致：平均日更的分母是
+ * **自然日**、今天没写不算断、并列时最高单日取更早的一天。
+ * mock 是行为镜像，镜像得不像比不实现更危险。
+ */
+function summarizeDays(days: readonly StatsDay[], today: string, threshold: number): StatsSummary {
+  const byDate = new Map(days.map((d) => [d.date, d]));
+  const month = today.slice(0, 7);
+  const weekStart = shiftDayKey(today, -weekdayOfKey(today));
+  const weekEnd = shiftDayKey(weekStart, 7);
+
+  let totalWords = 0;
+  let totalMinutes = 0;
+  let activeDays = 0;
+  let bestDay = 0;
+  let bestDayDate: string | null = null;
+  let thisMonth = 0;
+  let thisWeek = 0;
+
+  for (const day of [...days].sort((a, b) => (a.date < b.date ? -1 : 1))) {
+    totalWords += day.words;
+    totalMinutes += day.minutes;
+    if (day.words > 0) activeDays += 1;
+    if (day.words > bestDay) {
+      bestDay = day.words;
+      bestDayDate = day.date;
+    }
+    if (day.date.slice(0, 7) === month) thisMonth += day.words;
+    if (day.date >= weekStart && day.date < weekEnd) thisWeek += day.words;
+  }
+
+  let window7 = 0;
+  for (let i = 6; i >= 0; i -= 1) window7 += byDate.get(shiftDayKey(today, -i))?.words ?? 0;
+  const averagePerDay7 = Math.floor(window7 / 7);
+
+  const reached = (key: string): boolean => (byDate.get(key)?.words ?? 0) >= threshold;
+  let cursor = reached(today) ? today : shiftDayKey(today, -1);
+  let streak = 0;
+  while (streak < 10_000 && reached(cursor)) {
+    streak += 1;
+    cursor = shiftDayKey(cursor, -1);
+  }
+
+  return {
+    totalWords,
+    thisMonth,
+    thisWeek,
+    today: byDate.get(today)?.words ?? 0,
+    activeDays,
+    averagePerActiveDay: activeDays === 0 ? 0 : Math.floor(totalWords / activeDays),
+    averagePerDay7,
+    bestDay,
+    bestDayDate,
+    totalMinutes,
+    streak,
+    streakThreshold: threshold,
+    // 示例数据没有全书目标，因此不估算完稿日（与 Rust 侧无目标时返回 None 一致）
+    estimatedCompletion: null,
+    remainingDays: null,
+  };
 }
 
 /** 把每页条数收敛到 1..200，与 Rust 侧 `effective_limit` 一致。 */

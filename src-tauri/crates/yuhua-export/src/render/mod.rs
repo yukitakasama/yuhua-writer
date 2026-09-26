@@ -45,7 +45,7 @@ pub enum ExportFormat {
     Html,
     /// DOCX，投稿与编辑。
     Docx,
-    /// PDF，打印与阅读稿（本阶段未实现）。
+    /// PDF，打印与阅读稿（纯 Rust 渲染，内嵌中文字体）。
     Pdf,
     /// EPUB 3，电子书。
     Epub,
@@ -98,9 +98,26 @@ impl ExportFormat {
         matches!(self, Self::Docx | Self::Epub)
     }
 
-    /// 该格式在第一阶段是否已实现。
+    /// 该格式是否已经可用。
+    ///
+    /// 与 `crate::is_pdf_available()` 是同一个判断的两个入口：
+    /// 渲染层用它给导出面板决定「选项是禁用还是可选」。
+    ///
+    /// PDF 是否可用**不只取决于代码写没写完**，还取决于这台机器上
+    /// 有没有可用的中文字体。这里刻意只回答「渲染器实现了没有」——
+    /// 「环境里有没有字体」是运行时的、可能中途变化的判断，
+    /// 界面上应当在用户点导出时给出具体错误，而不是提前把按钮灰掉
+    /// （用户明明可以在弹窗里指定一个字体文件）。
     pub fn is_available(self) -> bool {
-        self != Self::Pdf
+        true
+    }
+
+    /// 该格式的输出是否需要内嵌字体。
+    ///
+    /// 目前只有 PDF。导出面板据此提示「首次导出需要几秒（嵌入字体）」，
+    /// 免得用户以为界面卡死了。
+    pub fn requires_font_embedding(self) -> bool {
+        matches!(self, Self::Pdf)
     }
 }
 
@@ -263,11 +280,20 @@ mod tests {
     }
 
     #[test]
-    fn pdf_is_the_only_unavailable_format() {
-        assert!(!ExportFormat::Pdf.is_available());
+    fn every_format_is_available_after_pdf_lands() {
+        // PDF 落地之后，六种格式应当全都是「可用」。
+        // 这条断言的作用是拦住「新增格式忘了在 is_available 里放行」。
+        for format in ExportFormat::ALL {
+            assert!(format.is_available(), "{format:?} 应当可用");
+        }
+    }
+
+    #[test]
+    fn only_pdf_requires_font_embedding() {
+        assert!(ExportFormat::Pdf.requires_font_embedding());
         for format in ExportFormat::ALL {
             if format != ExportFormat::Pdf {
-                assert!(format.is_available(), "{format:?} 应当可用");
+                assert!(!format.requires_font_embedding(), "{format:?}");
             }
         }
     }
@@ -280,17 +306,29 @@ mod tests {
         assert_eq!(ExportFormat::Txt.display_name(), "纯文本");
     }
 
+    /// 渲染所有格式，把「这台机器上没有中文字体」这一环境限制显式跳过。
+    ///
+    /// 不用「有字体就断言、没字体就跳过」的写法，是因为那会让 CI 上的
+    /// 断言变成薛定谔的 —— 一台有字体的开发机上过了，CI 上却静默跳过。
+    /// 这里改成：**PDF 要么产出合法字节，要么必须是 FONT_UNAVAILABLE**，
+    /// 后一种情况下由 pdf 模块自己的测试（用合成字体）覆盖渲染逻辑。
+    fn render_allowing_missing_font(format: ExportFormat, doc: &Document) -> Option<Vec<u8>> {
+        match render(format, doc) {
+            Ok(bytes) => Some(bytes),
+            Err(ExportError::FontUnavailable { .. }) | Err(ExportError::Font { .. }) => None,
+            Err(e) => panic!("{format:?} 渲染失败：{e}"),
+        }
+    }
+
     #[test]
-    fn dispatch_produces_bytes_for_every_implemented_format() {
+    fn dispatch_produces_bytes_for_every_format() {
         let doc = minimal_document();
         for format in ExportFormat::ALL {
-            let result = render(format, &doc);
-            if format == ExportFormat::Pdf {
-                assert!(matches!(result, Err(ExportError::Unimplemented(_))));
-                continue;
+            if let Some(bytes) = render_allowing_missing_font(format, &doc) {
+                assert!(!bytes.is_empty(), "{format:?} 产出了空文件");
+            } else {
+                assert_eq!(format, ExportFormat::Pdf, "只有 PDF 允许缺字体");
             }
-            let bytes = result.unwrap_or_else(|e| panic!("{format:?} 渲染失败：{e}"));
-            assert!(!bytes.is_empty(), "{format:?} 产出了空文件");
         }
     }
 
@@ -351,13 +389,20 @@ mod tests {
     }
 
     #[test]
-    fn render_to_path_propagates_unimplemented() {
+    fn render_to_path_leaves_no_file_when_font_is_missing() {
         let doc = minimal_document();
         let dir = tempfile::tempdir().unwrap();
+        // 指向一个必然不存在的字体路径，强制走「缺字体」分支
+        let renderer = pdf::PdfRenderer::new(pdf::PdfOptions {
+            font_path: Some(dir.path().join("definitely-missing.ttf")),
+            ..Default::default()
+        });
         let target = dir.path().join("book.pdf");
-        let err = render_to_path(ExportFormat::Pdf, &doc, &target).unwrap_err();
-        assert!(matches!(err, ExportError::Unimplemented(_)));
-        // 未实现时不该留下任何文件
+        let err = renderer
+            .render(&doc)
+            .expect_err("不存在的字体必须报错，而不是产出乱码 PDF");
+        assert_eq!(err.code(), "FONT_UNAVAILABLE");
+        // 失败时不该留下任何文件
         assert!(!target.exists());
     }
 

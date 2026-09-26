@@ -37,9 +37,10 @@ import {
   type RecoveryReport,
   type SearchQuery,
   type SearchResults,
+  type StatsDay,
+  type StatsPayload,
   type TrashEntry,
   type UpdateChapterMetaInput,
-  type Volume,
   type WordCount,
   type WordStats,
   type WorkspaceSummary,
@@ -140,42 +141,82 @@ export function hasWorkspace(): Promise<boolean> {
 // 卷
 // ---------------------------------------------------------------------------
 
-/** 新建一卷。 */
-export function createVolume(input: CreateVolumeInput): Promise<Volume> {
-  return call("create_volume", { title: input.title, sort: input.sort ?? null }, (b) => b.createVolume(input));
+/**
+ * 新建一卷。
+ *
+ * ## 返回值为什么是大纲而不是 Volume
+ *
+ * 后端 `create_volume` 返回的是**整份大纲**（`Vec<OutlineNode>`），
+ * 不是新卷本身。这是刻意的：新建卷会改动所有卷的 `sort`，
+ * 返回单条会让前端去做"把它插进列表的哪儿"这种推断，
+ * 而推断一旦与后端不一致，界面顺序就会与磁盘顺序分叉。
+ *
+ * 前端在收到大纲后刷新文稿（见 workspace-store 的 `addVolume`）。
+ */
+export function createVolume(input: CreateVolumeInput): Promise<OutlineNode[]> {
+  return call("create_volume", { title: input.title }, (b) => b.createVolume(input) as OutlineNode[] | Promise<OutlineNode[]>);
 }
 
-/** 重命名一卷。 */
-export function renameVolume(volumeId: string, title: string): Promise<void> {
-  return call("rename_volume", { volumeId, title }, (b) => b.renameVolume(volumeId, title));
+/** 重命名一卷。返回更新后的大纲。 */
+export function renameVolume(volumeId: string, title: string): Promise<OutlineNode[]> {
+  return call("rename_volume", { volumeId, title }, (b) => b.renameVolume(volumeId, title) as OutlineNode[] | Promise<OutlineNode[]>);
 }
 
-/** 删除一卷（连同其下章节一起进回收站）。 */
-export function deleteVolume(volumeId: string): Promise<void> {
-  return call("delete_volume", { volumeId }, (b) => b.deleteVolume(volumeId));
+/** 删除一卷（连同其下章节一起进回收站）。返回更新后的大纲。 */
+export function deleteVolume(volumeId: string): Promise<OutlineNode[]> {
+  return call("delete_volume", { volumeId }, (b) => b.deleteVolume(volumeId) as OutlineNode[] | Promise<OutlineNode[]>);
 }
 
-/** 移动一卷到新位置。 */
-export function moveVolume(volumeId: string, toIndex: number): Promise<void> {
-  return call("move_volume", { volumeId, toIndex }, (b) => b.moveVolume(volumeId, toIndex));
+/**
+ * 调整卷的顺序。
+ *
+ * ## 为什么是"整份顺序"而不是"把某卷移到第 N 位"
+ *
+ * 后端提供的是 `reorder_volumes(ordered_ids)`。之所以不像
+ * mock 那样做成 `move_volume(volumeId, toIndex)`：
+ *
+ * - **整份顺序是无歧义的**。`toIndex` 的语义取决于"移除被移动项
+ *   之前还是之后"，这是一个真实的、反复出现的一处之差 bug 来源
+ * - **拖拽本来就产生整份顺序**。UI 在放下时已经知道最终排列，
+ *   再把它折算成一个索引是一次没有收益的信息损失
+ *
+ * 因此调用方（tree-ops 的 `moveVolume`）负责算出新顺序。
+ */
+export function reorderVolumes(orderedIds: string[]): Promise<OutlineNode[]> {
+  return call("reorder_volumes", { orderedIds }, (b) => b.reorderVolumes(orderedIds) as OutlineNode[] | Promise<OutlineNode[]>);
 }
 
 // ---------------------------------------------------------------------------
 // 章
 // ---------------------------------------------------------------------------
 
-/** 新建一章。返回新章的摘要：正文必然是空的，不必传输。 */
-export function createChapter(input: CreateChapterInput): Promise<ChapterSummary> {
+/**
+ * 新建一章。
+ *
+ * 与 `createVolume` 同理，后端返回**整份大纲**而不是新章的摘要 ——
+ * 新建一章会改动同卷内所有章的 `sort` 与路径。
+ *
+ * 调用方需要新章 ID 时，从返回的大纲里按"数量增加了的那一卷"的
+ * 末项取（见 workspace-store 的 `addChapter`）。
+ */
+export function createChapter(input: CreateChapterInput): Promise<OutlineNode[]> {
   return call(
     "create_chapter",
-    { volumeId: input.volumeId, title: input.title ?? null, sort: input.sort ?? null },
-    (b) => b.createChapter(input),
+    { volumeId: input.volumeId, title: input.title ?? "" },
+    (b) => b.createChapter(input) as OutlineNode[] | Promise<OutlineNode[]>,
   );
 }
 
-/** 取当前书的全部章节摘要（不含正文）。 */
-export function listChapters(): Promise<ChapterSummary[]> {
-  return call("list_chapters", {}, (b) => b.listChapters());
+/**
+ * 取当前书的全部章节摘要（不含正文）。
+ *
+ * 后端没有独立的 `list_chapters`：**大纲就是章节列表**
+ * （`get_outline` 按卷聚合，恰好是前端卷章树需要的形状）。
+ * 这里把它拉平，让调用方不必关心聚合方式。
+ */
+export async function listChapters(): Promise<ChapterSummary[]> {
+  const outline = await getOutline();
+  return outline.flatMap((node) => node.chapters);
 }
 
 /** 读取一章的正文与统计。 */
@@ -204,24 +245,45 @@ export function updateChapterMeta(input: UpdateChapterMetaInput): Promise<void> 
   return call("update_chapter_meta", { ...input }, (b) => b.updateChapterMeta(input));
 }
 
-/** 重命名一章（元数据快捷方式）。 */
-export function renameChapter(chapterId: string, title: string): Promise<void> {
+/** 重命名一章（元数据快捷方式）。返回更新后的大纲。 */
+export function renameChapter(chapterId: string, title: string): Promise<OutlineNode[]> {
   return call("rename_chapter", { chapterId, title }, (b) => b.renameChapter(chapterId, title));
 }
 
-/** 设置章节写作状态。 */
+/**
+ * 设置章节写作状态。
+ *
+ * 后端没有独立的 `set_chapter_status` —— 状态是**章节元数据的一个
+ * 字段**，走统一的 `update_chapter_meta`。这里保留一个语义化的
+ * 包装而不是让每个调用点拼 `{ chapterId, status }`：
+ * 调用方关心的是"改状态"，不是"哪个命令能改状态"。
+ */
 export function setChapterStatus(chapterId: string, status: ChapterStatus): Promise<void> {
-  return call("set_chapter_status", { chapterId, status }, (b) => b.setChapterStatus(chapterId, status));
+  return call(
+    "update_chapter_meta",
+    { chapterId, title: null, status, wordGoal: null, summary: null, notes: null },
+    (b) => b.setChapterStatus(chapterId, status),
+  );
 }
 
-/** 删除一章（移入回收站）。 */
-export function deleteChapter(chapterId: string): Promise<void> {
-  return call("delete_chapter", { chapterId }, (b) => b.deleteChapter(chapterId));
+/** 删除一章（移入回收站）。返回更新后的大纲。 */
+export function deleteChapter(chapterId: string): Promise<OutlineNode[]> {
+  return call("delete_chapter", { chapterId }, (b) => b.deleteChapter(chapterId) as OutlineNode[] | Promise<OutlineNode[]>);
 }
 
-/** 移动一章到指定卷的指定位置。 */
-export function moveChapter(chapterId: string, toVolumeId: string, toIndex: number): Promise<void> {
-  return call("move_chapter", { chapterId, toVolumeId, toIndex }, (b) => b.moveChapter(chapterId, toVolumeId, toIndex));
+/**
+ * 调整某一卷内章节的顺序。
+ *
+ * 与 `reorderVolumes` 同理：拖拽产生的是整份顺序，
+ * `toIndex` 是信息损失。跨卷移动由调用方拆成
+ * 「源卷 reorder + 目标卷 reorder」两步（见 tree-ops 的 `moveChapter`）。
+ */
+export function reorderChapters(volumeId: string, orderedIds: string[]): Promise<OutlineNode[]> {
+  return call(
+    "reorder_chapters",
+    { volumeId, orderedIds },
+    (b) => b.reorderChapters(volumeId, orderedIds) as OutlineNode[] | Promise<OutlineNode[]>,
+  );
 }
 
 // ---------------------------------------------------------------------------
@@ -238,9 +300,44 @@ export function getWordStats(chapterId?: string): Promise<WordStats> {
   return call("get_word_stats", { chapterId: chapterId ?? null }, (b) => b.getWordStats(chapterId));
 }
 
-/** 取某一章的完整字数统计（三口径）。 */
-export function getChapterWordCount(chapterId: string): Promise<WordCount> {
-  return call("get_chapter_word_count", { chapterId }, (b) => b.getChapterWordCount(chapterId));
+/**
+ * 取某一章的完整字数统计（三口径）。
+ *
+ * 后端没有独立的 `get_chapter_word_count`：`read_chapter` 已经把
+ * 三口径统计随正文一起返回（见 `ChapterContent.words`）。
+ * 这里复用它而不是再加一条命令 —— 多一条命令就多一处要
+ * 同步的契约，而正文与统计本来就该一起取（打开一章时两者都要）。
+ */
+export async function getChapterWordCount(chapterId: string): Promise<WordCount> {
+  const content = await readChapter(chapterId);
+  return content.words;
+}
+
+/**
+ * 取写作统计的完整视图。
+ *
+ * 返回的是后端已经折算好的结构：按天记录 + 汇总。前端**不重算**，
+ * 因为口径（连续天数阈值、平均日更的分母）在 Rust 侧已经用测试钉死，
+ * 前端再来一份必然会漂移。
+ *
+ * Rust 命令层若尚未提供 `get_stats_summary`，mock 后端会抛
+ * `UNIMPLEMENTED`；调用方（stats/store.ts）把它当作「功能未接通」
+ * 而不是失败，界面显示空状态。
+ */
+export async function getStatsSummary(): Promise<StatsPayload> {
+  return call("get_stats_summary", {}, (b) => b.getStatsSummary());
+}
+
+/**
+ * 把按天数组折成日期键到记录的映射。
+ *
+ * 界面里所有查找都是「这一天写了多少」，用对象比每次线性扫描数组快得多，
+ * 而 365 天以上的线性扫描在日历翻页时会被反复触发。
+ */
+export function indexDays(days: readonly StatsDay[]): Record<string, StatsDay> {
+  const out: Record<string, StatsDay> = {};
+  for (const day of days) out[day.date] = day;
+  return out;
 }
 
 // ---------------------------------------------------------------------------
@@ -250,7 +347,7 @@ export function getChapterWordCount(chapterId: string): Promise<WordCount> {
 /** 全文检索。 */
 export async function search(query: SearchQuery): Promise<SearchResults> {
   const raw = await call(
-    "search",
+    "search_chapters",
     {
       keyword: query.keyword,
       limit: query.limit ?? null,
@@ -293,12 +390,12 @@ export function listTrash(): Promise<TrashEntry[]> {
 
 /** 从回收站恢复一条。 */
 export function restoreFromTrash(trashDirName: string): Promise<void> {
-  return call("restore_from_trash", { trashDirName }, (b) => b.restoreFromTrash(trashDirName));
+  return call("restore_trash", { trashDirName }, (b) => b.restoreFromTrash(trashDirName));
 }
 
 /** 永久删除一条回收站条目。 */
 export function purgeFromTrash(trashDirName: string): Promise<void> {
-  return call("purge_from_trash", { trashDirName }, (b) => b.purgeFromTrash(trashDirName));
+  return call("purge_trash", { trashDirName }, (b) => b.purgeFromTrash(trashDirName));
 }
 
 /** 清空回收站。 */
@@ -310,9 +407,42 @@ export function emptyTrash(): Promise<number> {
 // 恢复与索引
 // ---------------------------------------------------------------------------
 
-/** 重新读取崩溃恢复报告。 */
-export function getRecoveryReport(): Promise<RecoveryReport> {
-  return call("get_recovery_report", {}, (b) => b.getRecoveryReport());
+/**
+ * 重新读取崩溃恢复报告。
+ *
+ * 后端没有独立的 `get_recovery_report`：崩溃恢复报告是
+ * **打开工作区时**由 `open_workspace` 一并返回的
+ * （见 `OpenWorkspaceResult.document.recovery`）。
+ * 这是有意的设计 —— 恢复报告必须在作者看到任何界面之前就绪，
+ * 否则"上次崩溃时没保存完"这个提示会迟到。
+ *
+ * 因此这里重新打开一次工作区取报告。代价是一次目录扫描，
+ * 而这个函数只在恢复面板被打开时调用。
+ */
+export async function getRecoveryReport(): Promise<RecoveryReport> {
+  const outline = await getOutline();
+  void outline;
+  const result = await openWorkspace(currentRoot());
+  return result.document.recovery;
+}
+
+/**
+ * 当前已打开的工作区根路径。
+ *
+ * 由 workspace-store 在打开/关闭时写入。放在这里而不是让
+ * `ipc` 去依赖 store：依赖方向必须是 store → ipc，
+ * 反过来会形成循环（store 本来就要 import ipc）。
+ */
+let knownRoot = "";
+
+/** 记录当前工作区根路径（由 workspace-store 调用）。 */
+export function setCurrentRoot(root: string): void {
+  knownRoot = root;
+}
+
+/** 取当前工作区根路径。未打开时为空串。 */
+export function currentRoot(): string {
+  return knownRoot;
 }
 
 /** 从 Markdown 重建索引。 */

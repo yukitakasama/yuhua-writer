@@ -16,6 +16,8 @@ thiserror = { workspace = true }
 uuid = { workspace = true }
 blake3 = { workspace = true }
 notify = { workspace = true }
+# 工作区归档（T2.14）。与导出引擎共用同一个 zip 实现。
+zip = { workspace = true }
 
 [dev-dependencies]
 tempfile = { workspace = true }

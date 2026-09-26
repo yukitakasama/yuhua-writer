@@ -1,0 +1,734 @@
+/**
+ * 设置 / 外观 / 关于 / 引导 的样式。
+ *
+ * ## 为什么单独一个文件而不是继续堆在 app.css
+ *
+ * app.css 已经 1300 多行，涵盖布局、树、编辑器、书架等互不相关的领域；
+ * 设置面板是 M9 新增的**一整块独立界面**，与既有样式零共用选择器。
+ * 单独成文件的收益是：改设置面板时不需要在 1300 行里滚动定位，
+ * 也避免了与同时改 app.css 的其它工作流互相覆盖。
+ *
+ * ## 性能铁律仍然适用
+ *
+ * 只动画 transform 与 opacity。本文件里的过渡只有两处：
+ * 选择项的 hover 底色（颜色，不布局）与选中态的描边色。
+ * 字体、字号、行距、宽度**一律不动画** —— 它们由 CSS 变量驱动，
+ * 自定义属性不可过渡，因此天然不会触发 T1.12 要排除的整页重排动画。
+ */
+
+/* --------------------------------------------------------------------------
+   设置面板骨架
+   -------------------------------------------------------------------------- */
+
+.settings-dialog .yh-dialog__body {
+  /* 面板内容可能很高（字体分区有三个作用域块），给一个上限并允许滚动。
+     用 max-height 而不是固定 height：内容少时弹层不会留一大片空白。 */
+  max-height: min(68vh, 620px);
+  overflow-y: auto;
+  padding: 0;
+}
+
+.settings-panel {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-5);
+  padding: var(--sp-4) var(--sp-1) var(--sp-5);
+}
+
+.settings-footer {
+  display: flex;
+  justify-content: flex-end;
+}
+
+/* 链接式按钮：跳过、跟随全局、关闭这类「不是主要动作」的操作。
+   用真实的 button 而不是 <a>：它没有跳转语义，是纯粹的动作。 */
+.settings-link {
+  background: none;
+  border: none;
+  padding: 0;
+  color: var(--c-accent);
+  font: inherit;
+  font-size: var(--fs-sm);
+  cursor: pointer;
+  text-align: left;
+  border-radius: var(--r-sm);
+}
+
+.settings-link:hover {
+  text-decoration: underline;
+}
+
+/* --------------------------------------------------------------------------
+   字段：标签 + 控件
+   -------------------------------------------------------------------------- */
+
+.settings-field {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-2);
+}
+
+.settings-field__label {
+  font-size: var(--fs-sm);
+  font-weight: 600;
+  color: var(--c-text);
+}
+
+/* --------------------------------------------------------------------------
+   主题三选一
+   -------------------------------------------------------------------------- */
+
+.theme-choice {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: var(--sp-2);
+}
+
+.theme-choice__item {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--sp-2);
+  padding: var(--sp-4) var(--sp-2);
+  background: var(--c-surface);
+  border: 1px solid var(--c-border);
+  border-radius: var(--r-lg);
+  color: var(--c-text);
+  cursor: pointer;
+  font: inherit;
+  font-size: var(--fs-sm);
+  /* 只过渡颜色与描边，不动画尺寸 —— 选中不该让按钮「长大」 */
+  transition: border-color var(--d-fast) var(--e-standard), background-color var(--d-fast) var(--e-standard);
+}
+
+.theme-choice__item:hover {
+  border-color: var(--c-text-muted);
+}
+
+/* 选中态同时给「描边加粗的视觉」与「背景填充」两个通道：
+   只靠颜色区分在灰度屏幕上不可辨（5.6）。 */
+.theme-choice__item[aria-checked="true"] {
+  border-color: var(--c-accent);
+  background: var(--c-accent-subtle);
+  color: var(--c-accent-strong);
+  font-weight: 600;
+}
+
+.theme-choice__glyph {
+  display: inline-flex;
+  color: currentColor;
+}
+
+.theme-choice__label {
+  text-align: center;
+  line-height: 1.45;
+}
+
+/* --------------------------------------------------------------------------
+   全局 / 本书 层级切换
+   -------------------------------------------------------------------------- */
+
+.level-toggle {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-2);
+  padding: var(--sp-3);
+  background: var(--c-bg-subtle);
+  border-radius: var(--r-md);
+}
+
+.level-toggle__label {
+  font-size: var(--fs-xs);
+  color: var(--c-text-muted);
+}
+
+.level-toggle__group {
+  display: inline-flex;
+  padding: 2px;
+  background: var(--c-surface);
+  border: 1px solid var(--c-border);
+  border-radius: var(--r-full);
+  align-self: flex-start;
+}
+
+.level-toggle__item {
+  padding: var(--sp-1) var(--sp-4);
+  border: none;
+  border-radius: var(--r-full);
+  background: transparent;
+  color: var(--c-text-muted);
+  font: inherit;
+  font-size: var(--fs-sm);
+  cursor: pointer;
+  transition: background-color var(--d-fast) var(--e-standard), color var(--d-fast) var(--e-standard);
+}
+
+.level-toggle__item[aria-checked="true"] {
+  background: var(--c-accent);
+  color: var(--c-bg);
+  font-weight: 600;
+}
+
+.level-toggle__item[aria-disabled="true"] {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+.level-toggle__hint,
+.level-toggle__note {
+  margin: 0;
+  font-size: var(--fs-xs);
+  color: var(--c-text-muted);
+}
+
+/* --------------------------------------------------------------------------
+   作用域块
+   -------------------------------------------------------------------------- */
+
+.settings-scopes {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-4);
+}
+
+.settings-scope {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-3);
+  padding: var(--sp-4);
+  border: 1px solid var(--c-border);
+  border-radius: var(--r-lg);
+  background: var(--c-surface);
+}
+
+.settings-scope__head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: var(--sp-3);
+}
+
+.settings-scope__titles {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.settings-scope__title {
+  margin: 0;
+  font-size: var(--fs-base);
+  font-weight: 600;
+  /* 小标题用界面字体：汉字在衬线体下做 15px 的界面标签会显得松散 */
+  font-family: var(--font-ui);
+}
+
+.settings-scope__hint {
+  margin: 0;
+  font-size: var(--fs-xs);
+  color: var(--c-text-muted);
+}
+
+.settings-badge {
+  flex: 0 0 auto;
+  padding: 2px var(--sp-2);
+  border-radius: var(--r-full);
+  background: var(--c-accent-subtle);
+  color: var(--c-accent-strong);
+  font-size: var(--fs-xs);
+  white-space: nowrap;
+}
+
+/* 回退链展示。允许横向滚动而不是换行：
+   回退链是一串有顺序的 CSS 值，断开换行会让人误以为顺序无所谓。 */
+.settings-scope__chain {
+  display: flex;
+  align-items: baseline;
+  gap: var(--sp-2);
+  margin: 0;
+  font-size: var(--fs-xs);
+  color: var(--c-text-muted);
+  overflow-x: auto;
+}
+
+.settings-scope__chain-label {
+  flex: 0 0 auto;
+}
+
+.settings-scope__chain code {
+  font-family: var(--font-mono);
+  font-size: var(--fs-xs);
+  white-space: nowrap;
+}
+
+.settings-scope__nums {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: var(--sp-3);
+}
+
+/* --------------------------------------------------------------------------
+   滑杆
+   -------------------------------------------------------------------------- */
+
+.range-field {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-1);
+}
+
+.range-field__head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--sp-2);
+}
+
+.range-field__label {
+  font-size: var(--fs-xs);
+  color: var(--c-text-muted);
+}
+
+/* 数值用等宽数字：拖动滑杆时数字不会因为位宽变化而左右跳（计划书 10.5） */
+.range-field__value {
+  font-size: var(--fs-xs);
+  color: var(--c-text);
+  font-variant-numeric: tabular-nums;
+}
+
+.range-field__input {
+  width: 100%;
+  accent-color: var(--c-accent);
+}
+
+.range-field__hint {
+  font-size: var(--fs-xs);
+  color: var(--c-text-muted);
+}
+
+/* --------------------------------------------------------------------------
+   预览（T9.3）
+   -------------------------------------------------------------------------- */
+
+.font-preview {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-3);
+  padding: var(--sp-4);
+  border: 1px dashed var(--c-border);
+  border-radius: var(--r-lg);
+  background: var(--c-bg);
+}
+
+.font-preview__label {
+  margin: 0;
+  font-size: var(--fs-xs);
+  color: var(--c-text-muted);
+}
+
+/* 预览标题：走 --font-heading 与 --fs-heading，与真实标题同一条路径 */
+.font-preview__heading {
+  margin: 0;
+  font-size: var(--fs-heading);
+  color: var(--c-text);
+}
+
+/* 预览正文：走 --font-body / --fs-body / --lh-body / --measure-body，
+   与编辑区正文同一条路径。max-width 用变量，拖宽度滑块时预览同步变窄。 */
+.font-preview__body {
+  font-size: var(--fs-body);
+  color: var(--c-text);
+}
+
+.font-preview__body p {
+  margin: 0;
+}
+
+.font-preview__ui {
+  margin: 0;
+  font-family: var(--font-ui);
+  font-size: var(--fs-ui);
+  line-height: var(--lh-ui);
+  color: var(--c-text-muted);
+}
+
+.font-preview__note {
+  margin: 0;
+  font-size: var(--fs-xs);
+  color: var(--c-text-muted);
+  line-height: 1.6;
+}
+
+/* --------------------------------------------------------------------------
+   字体分区的聚焦切换
+   -------------------------------------------------------------------------- */
+
+.font-focus {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--sp-2);
+}
+
+.font-focus__item {
+  padding: 2px var(--sp-3);
+  border: 1px solid var(--c-border);
+  border-radius: var(--r-full);
+  background: var(--c-surface);
+  color: var(--c-text-muted);
+  font: inherit;
+  font-size: var(--fs-xs);
+  cursor: pointer;
+  transition: border-color var(--d-fast) var(--e-standard), color var(--d-fast) var(--e-standard);
+}
+
+.font-focus__item[aria-pressed="true"] {
+  border-color: var(--c-accent);
+  color: var(--c-accent-strong);
+  background: var(--c-accent-subtle);
+}
+
+/* --------------------------------------------------------------------------
+   说明块
+   -------------------------------------------------------------------------- */
+
+.settings-note {
+  padding: var(--sp-3);
+  background: var(--c-bg-subtle);
+  border-radius: var(--r-md);
+}
+
+.settings-note__body {
+  margin: 0;
+  font-size: var(--fs-xs);
+  color: var(--c-text-muted);
+  line-height: 1.7;
+}
+
+.settings-note__body + .settings-note__body {
+  margin-top: var(--sp-1);
+}
+
+.settings-actions {
+  display: flex;
+  gap: var(--sp-2);
+}
+
+/* --------------------------------------------------------------------------
+   关于页（T9.8）
+   -------------------------------------------------------------------------- */
+
+.about-panel {
+  gap: var(--sp-4);
+}
+
+.about-panel__hero {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-3);
+}
+
+.about-panel__mark {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 40px;
+  height: 40px;
+  flex: 0 0 auto;
+  border-radius: var(--r-lg);
+  background: var(--c-accent-subtle);
+  color: var(--c-accent-strong);
+}
+
+.about-panel__name {
+  margin: 0;
+  font-family: var(--font-heading);
+  font-size: var(--fs-xl);
+}
+
+.about-panel__tagline {
+  margin: 2px 0 0;
+  font-size: var(--fs-sm);
+  color: var(--c-text-muted);
+}
+
+.about-panel__meta {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-1);
+  margin: 0;
+  padding: var(--sp-3);
+  background: var(--c-bg-subtle);
+  border-radius: var(--r-md);
+}
+
+.about-panel__meta-row {
+  display: flex;
+  align-items: baseline;
+  gap: var(--sp-3);
+  font-size: var(--fs-sm);
+}
+
+.about-panel__meta-row dt {
+  flex: 0 0 72px;
+  color: var(--c-text-muted);
+  font-size: var(--fs-xs);
+}
+
+.about-panel__meta-row dd {
+  margin: 0;
+  color: var(--c-text);
+}
+
+.about-section {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-2);
+}
+
+.about-section__title {
+  margin: 0;
+  font-size: var(--fs-sm);
+  font-weight: 600;
+}
+
+.about-section__note {
+  margin: 0;
+  font-size: var(--fs-xs);
+  color: var(--c-text-muted);
+  line-height: 1.7;
+}
+
+.about-license-list,
+.about-fonts {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-2);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.about-license,
+.about-font {
+  padding: var(--sp-3);
+  border: 1px solid var(--c-border);
+  border-radius: var(--r-md);
+}
+
+.about-license__head,
+.about-font__head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--sp-2);
+}
+
+.about-license__asset,
+.about-font__family {
+  font-size: var(--fs-sm);
+}
+
+.about-license__badge {
+  flex: 0 0 auto;
+  padding: 1px var(--sp-2);
+  border-radius: var(--r-sm);
+  border: 1px solid var(--c-border);
+  font-size: var(--fs-xs);
+  color: var(--c-text-muted);
+  white-space: nowrap;
+}
+
+.about-license__note,
+.about-font__source {
+  margin: var(--sp-1) 0 0;
+  font-size: var(--fs-xs);
+  color: var(--c-text-muted);
+}
+
+/* 许可全文折叠面板。用原生的 details/summary：
+   键盘可达、读屏会播报展开状态、且与浏览器的页内查找天然协作。 */
+.about-details {
+  border: 1px solid var(--c-border);
+  border-radius: var(--r-md);
+  overflow: hidden;
+}
+
+.about-details__summary {
+  padding: var(--sp-2) var(--sp-3);
+  font-size: var(--fs-sm);
+  cursor: pointer;
+  background: var(--c-bg-subtle);
+}
+
+.about-details__hint {
+  color: var(--c-text-muted);
+  font-size: var(--fs-xs);
+}
+
+/* 许可全文：等宽 + 可滚动 + 不换行破坏原有排版 */
+.about-details__body {
+  margin: 0;
+  max-height: 280px;
+  overflow: auto;
+  padding: var(--sp-3);
+  font-family: var(--font-mono);
+  font-size: var(--fs-xs);
+  line-height: 1.6;
+  white-space: pre-wrap;
+  word-break: break-word;
+  color: var(--c-text-muted);
+}
+
+.about-panel__offline {
+  margin: 0;
+  font-size: var(--fs-xs);
+  color: var(--c-text-muted);
+}
+
+/* --------------------------------------------------------------------------
+   首次启动向导（T9.7）
+   -------------------------------------------------------------------------- */
+
+.wizard-dialog .yh-dialog__body {
+  padding: var(--sp-5);
+}
+
+.wizard {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-4);
+  min-height: 280px;
+}
+
+.wizard__progress {
+  display: flex;
+  gap: var(--sp-2);
+}
+
+.wizard__dot {
+  width: 8px;
+  height: 8px;
+  border-radius: var(--r-full);
+  background: var(--c-border);
+  transition: background-color var(--d-fast) var(--e-standard);
+}
+
+.wizard__dot[data-active="true"] {
+  background: var(--c-accent);
+}
+
+.wizard__indicator {
+  margin: 0;
+  font-size: var(--fs-xs);
+  color: var(--c-text-muted);
+}
+
+.wizard__step {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-3);
+}
+
+.wizard__title {
+  margin: 0;
+  font-family: var(--font-heading);
+  font-size: var(--fs-lg);
+}
+
+.wizard__body,
+.wizard__hint {
+  margin: 0;
+  font-size: var(--fs-sm);
+  color: var(--c-text-muted);
+  line-height: 1.7;
+}
+
+.wizard__choices {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: var(--sp-2);
+}
+
+.wizard__choices--fonts {
+  grid-template-columns: repeat(2, 1fr);
+}
+
+.wizard__choice {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: var(--sp-3);
+  border: 1px solid var(--c-border);
+  border-radius: var(--r-md);
+  background: var(--c-surface);
+  color: var(--c-text);
+  font: inherit;
+  font-size: var(--fs-sm);
+  cursor: pointer;
+  text-align: left;
+  transition: border-color var(--d-fast) var(--e-standard), background-color var(--d-fast) var(--e-standard);
+}
+
+.wizard__choice[aria-checked="true"] {
+  border-color: var(--c-accent);
+  background: var(--c-accent-subtle);
+  color: var(--c-accent-strong);
+  font-weight: 600;
+}
+
+.wizard__choice-note {
+  font-size: var(--fs-xs);
+  font-weight: 400;
+  color: var(--c-text-muted);
+}
+
+.wizard__scopes {
+  display: flex;
+  gap: var(--sp-2);
+  margin: auto 0 0;
+  padding: 0;
+  list-style: none;
+}
+
+.wizard__scope {
+  padding: 1px var(--sp-2);
+  border: 1px solid var(--c-border);
+  border-radius: var(--r-full);
+  font-size: var(--fs-xs);
+  color: var(--c-text-muted);
+}
+
+.wizard-footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--sp-3);
+  width: 100%;
+}
+
+.wizard-footer__nav {
+  display: flex;
+  gap: var(--sp-2);
+}
+
+/* --------------------------------------------------------------------------
+   无障碍降级（计划书 5.6）
+   本文件里所有过渡都是颜色类；减弱动效时统一压到 ≤100ms。
+   -------------------------------------------------------------------------- */
+
+@media (prefers-reduced-motion: reduce) {
+  .theme-choice__item,
+  .level-toggle__item,
+  .font-focus__item,
+  .wizard__choice,
+  .wizard__dot {
+    transition-duration: 100ms !important;
+  }
+}
+
+/* 窄窗口：主题与字体选项从三列降为两列，避免文字被压成竖排 */
+@media (max-width: 560px) {
+  .theme-choice,
+  .wizard__choices {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}

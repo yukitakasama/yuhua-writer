@@ -41,8 +41,8 @@ export interface LayoutState {
   leftCollapsed: boolean;
   /** 右栏是否折叠。 */
   rightCollapsed: boolean;
-  /** 主视图：书架还是写作台。 */
-  view: "library" | "workspace";
+  /** 主视图：书架、写作台，还是写作统计（M8）。 */
+  view: "library" | "workspace" | "stats";
 }
 
 /** 默认布局。 */
@@ -73,7 +73,12 @@ export function normalizeLayout(raw: Partial<LayoutState> | null): LayoutState {
     rightWidth: pickWidth(raw?.rightWidth, RIGHT_MIN, RIGHT_MAX, DEFAULT_LAYOUT.rightWidth),
     leftCollapsed: pickBool(raw?.leftCollapsed, DEFAULT_LAYOUT.leftCollapsed),
     rightCollapsed: pickBool(raw?.rightCollapsed, DEFAULT_LAYOUT.rightCollapsed),
-    view: raw?.view === "workspace" || raw?.view === "library" ? raw.view : DEFAULT_LAYOUT.view,
+    // 三个取值都要显式列出：只判两个的话，第三值会静默退回默认，
+    // 用户每次重启都会从统计页被弹回书架
+    view:
+      raw?.view === "workspace" || raw?.view === "library" || raw?.view === "stats"
+        ? raw.view
+        : DEFAULT_LAYOUT.view,
   };
 }
 

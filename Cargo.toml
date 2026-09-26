@@ -65,9 +65,11 @@ rusqlite = { version = "0.37", features = ["bundled", "blob", "functions", "limi
 
 # ---- Markdown 解析（导出用，M7）----
 pulldown-cmark = { version = "0.12", default-features = false, features = ["html"] }
-zip = { version = "2", default-features = false, features = ["deflate"] }
 
-# ---- 压缩（工作区 zip 备份，T2.14）----
+# ---- zip 容器（DOCX / EPUB 导出，以及工作区归档 T2.14）----
+# 两处共用同一个实现：它们都是 zip 容器，用两套库只会引入
+# "写入器版本差异"这样一个没有收益的不确定源。
+zip = { version = "2", default-features = false, features = ["deflate"] }
 
 # ---- 测试 ----
 [workspace.lints.rust]

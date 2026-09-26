@@ -160,15 +160,39 @@ export function focusTrap(container: HTMLElement, options: FocusTrapOptions = {}
   const { autoFocus = true, initialFocus, restoreFocus = true, focusContainer = true } = options;
   const previouslyFocused = document.activeElement instanceof HTMLElement ? document.activeElement : null;
 
+  /**
+   * 防重入闸门。
+   *
+   * `pullFocusIn` 会调用 `focus()`，而 `focus()` 会**同步**派发 `focusin` ——
+   * 那个事件又会被下面 `onFocusIn` 收到。如果此刻 `document.activeElement`
+   * 还没更新成我们刚聚焦的元素（jsdom 里就是如此，某些浏览器在
+   * 隐藏容器 / 跨 iframe 上也有同样的窗口期），判定就会再次得出
+   * 「焦点在容器外」，于是又拉一次 —— **无限递归直到栈溢出**。
+   *
+   * 闸门在 `focus()` **返回后同步复位**，不是延到微任务：
+   * `focus()` 的整条同步链路（focus → focusin → onFocusIn）都在
+   * `focus()` 内部跑完，返回时重入窗口已经关闭。延到微任务反而会把
+   * 同一轮里紧随其后的正常拉回也挡掉（containers.test.tsx 里
+   * 「焦点被脚本移到弹层外会被拉回」那条用例就是这么失败的）。
+   */
+  let pulling = false;
+
   /** 把焦点移回容器内部；没有可聚焦元素时退到容器本身。 */
   const pullFocusIn = (): void => {
-    const focusables = getFocusableElements(container);
-    const fallback = focusables[0];
-    if (fallback) {
-      fallback.focus();
-      return;
+    if (pulling) return;
+    pulling = true;
+    try {
+      const focusables = getFocusableElements(container);
+      const fallback = focusables[0];
+      if (fallback) {
+        // preventScroll：把焦点拉回来时不该把用户的滚动位置也一起拽走
+        fallback.focus({ preventScroll: true });
+        return;
+      }
+      if (focusContainer) container.focus({ preventScroll: true });
+    } finally {
+      pulling = false;
     }
-    if (focusContainer) container.focus();
   };
 
   if (autoFocus) {
@@ -213,7 +237,9 @@ export function focusTrap(container: HTMLElement, options: FocusTrapOptions = {}
 
   const onFocusIn = (event: FocusEvent): void => {
     if (isInside(container, event.target)) return;
-    // 焦点跑到容器外：立刻拉回来。用 preventScroll 避免页面被滚到弹层顶部。
+    // 我们自己把焦点拉进来时会触发 focusin，那次不该再拉一遍（见 pulling 的说明）
+    if (pulling) return;
+    // 焦点跑到容器外：立刻拉回来。preventScroll 避免页面被滚到弹层顶部。
     pullFocusIn();
   };
 

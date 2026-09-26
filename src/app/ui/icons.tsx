@@ -199,3 +199,25 @@ export function IconWarning(props: IconProps): JSX.Element {
     </Svg>
   );
 }
+
+/** 命令行提示符：命令面板入口。 */
+export function IconCommand(props: IconProps): JSX.Element {
+  return (
+    <Svg {...props}>
+      <path d="M5 7.5l4 4.5-4 4.5" />
+      <path d="M12.5 17h6.5" />
+    </Svg>
+  );
+}
+
+/** 三根高低不同的柱子：写作统计入口。 */
+export function IconStats(props: IconProps): JSX.Element {
+  return (
+    <Svg {...props}>
+      <path d="M5 19.5h14" />
+      <path d="M8 19.5v-5.5" />
+      <path d="M12 19.5V9" />
+      <path d="M16 19.5v-8.5" />
+    </Svg>
+  );
+}

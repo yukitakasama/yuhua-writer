@@ -1,0 +1,230 @@
+/**
+ * 组件预览页样式（T1.9）。
+ *
+ * ## 为什么单独一个文件而不是塞进 app.css
+ *
+ * 这一页**不进正式产物**（见 main.tsx 的 `isDevKit`），
+ * 它的样式同理。单独成文件让"删掉这一页"只需要删两个文件，
+ * 而不是去 app.css 里挑几十条散落的规则。
+ *
+ * 所有颜色都走设计令牌 —— 预览页如果用了硬编码色值，
+ * 它就失去了"验证主题切换"这个用途。
+ */
+
+.kit {
+  max-width: 960px;
+  margin: 0 auto;
+  padding: var(--sp-6) var(--sp-6) 80px;
+  font-family: var(--font-ui);
+  color: var(--c-text);
+  background: var(--c-bg);
+}
+
+.kit__head {
+  margin-bottom: var(--sp-8);
+  padding-bottom: var(--sp-4);
+  border-bottom: 1px solid var(--c-border);
+}
+
+.kit__title {
+  margin: 0 0 var(--sp-2);
+  font-family: var(--font-heading);
+  font-size: var(--fs-2xl);
+}
+
+.kit__note {
+  margin: 0 0 var(--sp-2);
+  color: var(--c-text-muted);
+  font-size: var(--fs-sm);
+  line-height: var(--lh-base);
+}
+
+.kit__status {
+  margin: 0;
+  font-size: var(--fs-xs);
+  color: var(--c-accent);
+}
+
+.kit-section + .kit-section {
+  margin-top: var(--sp-8);
+  padding-top: var(--sp-5);
+  border-top: 1px solid var(--c-border);
+}
+
+.kit-section__title {
+  margin: 0 0 var(--sp-1);
+  font-size: var(--fs-lg);
+  font-weight: 600;
+}
+
+.kit-section__note {
+  margin: 0 0 var(--sp-3);
+  color: var(--c-text-muted);
+  font-size: var(--fs-sm);
+  line-height: var(--lh-base);
+}
+
+.kit-section__body {
+  display: grid;
+  gap: var(--sp-3);
+}
+
+.kit-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--sp-3);
+}
+
+.kit-note {
+  margin: 0;
+  color: var(--c-text-muted);
+  font-size: var(--fs-xs);
+}
+
+/* ---- 动效预览 ---- */
+
+.kit-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: var(--fs-sm);
+}
+
+.kit-table th,
+.kit-table td {
+  padding: var(--sp-2);
+  text-align: left;
+  border-bottom: 1px solid var(--c-border);
+  /* 数字列用等宽数字，纵向对比时小数点不会错位 */
+  font-variant-numeric: tabular-nums;
+}
+
+.kit-table th {
+  color: var(--c-text-muted);
+  font-weight: 600;
+}
+
+.kit-motion-box {
+  display: grid;
+  place-items: center;
+  min-width: 120px;
+  height: 64px;
+  padding: var(--sp-3);
+  font-size: var(--fs-sm);
+  background: var(--c-surface);
+  border: 1px solid var(--c-border);
+  border-radius: var(--r-md);
+}
+
+/* 三个动效各自只用 transform / opacity —— 计划书 5.5 节的核心约束 */
+.kit-motion-box--fade {
+  animation: kit-fade 180ms var(--e-decelerate);
+}
+
+@keyframes kit-fade {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+.kit-motion-box--slide {
+  animation: kit-slide 240ms var(--e-decelerate);
+}
+
+@keyframes kit-slide {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+.kit-motion-box--scale {
+  animation: kit-scale 180ms var(--e-decelerate);
+}
+
+@keyframes kit-scale {
+  from {
+    opacity: 0;
+    transform: scale(0.96);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+/* ---- 图表预览 ---- */
+
+.kit-heat {
+  display: grid;
+  gap: var(--sp-1);
+  justify-items: center;
+}
+
+.kit-heat__cell {
+  width: 28px;
+  height: 28px;
+  border-radius: var(--r-sm);
+  border: 1px solid var(--c-border);
+}
+
+.kit-heat__label {
+  font-size: var(--fs-xs);
+  color: var(--c-text-muted);
+}
+
+.kit-ring {
+  display: grid;
+  gap: var(--sp-1);
+  justify-items: center;
+}
+
+.kit-ring__label {
+  font-size: var(--fs-xs);
+  color: var(--c-text-muted);
+}
+
+/* ---- 其它 ---- */
+
+.kit-scroll {
+  height: 140px;
+  border: 1px solid var(--c-border);
+  border-radius: var(--r-md);
+}
+
+.kit-scroll__inner {
+  padding: var(--sp-2);
+}
+
+.kit-popover-body {
+  padding: var(--sp-3);
+  font-size: var(--fs-sm);
+}
+
+.kit__foot {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-2);
+  margin-top: var(--sp-8);
+  padding-top: var(--sp-4);
+  border-top: 1px solid var(--c-border);
+  color: var(--c-text-muted);
+  font-size: var(--fs-xs);
+}
+
+/* ---- 减少动态效果（计划书 5.6：动效即时长归零，功能不受影响） ---- */
+
+@media (prefers-reduced-motion: reduce) {
+  .kit-motion-box--fade,
+  .kit-motion-box--slide,
+  .kit-motion-box--scale {
+    animation: none;
+  }
+}

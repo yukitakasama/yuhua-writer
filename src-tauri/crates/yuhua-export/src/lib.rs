@@ -10,31 +10,31 @@
 //!       ▼  pulldown-cmark（冻结子集，9.3）
 //!    Document IR（ir.rs）
 //!       │
-//!    ┌──┴───┬───────┬────────┬───────┐
-//!    ▼      ▼       ▼        ▼       ▼
-//!   TXT    MD    HTML     DOCX    EPUB     （PDF 待 WebView 接线）
+//!    ┌──┴──┬──────┬───────┬───────┬───────┐
+//!    ▼     ▼      ▼       ▼       ▼       ▼
+//!   TXT   MD    HTML    DOCX    EPUB     PDF
 //! ```
 //!
-//! 解析只做一次（[\`markdown\`]），五个渲染器只读 IR。这样做的三个理由
-//! 写在 [\`ir\`] 的模块文档里，核心是「降级规则只写一遍」（R19）。
+//! 解析只做一次（[`markdown`]），六个渲染器只读 IR。这样做的三个理由
+//! 写在 [`ir`] 的模块文档里，核心是「降级规则只写一遍」（R19）。
 //!
 //! ## 模块地图
 //!
 //! | 模块 | 职责 | 对应计划书 |
 //! | --- | --- | --- |
-//! | [\`error\`]    | 导出层细分错误，可收敛回 \`YuhuaError\` | — |
-//! | [\`ir\`]       | Document IR：Block / Inline 与嵌套表达能力 | T7.1 |
-//! | [\`markdown\`] | Markdown → IR，冻结子集 + 降级记录 | T7.2 |
-//! | [\`scope\`]    | 单章 / 选中 / 整卷 / 整书 四种范围 | T7.3 |
-//! | [\`render\`]   | 渲染器统一接口、格式枚举、原子产出 | T7.5–T7.14 |
+//! | [`error`]    | 导出层细分错误，可收敛回 `YuhuaError` | — |
+//! | [`ir`]       | Document IR：Block / Inline 与嵌套表达能力 | T7.1 |
+//! | [`markdown`] | Markdown → IR，冻结子集 + 降级记录 | T7.2 |
+//! | [`scope`]    | 单章 / 选中 / 整卷 / 整书 四种范围 | T7.3 |
+//! | [`render`]   | 渲染器统一接口、格式枚举、原子产出 | T7.5–T7.14 |
 //!
 //! ## 内存不变量（计划书不变量 5）
 //!
 //! **绝不整书载入内存**。体现在三处：
 //!
-//! 1. [\`scope::ChapterSource\`] 把「正文从哪来」抽象出来，一次只取一章；
-//! 2. 渲染器走 [\`ir::Document::iter_chapters\`]，喂一章渲染一章；
-//! 3. [\`render::Renderer::render_to_writer\`] 允许产物直接流进 \`Write\`，
+//! 1. [`scope::ChapterSource`] 把「正文从哪来」抽象出来，一次只取一章；
+//! 2. 渲染器走 [`ir::Document::iter_chapters`]，喂一章渲染一章；
+//! 3. [`render::Renderer::render_to_writer`] 允许产物直接流进 `Write`，
 //!    不要求在内存里攒出整本书。
 //!
 //! ## 快速上手
@@ -75,26 +75,29 @@ pub use scope::{ChapterSource, ExportScope, InMemorySource};
 
 /// 渲染 PDF（T7.10–T7.12）。
 ///
-/// ## 为什么现在只留一个占位
+/// 用默认选项（A4、2.5cm/3cm 页边距、10.5pt 正文、每章另起一页）。
+/// 需要自定义版式时直接构造 [`render::pdf::PdfRenderer`]。
 ///
-/// 计划书 9.4 把 PDF 定成「技术风险最高」的一项：首选方案是复用系统
-/// WebView 的「打印到 PDF」，需要 WebView2 / WKWebView / WebKitGTK 的平台绑定，
-/// 属于 **Tauri 应用层** 的接线工作，不是纯 Rust 计算层能完成的。
+/// ## 缺字体时的行为
 ///
-/// 明确返回 [\`ExportError::Unimplemented\`] 而不是「产出一个空 PDF」或
-/// 「悄悄退化成 HTML」：用户点「导出 PDF」却拿到别的东西，比报一个明确的
-/// 错误糟糕得多。错误码 \`UNIMPLEMENTED\` 让前端可以提示「PDF 导出即将推出」，
-/// 而不是弹一个语焉不详的失败。
+/// 找不到可用的中文字体时返回 [`ExportError::FontUnavailable`]
+/// （错误码 `FONT_UNAVAILABLE`），**绝不产出乱码 PDF**。
+/// 前端可以据此提示用户安装字体，或让用户在导出面板里指定字体文件。
 pub fn render_pdf(document: &Document) -> Result<Vec<u8>> {
     render::pdf::render_pdf(document)
 }
 
 /// PDF 导出是否已可用。
 ///
-/// 导出面板据此决定 PDF 选项是禁用还是可选。把这个判断放在领域层而不是
-/// 前端硬编码，是为了「接线完成后只需改这一处」。
+/// 返回 `true`：渲染器已经实现（T7.10–T7.12）。
+///
+/// 注意这个判断回答的是「**代码**里有没有 PDF 渲染器」，不是
+/// 「**这台机器**上能不能导出成功」—— 后者取决于有没有可用的中文字体，
+/// 是一个运行时的、可能中途变化的判断（用户可以边开着应用边装字体）。
+/// 把它做成「提前灰掉按钮」会让用户失去「在弹窗里指定字体文件」的机会，
+/// 所以这里统一返回 true，把环境问题留到点击导出时用具体错误说明。
 pub fn is_pdf_available() -> bool {
-    false
+    true
 }
 
 #[cfg(test)]
@@ -118,19 +121,30 @@ mod tests {
         doc
     }
 
+    /// PDF 要么产出合法字节，要么是「缺字体」这一条可恢复的错误。
+    ///
+    /// 这是全 crate 唯一允许「不产出字节」的情形，所以断言写得很死：
+    /// 任何别的错误（Panic 之外的 ExportError）都会在这里炸出来。
     #[test]
-    fn pdf_placeholder_returns_unimplemented_with_stable_code() {
-        let err = render_pdf(&sample_ir()).unwrap_err();
-        assert!(matches!(err, ExportError::Unimplemented(_)));
-        assert_eq!(err.code(), "UNIMPLEMENTED");
-        // 错误信息要能让用户看懂，而不是「error 500」
-        assert!(err.to_string().contains("尚未实现"), "{err}");
+    fn pdf_renders_or_reports_missing_font() {
+        match render_pdf(&sample_ir()) {
+            Ok(bytes) => {
+                assert!(bytes.starts_with(b"%PDF-1.7"), "PDF 头不对");
+                assert!(bytes.ends_with(b"%%EOF\n") || bytes.ends_with(b"%%EOF"));
+            }
+            Err(ExportError::FontUnavailable { hint, .. }) => {
+                // 缺字体的提示必须包含可操作信息，不能只是一句「失败」
+                assert!(hint.contains("字体"), "{hint}");
+            }
+            Err(other) => panic!("PDF 渲染返回了意外错误：{other}"),
+        }
     }
 
     #[test]
-    fn pdf_is_reported_unavailable() {
-        assert!(!is_pdf_available());
-        assert!(!ExportFormat::Pdf.is_available());
+    fn pdf_is_reported_available() {
+        // 渲染器已实现，导出面板不该再把它当「即将推出」
+        assert!(is_pdf_available());
+        assert!(ExportFormat::Pdf.is_available());
     }
 
     #[test]
@@ -178,11 +192,14 @@ mod tests {
         assert_eq!(ir.degradations[0].kind, DegradationKind::Table);
 
         for format in ExportFormat::ALL {
-            if !format.is_available() {
-                continue;
+            match render(format, &ir) {
+                Ok(bytes) => assert!(!bytes.is_empty(), "{format:?} 产出为空"),
+                // PDF 依赖本机中文字体；没装字体的机器上只允许这一种失败。
+                Err(ExportError::FontUnavailable { .. }) => {
+                    assert_eq!(format, ExportFormat::Pdf, "只有 PDF 依赖字体");
+                }
+                Err(e) => panic!("{format:?}：{e}"),
             }
-            let bytes = render(format, &ir).unwrap_or_else(|e| panic!("{format:?}：{e}"));
-            assert!(!bytes.is_empty(), "{format:?} 产出为空");
         }
     }
 

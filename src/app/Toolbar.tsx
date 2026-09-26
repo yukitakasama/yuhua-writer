@@ -22,12 +22,14 @@ import { Button } from "./ui/Button";
 import { IconButton } from "./ui/IconButton";
 import {
   IconBack,
+  IconCommand,
   IconLibrary,
   IconPanelLeft,
   IconPanelRight,
   IconPlus,
   IconSearch,
   IconSettings,
+  IconStats,
 } from "./ui/icons";
 import { layout, toggleLeft, toggleRight } from "./layout-store";
 
@@ -52,6 +54,10 @@ export interface ToolbarProps {
   onSettings: () => void;
   /** 回到书架。 */
   onLibrary: () => void;
+  /** 打开写作统计（M8）。 */
+  onStats: () => void;
+  /** 打开命令面板（T5.7）。 */
+  onCommands: () => void;
 }
 
 /** 顶部工具栏。 */
@@ -90,8 +96,16 @@ export function Toolbar(props: ToolbarProps): JSX.Element {
       </div>
 
       <div class="toolbar__group toolbar__group--right">
+        {/* 命令面板入口（Ctrl+K）。它把所有低频功能收进一个入口，
+            这样工具栏才能保持"只有写作相关的东西" */}
+        <IconButton label={t("toolbar.commands")} onClick={props.onCommands}>
+          <IconCommand size={17} />
+        </IconButton>
         <IconButton label={t("toolbar.search")} onClick={props.onSearch}>
           <IconSearch size={17} />
+        </IconButton>
+        <IconButton label={t("toolbar.stats")} onClick={props.onStats}>
+          <IconStats size={17} />
         </IconButton>
         <IconButton
           label={layout.rightCollapsed ? t("toolbar.toggleRight") : t("toolbar.toggleRight")}

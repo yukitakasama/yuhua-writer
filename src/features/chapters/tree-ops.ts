@@ -73,6 +73,31 @@ export function chaptersOf(snapshot: TreeSnapshot, volumeId: string): ChapterSum
 }
 
 /**
+ * 全部章节按「卷序 → 章序」拉平成一个列表。
+ *
+ * 用于"上一章 / 下一章"这类**跨卷连续移动**的快捷键：
+ * 作者按 Ctrl+Alt+↓ 时想的是"文字的下一篇"，
+ * 而不是"本卷的下一章"。到卷末再按应当进入下一卷的第一章。
+ *
+ * ## 为什么不能只按 sort 排
+ *
+ * 章节的 `sort` 只在**卷内**唯一：第 1 卷的第 3 章与第 2 卷的第 3 章
+ * `sort` 都是 2。直接全局排序会让两卷的章节交错在一起。
+ * 因此必须先按卷的顺序分组，再在组内按章序排。
+ *
+ * `snapshot` 为 `null` 时返回空数组 —— 调用方（应用壳）在没打开
+ * 工作区时会走到这里，让它返回空比让它抛错更合适。
+ */
+export function allChaptersInOrder(snapshot: TreeSnapshot | null): ChapterSummary[] {
+  if (snapshot === null) return [];
+  const out: ChapterSummary[] = [];
+  for (const volume of sortVolumes(snapshot.volumes)) {
+    out.push(...chaptersOf(snapshot, volume.id));
+  }
+  return out;
+}
+
+/**
  * 把一卷内的章节序号重编为 `0..n-1`。
  *
  * 返回新数组而不是就地修改：调用方需要在「算完成功」与「算完失败」
@@ -302,6 +327,35 @@ export function moveVolume(snapshot: TreeSnapshot, volumeId: string, toIndex: nu
     affectedVolumeIds: [volumeId],
     changed: true,
   };
+}
+
+/**
+ * 从"移动结果"里取出卷的完整顺序。
+ *
+ * ## 为什么要这个转换
+ *
+ * `moveVolume` 算出的是一个新快照（本地推断），而后端
+ * `reorder_volumes` 需要的是**完整的有序 ID 列表**。
+ * 把"本地推断的快照"翻译成"给后端的 ID 列表"这一步
+ * 必须与 `moveVolume` 用的是同一份排序逻辑 —— 否则
+ * 界面上的顺序与落盘后的顺序会不一样。
+ *
+ * 因此由本函数统一从快照里按 sort 提取顺序，而不是让调用方
+ * 自己 `snapshot.volumes.map(v => v.id)`（那样会漏掉排序）。
+ */
+export function volumeOrderOf(snapshot: TreeSnapshot): string[] {
+  return sortVolumes(snapshot.volumes).map((v) => v.id);
+}
+
+/**
+ * 从"移动结果"里取出某一卷的章节完整顺序。
+ *
+ * 与 {@link volumeOrderOf} 同理：后端要的是完整列表。
+ * **必须按 sort 排序后取** —— `snapshot.chapters` 的顺序是插入顺序，
+ * 不是展示顺序。
+ */
+export function chapterOrderOf(snapshot: TreeSnapshot, volumeId: string): string[] {
+  return chaptersOf(snapshot, volumeId).map((c) => c.id);
 }
 
 /**

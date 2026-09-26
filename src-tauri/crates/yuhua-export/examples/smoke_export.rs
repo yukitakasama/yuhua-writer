@@ -5,6 +5,10 @@
 //! 转义正确性等只有看真实字节才能确认的性质。
 //!
 //! 运行：`cargo run -p yuhua-export --example smoke_export -- <输出目录>`
+//!
+//! PDF 也在其中，但它多一层环境依赖：**必须能在这台机器上找到中文字体**。
+//! 找不到时这个 example 会打印 ERR 而不是 panic —— 产物缺失本身就是
+//! 一条值得看见的信息（PDF 是六种格式里唯一依赖外部资源的）。
 
 use yuhua_export::{
     render_to_path, Block, BookMeta, ChapterContent, Document, ExportFormat, Inline, VolumeMeta,
@@ -70,6 +74,7 @@ fn main() {
         ("out.html", ExportFormat::Html),
         ("out.docx", ExportFormat::Docx),
         ("out.epub", ExportFormat::Epub),
+        ("out.pdf", ExportFormat::Pdf),
     ] {
         let path = std::path::Path::new(&out_dir).join(name);
         match render_to_path(fmt, &doc, &path) {
