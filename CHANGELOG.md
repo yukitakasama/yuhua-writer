@@ -8,6 +8,8 @@
 
 ### 打包
 
+- 使用本机 Inno Setup 6.7.3 生成多文件安装包，安装后保留应用目录与 extensions/ 扩展目录。
+
 - Windows 默认目标改为 NSIS，多文件安装包不再默认生成 MSI。
 - 新增 pnpm package:windows，使用本机 7-Zip 生成包含独立应用目录和 xtensions/ 目录的 .7z / .zip 便携包；不生成单文件自解压 EXE。
 

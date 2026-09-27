@@ -386,3 +386,8 @@ SQL 绑定参数、CRDT 合并幂等性、冲突副本只读不删、命令层�
 - `src-tauri/tauri.conf.json` 的默认目标改为仅 `nsis`，避免 `alpha.2` 在 MSI 阶段因预发布版本规则失败。
 - 新增 `pnpm package:windows`，使用本机 7-Zip 生成目录型 `YuhuaWriter_0.1.0-alpha.2_portable.7z` / `.zip` 便携包。
 - 便携包保留独立应用目录和 `extensions/` 扩展目录；以后不发布单文件自解压 EXE，也不把 ISO 作为默认应用分发格式。
+
+### 2026-09-27 Inno Setup 打包
+
+- 使用本机 Inno Setup 6.7.3 成功生成 	arget/release/bundle/inno/YuhuaWriter_0.1.0-alpha.2_inno_setup.exe。
+- 安装方式为多文件目录安装，预留 extensions/；不生成单文件自解压应用。

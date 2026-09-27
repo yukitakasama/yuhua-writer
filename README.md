@@ -192,3 +192,13 @@ pnpm package:windows
 ```
 
 便携包包含独立的 `YuhuaWriter_0.1.0-alpha.2_portable/` 应用目录与 `extensions` 扩展目录，不是单文件 EXE。ISO 不是本项目的默认分发格式：它更适合光盘/磁盘镜像，不适合应用的日常安装和扩展。
+
+### Inno Setup
+
+也可以使用本机 Inno Setup 构建正常的多文件安装包：
+
+`powershell
+pnpm package:windows:inno
+`
+
+产物位于 	arget/release/bundle/inno/。安装包不会把应用压成单文件自解压 EXE；安装后保留正常目录结构，并包含 extensions/ 扩展目录。
