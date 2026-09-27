@@ -62,6 +62,16 @@ export function IconPlus(props: IconProps): JSX.Element {
 }
 
 /** 放大镜：搜索。 */
+/** ????????????? */
+export function IconSave(props: IconProps): JSX.Element {
+  return (
+    <Svg {...props}>
+      <path d="M5 4.5h11l3 3v12H5z" />
+      <path d="M8 4.5v5h7v-5M8.5 19.5v-5h7v5" />
+    </Svg>
+  );
+}
+
 export function IconSearch(props: IconProps): JSX.Element {
   return (
     <Svg {...props}>

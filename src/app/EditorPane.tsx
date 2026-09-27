@@ -40,6 +40,13 @@ import { focusModeClass } from "@/features/editor/focus";
 import { consumeJump, pendingJump } from "@/features/search/search-store";
 import { selectedChapter, editingChapter, loadChapterBody, createFirstChapter, saveChapterBody } from "./workspace-store";
 
+export type EditorSaveState = "idle" | "saving" | "dirty" | "failed";
+
+export interface EditorPaneProps {
+  onSaveStateChange?: (state: EditorSaveState) => void;
+  onSaveReady?: (save: () => Promise<void>) => void;
+}
+
 /** 每章的光标记忆表。模块级单例：它与编辑器实例的生命周期无关。 */
 const cursorStore: CursorStore = new Map();
 
@@ -73,10 +80,11 @@ export function __cursorStore(): CursorStore {
 /**
  * 中间编辑区。
  */
-export function EditorPane(): JSX.Element {
+export function EditorPane(props: EditorPaneProps = {}): JSX.Element {
   const [loading, setLoading] = createSignal(false);
   const [draft, setDraft] = createSignal("");
   const [dirty, setDirty] = createSignal(false);
+  const [saveState, setSaveState] = createSignal<EditorSaveState>("idle");
   let handle: EditorHandle | null = null;
   /** 已挂载的编辑器对应的章 ID。用于判断"这次变化是不是换了章"。 */
   let mountedChapterId: string | null = null;
@@ -93,8 +101,23 @@ export function EditorPane(): JSX.Element {
     if (id === null) return;
     const body = draft();
     setDirty(false);
+    setSaveState("saving");
     const ok = await saveChapterBody(id, body);
-    if (!ok) setDirty(true);
+    if (!ok) {
+      setDirty(true);
+      setSaveState("failed");
+      throw new Error("Unable to save chapter");
+    }
+    setSaveState(dirty() ? "dirty" : "idle");
+  };
+
+  const saveNow = async (): Promise<void> => {
+    rememberPosition();
+    if (scheduler !== null) {
+      await scheduler.flushNow();
+      return;
+    }
+    if (dirty()) await persist();
   };
 
   /**
@@ -199,6 +222,7 @@ export function EditorPane(): JSX.Element {
       // IME 组合期间不保存（T4.4）
       canSave: () => !(handle?.isComposing() ?? false),
     });
+    props.onSaveReady?.(saveNow);
 
     const first = selectedChapter();
     if (first && editingChapter()?.id !== first.id) {
@@ -211,7 +235,7 @@ export function EditorPane(): JSX.Element {
     scheduler?.dispose();
     scheduler = null;
     // 卸载前保存：否则关掉应用的最后一段字会丢
-    if (dirty()) void persist();
+    if (dirty()) void persist().catch(() => undefined);
   });
 
   /**
@@ -243,6 +267,7 @@ export function EditorPane(): JSX.Element {
   /** 用户编辑（用于标记 dirty 并排自动保存）。 */
   const handleUserEdit = (): void => {
     setDirty(true);
+    setSaveState("dirty");
     scheduler?.markDirty();
   };
 
@@ -285,6 +310,10 @@ export function EditorPane(): JSX.Element {
       window.removeEventListener("blur", handleBlur);
       window.removeEventListener("beforeunload", onBeforeUnload);
     });
+  });
+
+  createEffect(() => {
+    props.onSaveStateChange?.(saveState());
   });
 
   const body = createMemo(() => {

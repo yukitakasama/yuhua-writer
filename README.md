@@ -15,6 +15,12 @@
 一个网文作者可以**只用这个软件**完成一天的更新：打开即写、不用手动保存、
 断电不丢稿、想找某段能搜到、写完能按平台要求导出交稿。
 
+## 编辑与保存
+
+- 编辑器会自动保存：停止输入后会触发防抖保存，失焦、切换章节和关闭窗口时也会尝试保存。
+- 需要立即确认落盘时，点击顶部工具栏的「保存」按钮，或使用 `Ctrl+S`（macOS 为 `Cmd+S`）。
+- 顶部状态会显示「已保存」「保存中」「有未保存的改动」或「保存失败」。
+- 按 `Ctrl/Cmd+/` 可以打开快捷键面板；按 `Ctrl/Cmd+K` 可以打开命令面板。
 ## 设计取向
 
 | 取向 | 具体做法 |
@@ -71,7 +77,8 @@ pnpm build && pnpm check:kit   # 组件预览页未泄漏进生产产物
 
 ```bash
 pnpm icons            # 从 assets/icon.svg 派生全平台图标
-pnpm tauri:build      # 产出 Windows 安装包与便携版
+pnpm tauri:build      # 产出配置中的 Windows 安装包
+pnpm tauri:build -- --bundles nsis  # 仅构建 NSIS 安装包
 ```
 
 ## 仓库结构
@@ -170,3 +177,5 @@ Syncthing / 局域网共享 / U 盘 / Git。
 
 见 [CONTRIBUTING.md](./CONTRIBUTING.md)。提交信息遵循
 [Conventional Commits](https://www.conventionalcommits.org/)。
+
+> 打包提示：当前 `0.1.0-alpha.2` 的 NSIS 安装包已验证可构建。MSI 不接受 `alpha.2` 这种带字母的预发布标识；如需构建 MSI，请使用纯数字预发布版本（例如 `0.1.0-2`），或只指定 `nsis` 目标。

@@ -37,7 +37,7 @@ import { isTauri } from "@/lib/ipc";
 import { ChapterTree } from "@/features/chapters/ChapterTree";
 import { LibraryView } from "@/features/library/LibraryView";
 import { NewWorkspace } from "@/features/library/NewWorkspace";
-import { EditorPane } from "./app/EditorPane";
+import { EditorPane, type EditorSaveState } from "./app/EditorPane";
 import { MetaPanel } from "./app/MetaPanel";
 import { Resizer } from "./app/Resizer";
 import { LibraryToolbar, Toolbar, type SaveState } from "./app/Toolbar";
@@ -90,6 +90,8 @@ export function App(): JSX.Element {
   const [shortcutsOpen, setShortcutsOpen] = createSignal(false);
   // 首次启动向导（T9.7）：只在「从未引导过」时展示，走完或跳过都会写标记
   const [wizardOpen, setWizardOpen] = createSignal(!hasCompletedOnboarding());
+  const [editorSaveState, setEditorSaveState] = createSignal<EditorSaveState>("idle");
+  let saveEditor: (() => Promise<void>) | undefined;
 
   // 把生效的外观设置写进 CSS 变量与 html[data-theme]。
   // 必须在应用根部调用且只调用一次：多个 effect 争相写同一批变量时行为不确定。
@@ -111,6 +113,7 @@ export function App(): JSX.Element {
     { id: "commandPalette", run: () => setCommandOpen(true) },
     { id: "search", run: () => setSearchOpen(true) },
     { id: "shortcutPanel", run: () => setShortcutsOpen(true) },
+    { id: "save", run: () => void saveEditor?.(), enabled: () => hasOpenWorkspace() && editorSaveState() !== "saving" },
     { id: "focusMode", run: toggleFocusMode, enabled: () => layout.view === "workspace" },
     { id: "toggleLeft", run: toggleLeft, enabled: () => layout.view === "workspace" },
     { id: "toggleRight", run: toggleRight, enabled: () => layout.view === "workspace" },
@@ -127,7 +130,10 @@ export function App(): JSX.Element {
   });
 
   const bookTitle = createMemo(() => workspaceState.document?.book.title ?? "");
-  const saveState = createMemo<SaveState>(() => (workspaceState.status === "loading" ? "saving" : "idle"));
+  const saveState = createMemo<SaveState>(() => {
+    if (workspaceState.status === "loading") return "saving";
+    return editorSaveState();
+  });
 
   /** 新建卷：工具栏入口。 */
   const handleNewVolume = (): void => {
@@ -198,6 +204,13 @@ export function App(): JSX.Element {
       group: t("command.groupWrite"),
       run: () => void createFirstChapter(),
       enabled: () => hasOpenWorkspace(),
+    },
+    {
+      id: "save",
+      label: t("action.save"),
+      group: t("command.groupWrite"),
+      run: () => void saveEditor?.(),
+      enabled: () => hasOpenWorkspace() && editorSaveState() !== "saving",
     },
     {
       id: "newVolume",
@@ -284,6 +297,7 @@ export function App(): JSX.Element {
             onLibrary={handleLibrary}
             onStats={() => setView("stats")}
             onCommands={() => setCommandOpen(true)}
+            onSave={() => void saveEditor?.()}
           />
 
           <div
@@ -306,7 +320,12 @@ export function App(): JSX.Element {
               <Resizer side="left" getWidth={() => layout.leftWidth} setWidth={setLeftWidth} min={LEFT_MIN} max={LEFT_MAX} />
             </Show>
 
-            <EditorPane />
+            <EditorPane
+              onSaveStateChange={setEditorSaveState}
+              onSaveReady={(save) => {
+                saveEditor = save;
+              }}
+            />
 
             <Show when={!layout.rightCollapsed}>
               <Resizer side="right" getWidth={() => layout.rightWidth} setWidth={setRightWidth} min={RIGHT_MIN} max={RIGHT_MAX} />

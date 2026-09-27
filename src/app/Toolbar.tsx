@@ -28,6 +28,7 @@ import {
   IconPanelRight,
   IconPlus,
   IconSearch,
+  IconSave,
   IconSettings,
   IconStats,
 } from "./ui/icons";
@@ -58,6 +59,8 @@ export interface ToolbarProps {
   onStats: () => void;
   /** 打开命令面板（T5.7）。 */
   onCommands: () => void;
+  /** Save the current chapter immediately. */
+  onSave: () => void;
 }
 
 /** 顶部工具栏。 */
@@ -96,6 +99,17 @@ export function Toolbar(props: ToolbarProps): JSX.Element {
       </div>
 
       <div class="toolbar__group toolbar__group--right">
+        <Button
+          variant={props.saveState === "dirty" || props.saveState === "failed" ? "solid" : "ghost"}
+          size="sm"
+          onClick={props.onSave}
+          disabled={props.saveState === "saving"}
+          title={`${t("action.save")} (Ctrl/Cmd+S)`}
+          aria-keyshortcuts="Control+S Meta+S"
+        >
+          <IconSave size={14} />
+          <span class="toolbar__label">{t("action.save")}</span>
+        </Button>
         {/* 命令面板入口（Ctrl+K）。它把所有低频功能收进一个入口，
             这样工具栏才能保持"只有写作相关的东西" */}
         <IconButton label={t("toolbar.commands")} onClick={props.onCommands}>
