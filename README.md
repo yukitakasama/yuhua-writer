@@ -179,3 +179,16 @@ Syncthing / 局域网共享 / U 盘 / Git。
 [Conventional Commits](https://www.conventionalcommits.org/)。
 
 > 打包提示：当前 `0.1.0-alpha.2` 的 NSIS 安装包已验证可构建。MSI 不接受 `alpha.2` 这种带字母的预发布标识；如需构建 MSI，请使用纯数字预发布版本（例如 `0.1.0-2`），或只指定 `nsis` 目标。
+
+
+## Windows 打包策略
+
+Windows 默认只构建 NSIS 安装包，不再构建 MSI。NSIS 是正常的多文件安装方式，安装目录保留应用结构，便于后续加入资源和扩展；不要把应用重新打包成单文件自解压 EXE。
+
+如需便携版，使用本机已安装的 7-Zip 生成目录型 `.7z` 和 `.zip` 包：
+
+```powershell
+pnpm package:windows
+```
+
+便携包包含独立的 `YuhuaWriter_0.1.0-alpha.2_portable/` 应用目录与 `extensions` 扩展目录，不是单文件 EXE。ISO 不是本项目的默认分发格式：它更适合光盘/磁盘镜像，不适合应用的日常安装和扩展。

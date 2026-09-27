@@ -379,3 +379,10 @@ SQL 绑定参数、CRDT 合并幂等性、冲突副本只读不删、命令层�
 - 编辑器新增可见「保存」按钮、`Ctrl/Cmd+S` 快捷键、命令面板保存命令，并将实际保存状态接到顶部状态指示。
 - `pnpm tauri:build -- --bundles nsis` 已验证成功，产物为 `target/release/bundle/nsis/羽化写作_0.1.0-alpha.2_x64-setup.exe`。
 - 完整 `pnpm tauri:build` 已完成前端与 Rust 构建并生成 NSIS，但 MSI 阶段因 WiX 要求纯数字预发布标识而失败；M10.1 仍保持 `[~]`。
+
+
+### 2026-09-27 Windows 打包策略补记
+
+- `src-tauri/tauri.conf.json` 的默认目标改为仅 `nsis`，避免 `alpha.2` 在 MSI 阶段因预发布版本规则失败。
+- 新增 `pnpm package:windows`，使用本机 7-Zip 生成目录型 `YuhuaWriter_0.1.0-alpha.2_portable.7z` / `.zip` 便携包。
+- 便携包保留独立应用目录和 `extensions/` 扩展目录；以后不发布单文件自解压 EXE，也不把 ISO 作为默认应用分发格式。
