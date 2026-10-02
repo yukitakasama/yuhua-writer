@@ -344,6 +344,11 @@ fn normalize_relative(relative: &str) -> Result<String> {
 
 /// 取系统应用数据目录下的 `YuhuaWriter/index`。
 fn dirs_index_base() -> Option<PathBuf> {
+    // Tests and restricted environments can inject an isolated index directory.
+    if let Some(path) = std::env::var_os("YUHUA_WRITER_INDEX_DIR") {
+        return Some(PathBuf::from(path));
+    }
+
     // 不用 dirs::data_dir() 而是分平台显式书写：
     // 计划书 4.3 节的表格把三个平台的路径写死了，实现必须与文档一致。
     #[cfg(target_os = "windows")]

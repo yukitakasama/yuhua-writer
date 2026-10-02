@@ -56,7 +56,7 @@
  */
 
 import { createHash } from "node:crypto";
-import { existsSync, mkdirSync, readFileSync, statSync, writeFileSync } from "node:fs";
+import { copyFileSync, existsSync, mkdirSync, readFileSync, statSync, writeFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 
@@ -66,6 +66,7 @@ const __dirname = dirname(fileURLToPath(import.meta.url));
 const ROOT = join(__dirname, "..");
 const FONT_DIR = join(ROOT, "assets", "fonts");
 const OUT_DIR = join(FONT_DIR, "subset");
+const PUBLIC_DIR = join(ROOT, "public", "fonts");
 const REPORT = join(ROOT, "assets", "fonts.subset.json");
 
 /** 通用规范汉字表 8105 字的码点范围描述。 */
@@ -98,51 +99,16 @@ const HAN_EXT_A = [0x3400, 0x4dbf];
  */
 function buildCharset() {
   const parts = [];
-
-  // ---- CJK 基本区与扩展 A：汉字主体 ----
+  // CJK 基本区覆盖通用规范汉字与绝大多数中文写作场景。
+  // 生僻字由 CSS 回退链提供，避免内置包突破安装包预算。
   parts.push(range(HAN_BASE[0], HAN_BASE[1]));
-  parts.push(range(HAN_EXT_A[0], HAN_EXT_A[1]));
-
-  // ---- ASCII 可见字符 + 制表符与换行 ----
-  // 换行/制表不是字形，但 subset-font 接受它们不报错，
-  // 留着可以让"复制出来的文本"与字体覆盖范围一致
   parts.push(range(0x0020, 0x007e));
-
-  // ---- 拉丁补充（西欧重音字母，用于外文人名） ----
-  parts.push(range(0x00a0, 0x00ff));
-  parts.push(range(0x0100, 0x017f));
-
-  // ---- 希腊字母与西里尔字母（少数外文引用） ----
-  parts.push(range(0x0370, 0x03ff));
-  parts.push(range(0x0400, 0x04ff));
-
-  // ---- 常用标点与符号 ----
-  parts.push(range(0x2000, 0x206f)); // 通用标点（含破折号、省略号、各种空格）
-  parts.push(range(0x2070, 0x209f)); // 上下标
-  parts.push(range(0x20a0, 0x20cf)); // 货币符号
-  parts.push(range(0x2100, 0x214f)); // 字母式符号（℃、№ 等）
-  parts.push(range(0x2150, 0x218f)); // 数字形式（罗马数字等）
-  parts.push(range(0x2190, 0x21ff)); // 箭头
-  parts.push(range(0x2200, 0x22ff)); // 数学运算符
-  parts.push(range(0x2460, 0x24ff)); // 带圈数字与字母
-  parts.push(range(0x2500, 0x257f)); // 制表符
-  parts.push(range(0x25a0, 0x25ff)); // 几何图形（项目符号）
-  parts.push(range(0x2600, 0x26ff)); // 杂项符号
-  parts.push(range(0x2700, 0x27bf)); // 装饰符号（勾、叉）
-
-  // ---- CJK 符号与标点 ----
-  parts.push(range(0x3000, 0x303f)); // 中文标点（。「」『』〈〉《》——……）
-  parts.push(range(0x3040, 0x30ff)); // 日文假名（少数作品会有日文引用）
-  parts.push(range(0x3100, 0x312f)); // 注音符号
-  parts.push(range(0x31c0, 0x31ef)); // CJK 笔画
-  parts.push(range(0x3200, 0x32ff)); // 带圈中日韩文字
-  parts.push(range(0x3300, 0x33ff)); // 中日韩兼容字符（含 ㎡ 等）
-  parts.push(range(0xfe10, 0xfe1f)); // 竖排标点
-  parts.push(range(0xfe30, 0xfe4f)); // CJK 兼容形式
-  parts.push(range(0xff00, 0xffef)); // 全角形式（全角字母数字、全角标点）
-  parts.push(range(0xa960, 0xa97f)); // 谚文字母扩展 A
-  parts.push(range(0xac00, 0xd7af)); // 谚文音节（韩文标题偶见）
-
+  parts.push(range(0x00a0, 0x017f));
+  parts.push(range(0x2000, 0x206f));
+  parts.push(range(0x3000, 0x303f));
+  parts.push(range(0xfe10, 0xfe1f));
+  parts.push(range(0xfe30, 0xfe4f));
+  parts.push(range(0xff00, 0xffef));
   return parts.join("");
 }
 
@@ -182,7 +148,13 @@ function weightSlug(weight) {
 
 async function main() {
   const lock = readJson(join(ROOT, "assets", "fonts.lock.json"), { fonts: [] });
-  const entries = Array.isArray(lock.fonts) ? lock.fonts : [];
+  const entries = Array.isArray(lock.fonts)
+    ? [...lock.fonts].sort(
+        (a, b) =>
+          Number(b.file.toLowerCase().endsWith(".ttf")) -
+          Number(a.file.toLowerCase().endsWith(".ttf")),
+      )
+    : [];
 
   if (entries.length === 0) {
     log("fonts.lock.json 里还没有字体条目，无法子集化。");
@@ -195,9 +167,10 @@ async function main() {
   }
 
   const charset = buildCharset();
-  log("目标字符集：" + charset.length + " 个字符（含 CJK 基本区与扩展 A）");
+  log("目标字符集：" + charset.length + " 个字符（含 CJK 基本区与常用符号）");
 
   mkdirSync(OUT_DIR, { recursive: true });
+  mkdirSync(PUBLIC_DIR, { recursive: true });
   const previous = readJson(REPORT, { schema: 1, outputs: [] });
   const previousByKey = new Map((previous.outputs || []).map((o) => [o.key, o]));
 
@@ -227,6 +200,11 @@ async function main() {
       log("跳过（输入未变）：" + outName);
       outputs.push(prev);
       totalBytes += prev.outputBytes;
+      const publicName =
+        font.family === "Yuhua Serif SC"
+          ? `YuhuaSerifSC-${font.weight === 400 ? "Regular" : "Bold"}.woff2`
+          : `YuhuaKaiSC-${font.weight === 400 ? "Regular" : "Bold"}.woff2`;
+      copyFileSync(outPath, join(PUBLIC_DIR, publicName));
       skipped += 1;
       continue;
     }
@@ -236,15 +214,40 @@ async function main() {
       const started = Date.now();
       // subset-font 内部用 harfbuzz 的 wasm 版，纯 JS 环境可跑，
       // 不需要在开发机上装任何系统工具
-      const subset = await subsetFont(input, charset, {
-        targetFormat: "woff2",
+      const subsetOptions = {
         // 保留 OpenType 特性：合字、字距调整对中文排版影响不大，
         // 但外文引用与标点挤压用得到
         preserveNameIds: undefined,
-      });
+        noHinting: true,
+        noLayoutClosure: true,
+      };
+      let subset;
+      // Large TTF files are processed through an SFNT intermediate because
+      // the direct TTF-to-WOFF2 conversion is not reliable in WASM.
+      if (font.file.toLowerCase().endsWith(".ttf")) {
+        const sfnt = await subsetFont(input, charset, {
+          ...subsetOptions,
+          targetFormat: "sfnt",
+        });
+        subset = await subsetFont(sfnt, null, {
+          ...subsetOptions,
+          targetFormat: "woff2",
+          keepAllGlyphs: true,
+        });
+      } else {
+        subset = await subsetFont(input, charset, {
+          ...subsetOptions,
+          targetFormat: "woff2",
+        });
+      }
       const elapsed = Date.now() - started;
 
       writeFileSync(outPath, subset);
+      const publicName =
+        font.family === "Yuhua Serif SC"
+          ? `YuhuaSerifSC-${font.weight === 400 ? "Regular" : "Bold"}.woff2`
+          : `YuhuaKaiSC-${font.weight === 400 ? "Regular" : "Bold"}.woff2`;
+      copyFileSync(outPath, join(PUBLIC_DIR, publicName));
       const record = {
         key,
         family: font.family,
@@ -320,3 +323,9 @@ main().catch((e) => {
 
 // 保持 statSync 的引用：体积校验在后续版本会用它检查输出文件是否真的落盘
 void statSync;
+
+
+
+
+
+

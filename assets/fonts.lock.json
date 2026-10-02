@@ -1,27 +1,48 @@
 {
-  "$comment": "字体获取锁定文件。字体二进制不入 git，由 scripts/fetch-fonts.mjs 按此处的固定版本与 SHA256 下载并校验。填入真实条目后即可使用。",
+  "$comment": "固定版本的官方 OFL 字体源；运行 pnpm fonts:fetch 下载并校验，随后运行 pnpm fonts:subset 生成 WOFF2。霞鹜文楷 Medium 映射为 700，作为官方可用的粗体近似。",
   "schema": 1,
-  "fonts": [],
-  "plannedFonts": [
+  "fonts": [
     {
       "family": "Yuhua Serif SC",
-      "source": "Source Han Serif SC (思源宋体)",
+      "weight": 400,
+      "file": "source-han-serif-cn-regular.otf",
+      "version": "2.003",
+      "url": "https://raw.githubusercontent.com/adobe-fonts/source-han-serif/release/SubsetOTF/CN/SourceHanSerifCN-Regular.otf",
+      "sha256": "3754ea669c530e2473354f8f6d9f79680a44d7e26ec7d00eeabee4a7e0753c5d",
       "license": "SIL OFL 1.1",
-      "weights": [
-        "regular",
-        "bold"
-      ],
+      "subset": true
+    },
+    {
+      "family": "Yuhua Serif SC",
+      "weight": 700,
+      "file": "source-han-serif-cn-bold.otf",
+      "version": "2.003",
+      "url": "https://raw.githubusercontent.com/adobe-fonts/source-han-serif/release/SubsetOTF/CN/SourceHanSerifCN-Bold.otf",
+      "sha256": "4ee555ae58b3d22f6a95c2c494f2c36b7cccfc1d2224635f6461a03756f0e3c1",
+      "license": "SIL OFL 1.1",
       "subset": true
     },
     {
       "family": "Yuhua Kai SC",
-      "source": "LXGW WenKai (霞鹜文楷)",
+      "weight": 400,
+      "file": "lxgw-wenkai-regular.ttf",
+      "version": "1.522",
+      "url": "https://github.com/lxgw/LxgwWenKai/releases/download/v1.522/LXGWWenKai-Regular.ttf",
+      "sha256": "39ad71264b588165b469e35e6afb162a378dacd1f95348160240ba9038ac3009",
       "license": "SIL OFL 1.1",
-      "weights": [
-        "regular",
-        "bold"
-      ],
       "subset": true
+    },
+    {
+      "family": "Yuhua Kai SC",
+      "weight": 700,
+      "file": "lxgw-wenkai-medium.ttf",
+      "version": "1.522",
+      "url": "https://github.com/lxgw/LxgwWenKai/releases/download/v1.522/LXGWWenKai-Medium.ttf",
+      "sha256": "d4bdeb38a39151d74d084cba5090f8cb7d20bf83eedb78c35939ae70b9f4e3f6",
+      "license": "SIL OFL 1.1",
+      "subset": true,
+      "weightNote": "官方 Medium 文件按 700 使用，避免伪造字形；CSS 粗体语义统一。"
     }
-  ]
+  ],
+  "plannedFonts": []
 }

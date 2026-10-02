@@ -1301,10 +1301,7 @@ pub fn export_document(
             ExportScope::Single(cid)
         }
         ExportScopeDto::Selected { chapter_ids } => {
-            let ids: Result<Vec<_>, _> = chapter_ids
-                .into_iter()
-                .map(|s| ChapterId::parse(s))
-                .collect();
+            let ids: Result<Vec<_>, _> = chapter_ids.into_iter().map(ChapterId::parse).collect();
             let ids =
                 ids.map_err(|e| CommandError::Domain(yuhua_core::YuhuaError::InvalidInput(e)))?;
             ExportScope::Selected(ids)

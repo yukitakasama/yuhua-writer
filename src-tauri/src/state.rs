@@ -244,6 +244,8 @@ pub struct AppState {
 impl AppState {
     /// 新建一个空状态。
     pub fn new() -> Self {
+        #[cfg(test)]
+        initialize_test_index_dir();
         Self::default()
     }
 
@@ -443,6 +445,19 @@ impl std::fmt::Debug for AppState {
             .field("has_session", &self.has_session())
             .finish()
     }
+}
+
+#[cfg(test)]
+fn initialize_test_index_dir() {
+    use std::sync::OnceLock;
+
+    static TEST_INDEX_DIR: OnceLock<PathBuf> = OnceLock::new();
+    let dir = TEST_INDEX_DIR.get_or_init(|| {
+        let path = std::env::temp_dir().join(format!("yuhua-writer-tests-{}", std::process::id()));
+        std::fs::create_dir_all(&path).expect("create isolated test index directory");
+        path
+    });
+    std::env::set_var("YUHUA_WRITER_INDEX_DIR", dir);
 }
 
 #[cfg(test)]
