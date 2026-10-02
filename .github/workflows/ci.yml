@@ -83,7 +83,10 @@ jobs:
         with:
           workspaces: ". -> target"
 
-      # Tauri 在 Linux 上需要这些系统库才能编译
+      # Tauri 在 Linux 上需要这些系统库才能编译。
+      # librsvg2-bin 提供 rsvg-convert 命令行工具 —— gen-icons.mjs 需要它
+      # 把 SVG 转成 PNG。注意 librsvg2-dev 只是开发库，不含该命令，
+      # 只装 dev 会让图标派生静默跳过。
       - name: 安装系统依赖
         run: |
           sudo apt-get update
@@ -91,6 +94,7 @@ jobs:
             libwebkit2gtk-4.1-dev \
             libappindicator3-dev \
             librsvg2-dev \
+            librsvg2-bin \
             patchelf \
             libgtk-3-dev
 

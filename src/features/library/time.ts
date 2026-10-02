@@ -48,6 +48,15 @@ export function formatRelativeTime(
  * 手写而不是用 `toLocaleString`：不同平台/地区的输出差异很大
  * （有的给「2026/9/22 14:30:00」有的给「22/09/2026」），
  * 而写作软件的时间显示应当稳定可预期。
+ *
+ * ## 时区语义
+ *
+ * 刻意使用 getHours() / getMonth() 等**本地时区** getter，输出的是
+ * 「用户所在时区的时刻」。理由：这是文件修改时间一类的信息，用户预期
+ * 与系统状态栏、文件管理器显示的一致；转成 UTC 反而会让用户怀疑。
+ *
+ * 代价是输出随运行环境时区变化，因此调用方与测试都不应硬编码某一时区
+ * 的时刻 —— 传入带偏移量的 ISO 串时，不要期望原样回显其中的时分。
  */
 export function formatAbsoluteTime(iso: string): string {
   const at = new Date(iso);

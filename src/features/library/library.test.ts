@@ -187,10 +187,26 @@ describe("formatAbsoluteTime", () => {
     expect(result).toMatch(/^\d{4}-\d{2}-\d{2} \d{2}:\d{2}$/);
   });
 
-  it("月份与日期补零", () => {
+  // 这条用例此前断言 formatAbsoluteTime("…T09:07:00+08:00") 一定包含
+  // "09:07"，等于要求函数无视偏移量、原样回显字符串里的时刻。实现用的是
+  // getHours() 等本地时区方法（对写作软件这是正确行为——用户看到的是自己
+  // 系统的时间），于是只有在运行时恰好处于 UTC+8 时才通过，CI 的 UTC
+  // 环境下必然失败。
+  //
+  // 改为断言「按本地时区渲染并补零」这一真正的契约：先用本地 getter算出
+  // 期望值，再验证补零与拼接。这样在任何时区下都成立。
+  it("月份、日期与时刻按本地时区补零", () => {
+    const at = new Date("2026-01-05T09:07:00+08:00");
+    const pad = (n: number): string => String(n).padStart(2, "0");
+
     const result = formatAbsoluteTime("2026-01-05T09:07:00+08:00");
-    expect(result).toContain("-01-05");
-    expect(result).toContain("09:07");
+
+    expect(result).toBe(
+      `${at.getFullYear()}-${pad(at.getMonth() + 1)}-${pad(at.getDate())} ` +
+        `${pad(at.getHours())}:${pad(at.getMinutes())}`,
+    );
+    // 显式钉住补零行为：月、日、时、分都是两位。
+    expect(result).toMatch(/^\d{4}-0\d-\d{2} \d{2}:\d{2}$/);
   });
 
   it("非法输入返回空串", () => {
