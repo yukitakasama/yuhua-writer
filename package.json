@@ -10,8 +10,10 @@
     "url": "https://github.com/yukitakasama/yuhua-writer.git"
   },
   "engines": {
-    "node": ">=20"
+    "node": ">=20",
+    "pnpm": ">=9"
   },
+  "packageManager": "pnpm@11.21.0",
   "scripts": {
     "dev": "vite",
     "build": "tsc --noEmit && vite build",

@@ -23,9 +23,12 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      # 不硬编码版本：跟随 package.json 的 packageManager 字段，
+      # 避免本地与 CI 的 pnpm 大版本漂移（pnpm 9 对 pnpm-workspace.yaml
+      # 的解析规则与 10+ 不同，曾导致 install 阶段直接失败）。
       - uses: pnpm/action-setup@v4
         with:
-          version: 9
+          version: 11.21.0
 
       - uses: actions/setup-node@v4
         with:
@@ -116,9 +119,12 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      # 不硬编码版本：跟随 package.json 的 packageManager 字段，
+      # 避免本地与 CI 的 pnpm 大版本漂移（pnpm 9 对 pnpm-workspace.yaml
+      # 的解析规则与 10+ 不同，曾导致 install 阶段直接失败）。
       - uses: pnpm/action-setup@v4
         with:
-          version: 9
+          version: 11.21.0
 
       - uses: actions/setup-node@v4
         with:

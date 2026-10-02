@@ -1,5 +1,11 @@
 # pnpm 工作区配置。
 #
+# packages：本仓库是单包项目（Rust 工作区在 src-tauri/ 下，由cargo 管，
+# 不参与 pnpm）。显式声明根包，避免 pnpm 在缺少该字段时报
+#「packages field missing or empty」。
+packages:
+  - "."
+
 # allowBuilds：显式批准哪些依赖可以执行 postinstall 脚本。
 # pnpm 默认拦截所有构建脚本（供应链防护），但 esbuild 与 @tauri-apps/cli
 # 需要 postinstall 来落位平台原生二进制 —— 不批准的话 Vite 构建与
