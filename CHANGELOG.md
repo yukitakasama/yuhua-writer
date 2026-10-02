@@ -92,4 +92,4 @@ P0 缺陷修复轮（详见 [docs/fix-plan-p0.md](./docs/fix-plan-p0.md)）。
   路径上不可得（`OpenResult` 不含）。前端现用最小占位并有测试钉死
   「不伪造」，要真正填上需后端新增命令或扩 `OpenResult`。
 
-[未发布]: https://github.com/yuhua-writer/yuhua-writer/commits/main
+[未发布]: https://github.com/yukitakasama/yuhua-writer/commits/main
