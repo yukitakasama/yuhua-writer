@@ -37,7 +37,13 @@ import {
 
 /** 造一个卷。 */
 function vol(id: string, sort: number, title = id): Volume {
-  return { id, bookId: "bk_1", title, sort, created: "2026-01-01T09:00:00+08:00" };
+  return {
+    id,
+    bookId: "bk_1",
+    title,
+    sort,
+    created: "2026-01-01T09:00:00+08:00",
+  };
 }
 
 /**
@@ -47,7 +53,13 @@ function vol(id: string, sort: number, title = id): Volume {
  * 输入就是摘要，测试用的数据必须与真实契约同形，否则测过的东西
  * 到了界面上会因为字段缺失而炸。
  */
-function ch(id: string, volumeId: string, sort: number, title = id, wordCount = 100): ChapterSummary {
+function ch(
+  id: string,
+  volumeId: string,
+  sort: number,
+  title = id,
+  wordCount = 100,
+): ChapterSummary {
   return {
     id,
     volumeId,
@@ -77,7 +89,11 @@ function sample(): TreeSnapshot {
 }
 
 /** 断言某一卷内的章节 id 顺序与 sort 连续性。 */
-function expectVolume(snapshot: TreeSnapshot, volumeId: string, expectedIds: string[]): void {
+function expectVolume(
+  snapshot: TreeSnapshot,
+  volumeId: string,
+  expectedIds: string[],
+): void {
   const list = chaptersOf(snapshot, volumeId);
   expect(list.map((c) => c.id)).toEqual(expectedIds);
   // 关键不变量：序号必须连续，否则拖拽落位会跳
@@ -116,12 +132,20 @@ describe("sortVolumes / renumberVolumes", () => {
 
 describe("renumber", () => {
   it("把一卷内乱序的章节收敛为连续序号", () => {
-    const broken: ChapterSummary[] = [ch("a", "v1", 7), ch("b", "v1", 3), ch("c", "v2", 0)];
+    const broken: ChapterSummary[] = [
+      ch("a", "v1", 7),
+      ch("b", "v1", 3),
+      ch("c", "v2", 0),
+    ];
     const out = renumber(broken, "v1");
     // renumber 保持**数组顺序不变**，只改序号；
     // 章节在数组里的相对次序由 sort 表达，因此要按 sort 排序后再断言
-    expect(chaptersOf({ volumes: [], chapters: out }, "v1").map((c) => c.id)).toEqual(["b", "a"]);
-    expect(chaptersOf({ volumes: [], chapters: out }, "v1").map((c) => c.sort)).toEqual([0, 1]);
+    expect(
+      chaptersOf({ volumes: [], chapters: out }, "v1").map((c) => c.id),
+    ).toEqual(["b", "a"]);
+    expect(
+      chaptersOf({ volumes: [], chapters: out }, "v1").map((c) => c.sort),
+    ).toEqual([0, 1]);
     // 别的卷不受影响
     expect(out.find((c) => c.id === "c")?.sort).toBe(0);
   });
@@ -152,22 +176,35 @@ describe("addChapter", () => {
 
 describe("insertChapter", () => {
   it("插入到中间，后续章节序号顺延", () => {
-    const next = insertChapter(sample(), ch("cx", "v1", 0), { volumeId: "v1", index: 1 });
+    const next = insertChapter(sample(), ch("cx", "v1", 0), {
+      volumeId: "v1",
+      index: 1,
+    });
     expectVolume(next, "v1", ["c1", "cx", "c2", "c3"]);
   });
 
   it("越界索引被夹紧到末尾而不是报错", () => {
-    const next = insertChapter(sample(), ch("cx", "v1", 0), { volumeId: "v1", index: 99 });
+    const next = insertChapter(sample(), ch("cx", "v1", 0), {
+      volumeId: "v1",
+      index: 99,
+    });
     expectVolume(next, "v1", ["c1", "c2", "c3", "cx"]);
   });
 
   it("负数索引被夹紧到开头", () => {
-    const next = insertChapter(sample(), ch("cx", "v1", 0), { volumeId: "v1", index: -5 });
+    const next = insertChapter(sample(), ch("cx", "v1", 0), {
+      volumeId: "v1",
+      index: -5,
+    });
     expectVolume(next, "v1", ["cx", "c1", "c2", "c3"]);
   });
 
   it("把已有的章移到本卷别的位置不会产生副本", () => {
-    const next = insertChapter(sample(), { ...ch("c1", "v1", 0) }, { volumeId: "v1", index: 2 });
+    const next = insertChapter(
+      sample(),
+      { ...ch("c1", "v1", 0) },
+      { volumeId: "v1", index: 2 },
+    );
     expect(next.chapters.filter((c) => c.id === "c1")).toHaveLength(1);
     expectVolume(next, "v1", ["c2", "c3", "c1"]);
   });
@@ -209,7 +246,9 @@ describe("renameChapter", () => {
 
   it("中文多字节标题可以完整取回", () => {
     const next = renameChapter(sample(), "c2", "第二章 山雨欲来风满楼");
-    expect(next.chapters.find((c) => c.id === "c2")?.title).toBe("第二章 山雨欲来风满楼");
+    expect(next.chapters.find((c) => c.id === "c2")?.title).toBe(
+      "第二章 山雨欲来风满楼",
+    );
   });
 });
 
@@ -271,7 +310,10 @@ describe("moveChapter 跨卷移动", () => {
   });
 
   it("移到空卷", () => {
-    const withEmpty: TreeSnapshot = { volumes: [vol("v1", 0), vol("v2", 1)], chapters: [ch("c1", "v1", 0)] };
+    const withEmpty: TreeSnapshot = {
+      volumes: [vol("v1", 0), vol("v2", 1)],
+      chapters: [ch("c1", "v1", 0)],
+    };
     const result = moveChapter(withEmpty, "c1", { volumeId: "v2", index: 0 });
     expectVolume(result.snapshot, "v2", ["c1"]);
     expectVolume(result.snapshot, "v1", []);
@@ -292,7 +334,10 @@ describe("moveChapter 跨卷移动", () => {
   it("移到不存在的卷时按只读处理：不会丢失章节", () => {
     // 目标卷不存在 —— 纯函数不校验卷的存在性（那是后端的职责），
     // 但至少必须保证章节总数不变，不能悄悄吞掉数据
-    const result = moveChapter(sample(), "c1", { volumeId: "不存在", index: 0 });
+    const result = moveChapter(sample(), "c1", {
+      volumeId: "不存在",
+      index: 0,
+    });
     expect(result.snapshot.chapters).toHaveLength(5);
   });
 });
@@ -301,8 +346,13 @@ describe("moveVolume", () => {
   it("把第一卷移到第二位", () => {
     const result = moveVolume(sample(), "v1", 1);
     expect(result.changed).toBe(true);
-    expect(sortVolumes(result.snapshot.volumes).map((v) => v.id)).toEqual(["v2", "v1"]);
-    expect(sortVolumes(result.snapshot.volumes).map((v) => v.sort)).toEqual([0, 1]);
+    expect(sortVolumes(result.snapshot.volumes).map((v) => v.id)).toEqual([
+      "v2",
+      "v1",
+    ]);
+    expect(sortVolumes(result.snapshot.volumes).map((v) => v.sort)).toEqual([
+      0, 1,
+    ]);
   });
 
   it("章节归属不因卷移动而改变", () => {
@@ -318,7 +368,10 @@ describe("moveVolume", () => {
 
   it("越界索引被夹紧", () => {
     const result = moveVolume(sample(), "v1", 99);
-    expect(sortVolumes(result.snapshot.volumes).map((v) => v.id)).toEqual(["v2", "v1"]);
+    expect(sortVolumes(result.snapshot.volumes).map((v) => v.id)).toEqual([
+      "v2",
+      "v1",
+    ]);
   });
 
   it("不存在的卷原样返回", () => {
@@ -336,7 +389,10 @@ describe("removeVolume", () => {
   });
 
   it("删到一卷不剩时自动补一个空卷（章不能没有卷）", () => {
-    const one: TreeSnapshot = { volumes: [vol("v1", 0)], chapters: [ch("c1", "v1", 0)] };
+    const one: TreeSnapshot = {
+      volumes: [vol("v1", 0)],
+      chapters: [ch("c1", "v1", 0)],
+    };
     const next = removeVolume(one, "v1");
     expect(next.volumes).toHaveLength(1);
     expect(next.chapters).toHaveLength(0);

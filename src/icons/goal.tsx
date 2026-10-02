@@ -17,9 +17,9 @@ export function GoalIcon(props: SvgIconProps) {
   return (
     <svg {...iconProps(props)}>
       <circle cx="12" cy="12" r="8.5" />
-    <circle cx="12" cy="12" r="4.6" />
-    <circle cx="12" cy="12" r="1.2" />
-    <path d="M12 3.5V1.8" />
+      <circle cx="12" cy="12" r="4.6" />
+      <circle cx="12" cy="12" r="1.2" />
+      <path d="M12 3.5V1.8" />
     </svg>
   );
 }

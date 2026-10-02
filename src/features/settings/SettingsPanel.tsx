@@ -74,13 +74,22 @@ export function SettingsPanel(props: SettingsPanelProps): JSX.Element {
       class="settings-dialog"
       footer={
         <div class="settings-footer">
-          <button type="button" class="settings-link" onClick={() => props.onClose()}>
+          <button
+            type="button"
+            class="settings-link"
+            onClick={() => props.onClose()}
+          >
             {t("action.close")}
           </button>
         </div>
       }
     >
-      <Tabs items={items()} value={tab()} onChange={setTab} label={t("settings.panelLabel")}>
+      <Tabs
+        items={items()}
+        value={tab()}
+        onChange={setTab}
+        label={t("settings.panelLabel")}
+      >
         {(value) => (
           <Switch>
             <Match when={value === "appearance"}>
@@ -114,5 +123,6 @@ export const TAB_ICONS = {
 export const SETTINGS_TAB_COUNT = TAB_ITEMS.length;
 
 /** 分区值的完整列表。 */
-export const SETTINGS_TABS: readonly string[] = TAB_ITEMS.map((entry) => entry.value);
-
+export const SETTINGS_TABS: readonly string[] = TAB_ITEMS.map(
+  (entry) => entry.value,
+);

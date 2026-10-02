@@ -38,9 +38,15 @@ export function Resizer(props: ResizerProps): JSX.Element {
   const onMove = (event: PointerEvent): void => {
     if (!active) return;
     // 左侧栏向右拖是变宽，右侧栏向右拖是变窄，方向相反
-    const delta = props.side === "left" ? event.clientX - startX : startX - event.clientX;
-    const next = Math.round(Math.min(props.max, Math.max(props.min, startWidth + delta)));
-    document.documentElement.style.setProperty(props.side === "left" ? "--left-w" : "--right-w", `${next}px`);
+    const delta =
+      props.side === "left" ? event.clientX - startX : startX - event.clientX;
+    const next = Math.round(
+      Math.min(props.max, Math.max(props.min, startWidth + delta)),
+    );
+    document.documentElement.style.setProperty(
+      props.side === "left" ? "--left-w" : "--right-w",
+      `${next}px`,
+    );
   };
 
   const onUp = (): void => {
@@ -50,7 +56,9 @@ export function Resizer(props: ResizerProps): JSX.Element {
     window.removeEventListener("pointermove", onMove);
     window.removeEventListener("pointerup", onUp);
 
-    const raw = document.documentElement.style.getPropertyValue(props.side === "left" ? "--left-w" : "--right-w");
+    const raw = document.documentElement.style.getPropertyValue(
+      props.side === "left" ? "--left-w" : "--right-w",
+    );
     const value = Number.parseInt(raw, 10);
     if (Number.isFinite(value)) props.setWidth(value);
   };

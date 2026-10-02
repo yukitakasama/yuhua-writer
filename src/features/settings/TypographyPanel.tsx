@@ -49,7 +49,8 @@ export function TypographyPanel(props: TypographyPanelProps): JSX.Element {
     syncAppearanceWorkspace(workspaceState.root);
   });
 
-  const typo = (): ReturnType<typeof effectiveTypography> => effectiveTypography();
+  const typo = (): ReturnType<typeof effectiveTypography> =>
+    effectiveTypography();
 
   const write = (patch: { paragraphGap?: number; measure?: number }): void => {
     if (props.level === "workspace") {
@@ -65,7 +66,8 @@ export function TypographyPanel(props: TypographyPanelProps): JSX.Element {
   };
 
   // 本书覆盖标记：只在「本书」层级且确有覆盖时显示
-  const overriddenGap = (): boolean => props.level === "workspace" && isTypographyOverridden();
+  const overriddenGap = (): boolean =>
+    props.level === "workspace" && isTypographyOverridden();
 
   return (
     <div class="settings-panel">

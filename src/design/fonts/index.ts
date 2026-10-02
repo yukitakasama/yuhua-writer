@@ -23,7 +23,13 @@ export {
   LOAD_TIMEOUT_MS,
   BUNDLED_FAMILY_IDS,
 } from "./loader";
-export type { FamilyStatus, FontHost, FontFaceLike, FontSetLike, FontFaceFactory } from "./loader";
+export type {
+  FamilyStatus,
+  FontHost,
+  FontFaceLike,
+  FontSetLike,
+  FontFaceFactory,
+} from "./loader";
 
 export {
   APPEARANCE_CSS,

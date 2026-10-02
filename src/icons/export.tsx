@@ -17,8 +17,8 @@ export function ExportIcon(props: SvgIconProps) {
   return (
     <svg {...iconProps(props)}>
       <path d="M12 15.5V3.5" />
-    <path d="M8 7.5L12 3.5l4 4" />
-    <path d="M4.5 14v5a2 2 0 0 0 2 2h11a2 2 0 0 0 2-2v-5" />
+      <path d="M8 7.5L12 3.5l4 4" />
+      <path d="M4.5 14v5a2 2 0 0 0 2 2h11a2 2 0 0 0 2-2v-5" />
     </svg>
   );
 }

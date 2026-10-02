@@ -79,13 +79,18 @@ describe("色阶映射", () => {
       const start = css.indexOf(startMarker);
       const block = css.slice(start, css.indexOf(endMarker, start));
       return [0, 1, 2, 3, 4].map((i) => {
-        const m = block.match(new RegExp(`--c-heat-${i}:\\s*(#[0-9a-f]{6})`, "i"));
+        const m = block.match(
+          new RegExp(`--c-heat-${i}:\\s*(#[0-9a-f]{6})`, "i"),
+        );
         return m?.[1] ?? "";
       });
     }
 
     const light = heatFromCss(":root {", '[data-theme="dark"]');
-    const dark = heatFromCss('[data-theme="dark"]', "@media (prefers-color-scheme");
+    const dark = heatFromCss(
+      '[data-theme="dark"]',
+      "@media (prefers-color-scheme",
+    );
 
     expect(light).toEqual([...heatColors("light")]);
     expect(dark).toEqual([...heatColors("dark")]);
@@ -231,8 +236,12 @@ describe("网格几何", () => {
     const boxes = buildGrid(3, 2, opts);
     expect(boxes).toHaveLength(6);
     expect(boxes.map((b) => [b.column, b.row])).toEqual([
-      [0, 0], [1, 0], [2, 0],
-      [0, 1], [1, 1], [2, 1],
+      [0, 0],
+      [1, 0],
+      [2, 0],
+      [0, 1],
+      [1, 1],
+      [2, 1],
     ]);
   });
 
@@ -363,7 +372,9 @@ describe("月历网格", () => {
   it("每列恰好 6 格，保证切月高度不跳动", () => {
     const grid = monthGrid(2026, 7);
     for (let col = 0; col < CALENDAR_COLUMNS; col += 1) {
-      expect(grid.filter((_, i) => i % CALENDAR_COLUMNS === col)).toHaveLength(CALENDAR_ROWS);
+      expect(grid.filter((_, i) => i % CALENDAR_COLUMNS === col)).toHaveLength(
+        CALENDAR_ROWS,
+      );
     }
   });
 
@@ -392,7 +403,10 @@ describe("年热力图网格", () => {
     expect(grid[0]).toMatchObject({ week: 0, weekday: 0 });
     expect(grid[6]).toMatchObject({ week: 0, weekday: 6 });
     expect(grid[7]).toMatchObject({ week: 1, weekday: 0 });
-    expect(grid.at(-1)).toMatchObject({ week: HEATMAP_WEEKS - 1, weekday: HEATMAP_DAYS - 1 });
+    expect(grid.at(-1)).toMatchObject({
+      week: HEATMAP_WEEKS - 1,
+      weekday: HEATMAP_DAYS - 1,
+    });
   });
 
   it("覆盖整年 365 或 366 天", () => {
@@ -412,7 +426,9 @@ describe("年热力图网格", () => {
     for (let week = 0; week < HEATMAP_WEEKS; week += 1) {
       const slice = grid.slice(week * 7, week * 7 + 7);
       expect(slice.map((c) => c.weekday)).toEqual([0, 1, 2, 3, 4, 5, 6]);
-      expect(slice.map((c) => weekdayIndex(c.timestamp))).toEqual([0, 1, 2, 3, 4, 5, 6]);
+      expect(slice.map((c) => weekdayIndex(c.timestamp))).toEqual([
+        0, 1, 2, 3, 4, 5, 6,
+      ]);
     }
   });
 
@@ -435,7 +451,10 @@ describe("事件委托", () => {
     for (let i = 0; i < count; i += 1) {
       const cell = document.createElement("div");
       cell.setAttribute("data-index", String(i));
-      cell.setAttribute("data-date", `2026-01-${String((i % 28) + 1).padStart(2, "0")}`);
+      cell.setAttribute(
+        "data-date",
+        `2026-01-${String((i % 28) + 1).padStart(2, "0")}`,
+      );
       cell.setAttribute("data-value", String(i * 10));
       container.appendChild(cell);
     }
@@ -468,7 +487,9 @@ describe("事件委托", () => {
     container.children[1]!.appendChild(inner);
 
     const seen: (number | null)[] = [];
-    const off = delegateEvents(container, { click: (hit) => seen.push(hit.index) });
+    const off = delegateEvents(container, {
+      click: (hit) => seen.push(hit.index),
+    });
     inner.dispatchEvent(new MouseEvent("click", { bubbles: true }));
     expect(seen).toEqual([1]);
     off();
@@ -493,7 +514,9 @@ describe("事件委托", () => {
         hit = { date: h.date, value: h.value };
       },
     });
-    container.children[3]!.dispatchEvent(new MouseEvent("click", { bubbles: true }));
+    container.children[3]!.dispatchEvent(
+      new MouseEvent("click", { bubbles: true }),
+    );
     expect(hit).toEqual({ date: "2026-01-04", value: 30 });
     off();
   });
@@ -549,7 +572,9 @@ describe("事件委托", () => {
     const { cellDataAttrs, findCell } = await import("./delegate");
     const container = document.createElement("div");
     const cell = document.createElement("div");
-    for (const [k, v] of Object.entries(cellDataAttrs(42, "2026-05-01", 1234))) {
+    for (const [k, v] of Object.entries(
+      cellDataAttrs(42, "2026-05-01", 1234),
+    )) {
       cell.setAttribute(k, v);
     }
     container.appendChild(cell);

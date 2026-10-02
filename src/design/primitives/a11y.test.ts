@@ -71,13 +71,17 @@ describe("reducedMotion", () => {
 
 describe("isFocusable", () => {
   it("原生可聚焦元素可聚焦", () => {
-    const container = makeTrappableContainer("<button>确定</button><input /><a href='#x'>链接</a>");
+    const container = makeTrappableContainer(
+      "<button>确定</button><input /><a href='#x'>链接</a>",
+    );
     expect(getFocusableElements(container)).toHaveLength(3);
     container.remove();
   });
 
   it("disabled 元素被排除", () => {
-    const container = makeTrappableContainer("<button disabled>禁用</button><button>可用</button>");
+    const container = makeTrappableContainer(
+      "<button disabled>禁用</button><button>可用</button>",
+    );
     expect(getFocusableElements(container)).toHaveLength(1);
     expect(getFocusableElements(container)[0]?.textContent).toBe("可用");
     container.remove();
@@ -94,20 +98,26 @@ describe("isFocusable", () => {
   });
 
   it("hidden 属性内的元素被排除", () => {
-    const container = makeTrappableContainer("<div hidden><button>藏起来</button></div>");
+    const container = makeTrappableContainer(
+      "<div hidden><button>藏起来</button></div>",
+    );
     expect(getFocusableElements(container)).toHaveLength(0);
     container.remove();
   });
 
   it("null 与非 HTMLElement 输入返回 false", () => {
     expect(isFocusable(null)).toBe(false);
-    expect(isFocusable(document.createTextNode("x") as unknown as Element)).toBe(false);
+    expect(
+      isFocusable(document.createTextNode("x") as unknown as Element),
+    ).toBe(false);
   });
 });
 
 describe("focusTrap", () => {
   it("Tab 在末元素上会绕回首元素", () => {
-    const container = makeTrappableContainer("<button id='a'>一</button><button id='b'>二</button>");
+    const container = makeTrappableContainer(
+      "<button id='a'>一</button><button id='b'>二</button>",
+    );
     const release = focusTrap(container);
 
     const last = container.querySelector<HTMLButtonElement>("#b");
@@ -120,7 +130,9 @@ describe("focusTrap", () => {
   });
 
   it("Shift+Tab 在首元素上会绕回末元素", () => {
-    const container = makeTrappableContainer("<button id='a'>一</button><button id='b'>二</button>");
+    const container = makeTrappableContainer(
+      "<button id='a'>一</button><button id='b'>二</button>",
+    );
     const release = focusTrap(container);
 
     container.querySelector<HTMLButtonElement>("#a")?.focus();
@@ -132,7 +144,9 @@ describe("focusTrap", () => {
   });
 
   it("开启时自动聚焦容器内第一个可聚焦元素", () => {
-    const container = makeTrappableContainer("<button id='first'>一</button><button id='second'>二</button>");
+    const container = makeTrappableContainer(
+      "<button id='first'>一</button><button id='second'>二</button>",
+    );
     const release = focusTrap(container);
     expect(document.activeElement?.id).toBe("first");
     release();
@@ -231,24 +245,45 @@ describe("键盘导航", () => {
   });
 
   it("nextIndexFor 在边界处不循环时返回 null", () => {
-    const items = [document.createElement("button"), document.createElement("button")];
-    expect(nextIndexFor(items, items[1] as HTMLElement, "ArrowDown", { loop: false })).toBeNull();
+    const items = [
+      document.createElement("button"),
+      document.createElement("button"),
+    ];
+    expect(
+      nextIndexFor(items, items[1] as HTMLElement, "ArrowDown", {
+        loop: false,
+      }),
+    ).toBeNull();
   });
 
   it("nextIndexFor 循环时首尾相接", () => {
-    const items = [document.createElement("button"), document.createElement("button")];
-    expect(nextIndexFor(items, items[1] as HTMLElement, "ArrowDown", { loop: true })).toBe(0);
-    expect(nextIndexFor(items, items[0] as HTMLElement, "ArrowUp", { loop: true })).toBe(1);
+    const items = [
+      document.createElement("button"),
+      document.createElement("button"),
+    ];
+    expect(
+      nextIndexFor(items, items[1] as HTMLElement, "ArrowDown", { loop: true }),
+    ).toBe(0);
+    expect(
+      nextIndexFor(items, items[0] as HTMLElement, "ArrowUp", { loop: true }),
+    ).toBe(1);
   });
 
   it("nextIndexFor 支持 Home / End", () => {
-    const items = [document.createElement("button"), document.createElement("button"), document.createElement("button")];
+    const items = [
+      document.createElement("button"),
+      document.createElement("button"),
+      document.createElement("button"),
+    ];
     expect(nextIndexFor(items, items[1] as HTMLElement, "Home")).toBe(0);
     expect(nextIndexFor(items, items[1] as HTMLElement, "End")).toBe(2);
   });
 
   it("焦点不在列表内时方向键把焦点带入列表", () => {
-    const items = [document.createElement("button"), document.createElement("button")];
+    const items = [
+      document.createElement("button"),
+      document.createElement("button"),
+    ];
     const outside = document.createElement("button");
     document.body.appendChild(outside);
     outside.focus();
@@ -263,11 +298,17 @@ describe("键盘导航", () => {
   });
 
   it("handleListNavigation 移动焦点并消费按键", () => {
-    const container = makeTrappableContainer("<button id='a'>一</button><button id='b'>二</button>");
+    const container = makeTrappableContainer(
+      "<button id='a'>一</button><button id='b'>二</button>",
+    );
     const items = getFocusableElements(container);
     items[0]?.focus();
 
-    const event = new KeyboardEvent("keydown", { key: "ArrowDown", bubbles: true, cancelable: true });
+    const event = new KeyboardEvent("keydown", {
+      key: "ArrowDown",
+      bubbles: true,
+      cancelable: true,
+    });
     const consumed = handleListNavigation(event, items, { axis: "vertical" });
 
     expect(consumed).toBe(true);
@@ -278,14 +319,25 @@ describe("键盘导航", () => {
   it("handleListNavigation 对无关按键返回 false", () => {
     const container = makeTrappableContainer("<button id='a'>一</button>");
     const items = getFocusableElements(container);
-    const event = new KeyboardEvent("keydown", { key: "ArrowRight", bubbles: true, cancelable: true });
-    expect(handleListNavigation(event, items, { axis: "vertical" })).toBe(false);
+    const event = new KeyboardEvent("keydown", {
+      key: "ArrowRight",
+      bubbles: true,
+      cancelable: true,
+    });
+    expect(handleListNavigation(event, items, { axis: "vertical" })).toBe(
+      false,
+    );
     container.remove();
   });
 
   it("applyRovingTabindex 只让当前项进入 Tab 序", () => {
-    const container = makeTrappableContainer("<button id='a'>一</button><button id='b'>二</button>");
-    const items = applyRovingTabindex(container, container.querySelector<HTMLElement>("#b"));
+    const container = makeTrappableContainer(
+      "<button id='a'>一</button><button id='b'>二</button>",
+    );
+    const items = applyRovingTabindex(
+      container,
+      container.querySelector<HTMLElement>("#b"),
+    );
 
     expect(items[0]?.getAttribute("tabindex")).toBe("-1");
     expect(items[1]?.getAttribute("tabindex")).toBe("0");

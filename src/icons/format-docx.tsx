@@ -17,9 +17,9 @@ export function FormatDocxIcon(props: SvgIconProps) {
   return (
     <svg {...iconProps(props)}>
       <path d="M13.5 3.5H7a2 2 0 0 0-2 2v13a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V9z" />
-    <path d="M13.5 3.5V9H19" />
-    <path d="M7.8 12.6l1.1 4.4 1.2-3 1.2 3 1.1-4.4" />
-    <path d="M15.2 12.6v4.4h1.4" />
+      <path d="M13.5 3.5V9H19" />
+      <path d="M7.8 12.6l1.1 4.4 1.2-3 1.2 3 1.1-4.4" />
+      <path d="M15.2 12.6v4.4h1.4" />
     </svg>
   );
 }

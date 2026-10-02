@@ -26,8 +26,18 @@
  * 拖选一整段时被选中的行标记会被隐藏，作者看不到自己选了什么。
  */
 
-import { EditorView, Decoration, ViewPlugin, type DecorationSet, type ViewUpdate } from "@codemirror/view";
-import { RangeSetBuilder, type EditorState, type Extension } from "@codemirror/state";
+import {
+  EditorView,
+  Decoration,
+  ViewPlugin,
+  type DecorationSet,
+  type ViewUpdate,
+} from "@codemirror/view";
+import {
+  RangeSetBuilder,
+  type EditorState,
+  type Extension,
+} from "@codemirror/state";
 
 /** 隐藏标记的装饰（把字符从 DOM 里去掉，但文档不变）。 */
 const HIDE = Decoration.replace({});
@@ -88,14 +98,38 @@ const RULES: readonly MarkerRule[] = [
   //
   // 每个正则只产生**一个**捕获组（开标记），闭合标记靠反向引用 `\1`
   // 匹配，位置由 `mirror` 分支算出（见下面的取区间代码）。
-  { pattern: /(\*\*|__)(?:(?!\*\*|__)[\s\S])+?\1/g, groups: [1], mirror: true, global: true },
+  {
+    pattern: /(\*\*|__)(?:(?!\*\*|__)[\s\S])+?\1/g,
+    groups: [1],
+    mirror: true,
+    global: true,
+  },
   // 斜体：同样用温度点排除同类标记，另外用前后查断避免吃掉粗体的星号
-  { pattern: /(?<!\*)(\*|_)(?!\1)(?:(?!\1)[\s\S])+?\1(?![*_])/g, groups: [1], mirror: true, global: true },
-  { pattern: /(~~)(?:(?!~~)[\s\S])+?\1/g, groups: [1], mirror: true, global: true },
-  { pattern: /(`+)(?:(?!\1)[\s\S])+?\1/g, groups: [1], mirror: true, global: true },
+  {
+    pattern: /(?<!\*)(\*|_)(?!\1)(?:(?!\1)[\s\S])+?\1(?![*_])/g,
+    groups: [1],
+    mirror: true,
+    global: true,
+  },
+  {
+    pattern: /(~~)(?:(?!~~)[\s\S])+?\1/g,
+    groups: [1],
+    mirror: true,
+    global: true,
+  },
+  {
+    pattern: /(`+)(?:(?!\1)[\s\S])+?\1/g,
+    groups: [1],
+    mirror: true,
+    global: true,
+  },
   // 链接与图片：折叠 `[`（含前导 `!`）、`]`、`(`、`)`，保留文字与地址。
   // 这一条没有反向引用，四组标记各自独立捕获
-  { pattern: /(!?\[)(?:[^\]]*)(\])(\()(?:[^)\s]*)(\))/g, groups: [1, 2, 3, 4], global: true },
+  {
+    pattern: /(!?\[)(?:[^\]]*)(\])(\()(?:[^)\s]*)(\))/g,
+    groups: [1, 2, 3, 4],
+    global: true,
+  },
 ];
 
 /**
@@ -132,8 +166,12 @@ export function hiddenRangesForLine(text: string): Array<[number, number]> {
       if (rule.mirror && indices[0]) {
         const matchStart = indices[0][0];
         const matchEnd = indices[0][1];
-        const openLength = (indices[rule.groups[0] ?? 1]?.[1] ?? matchStart) - matchStart;
-        if (openLength > 0 && matchEnd - openLength >= matchStart + openLength) {
+        const openLength =
+          (indices[rule.groups[0] ?? 1]?.[1] ?? matchStart) - matchStart;
+        if (
+          openLength > 0 &&
+          matchEnd - openLength >= matchStart + openLength
+        ) {
           out.push([matchEnd - openLength, matchEnd]);
         }
       }

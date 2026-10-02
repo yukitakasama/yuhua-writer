@@ -17,12 +17,12 @@ export function FormatEpubIcon(props: SvgIconProps) {
   return (
     <svg {...iconProps(props)}>
       <path d="M13.5 3.5H7a2 2 0 0 0-2 2v13a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V9z" />
-    <path d="M13.5 3.5V9H19" />
-    <path d="M8 12.6h3.6" />
-    <path d="M8 14.9h2.6" />
-    <path d="M8 17.2h3.6" />
-    <path d="M14.4 17.2v-4.6" />
-    <path d="M17.4 12.6h-3" />
+      <path d="M13.5 3.5V9H19" />
+      <path d="M8 12.6h3.6" />
+      <path d="M8 14.9h2.6" />
+      <path d="M8 17.2h3.6" />
+      <path d="M14.4 17.2v-4.6" />
+      <path d="M17.4 12.6h-3" />
     </svg>
   );
 }

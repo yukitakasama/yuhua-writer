@@ -17,9 +17,9 @@ export function ChapterIcon(props: SvgIconProps) {
   return (
     <svg {...iconProps(props)}>
       <path d="M6.5 3.5h11v17H6.5z" />
-    <path d="M9.5 7.5h5" />
-    <path d="M9.5 11h5" />
-    <path d="M9.5 14.5h3" />
+      <path d="M9.5 7.5h5" />
+      <path d="M9.5 11h5" />
+      <path d="M9.5 14.5h3" />
     </svg>
   );
 }

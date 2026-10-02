@@ -48,16 +48,29 @@ import {
   Tooltip,
   pushToast,
 } from "@/design/primitives";
-import { DURATION, EASING, EASING_POINTS, SPRING_SOFT, SPRING_SNAPPY, prefersReducedMotion } from "@/design/motion";
+import {
+  DURATION,
+  EASING,
+  EASING_POINTS,
+  SPRING_SOFT,
+  SPRING_SNAPPY,
+  prefersReducedMotion,
+} from "@/design/motion";
 import { formatNumber, heatColors, progressRing } from "@/design/charts";
 import { PlusIcon, SearchIcon, SettingsIcon, TrashIcon } from "@/icons";
 
 /** 预览页的区块。 */
-function Section(props: { title: string; note?: string; children: JSX.Element }): JSX.Element {
+function Section(props: {
+  title: string;
+  note?: string;
+  children: JSX.Element;
+}): JSX.Element {
   return (
     <section class="kit-section">
       <h2 class="kit-section__title">{props.title}</h2>
-      <Show when={props.note}>{(note) => <p class="kit-section__note">{note()}</p>}</Show>
+      <Show when={props.note}>
+        {(note) => <p class="kit-section__note">{note()}</p>}
+      </Show>
       <div class="kit-section__body">{props.children}</div>
     </section>
   );
@@ -92,7 +105,9 @@ export function DevKit(): JSX.Element {
         <h1 class="kit__title">{t("kit.title")}</h1>
         <p class="kit__note">{t("kit.note")}</p>
         <p class="kit__status" role="status">
-          {prefersReducedMotion() ? t("kit.reducedMotionOn") : t("kit.reducedMotionOff")}
+          {prefersReducedMotion()
+            ? t("kit.reducedMotionOn")
+            : t("kit.reducedMotionOff")}
         </p>
       </header>
 
@@ -162,7 +177,14 @@ export function DevKit(): JSX.Element {
             <Button variant="secondary">悬停提示</Button>
           </Tooltip>
           <Button
-            onClick={() => pushToast({ id: "kit-demo", title: "这是一条提示消息", tone: "info", duration: 3000 })}
+            onClick={() =>
+              pushToast({
+                id: "kit-demo",
+                title: "这是一条提示消息",
+                tone: "info",
+                duration: 3000,
+              })
+            }
           >
             吐司
           </Button>
@@ -172,7 +194,11 @@ export function DevKit(): JSX.Element {
         <Popover
           open={popoverOpen()}
           onOpenChange={setPopoverOpen}
-          content={<div class="kit-popover-body">浮层内容。按 Esc 或点击外部关闭。</div>}
+          content={
+            <div class="kit-popover-body">
+              浮层内容。按 Esc 或点击外部关闭。
+            </div>
+          }
         />
 
         <Menu open={menuOpen()} onClose={() => setMenuOpen(false)}>
@@ -200,7 +226,9 @@ export function DevKit(): JSX.Element {
         <div class="kit-scroll">
           <ScrollArea>
             <div class="kit-scroll__inner">
-              <For each={Array.from({ length: 30 })}>{(_, i) => <p>第 {i() + 1} 行内容</p>}</For>
+              <For each={Array.from({ length: 30 })}>
+                {(_, i) => <p>第 {i() + 1} 行内容</p>}
+              </For>
             </div>
           </ScrollArea>
         </div>
@@ -245,9 +273,12 @@ export function DevKit(): JSX.Element {
         </table>
 
         <p class="kit-note">
-          弹簧 SOFT：{JSON.stringify(SPRING_SOFT)}；SNAPPY：{JSON.stringify(SPRING_SNAPPY)}
+          弹簧 SOFT：{JSON.stringify(SPRING_SOFT)}；SNAPPY：
+          {JSON.stringify(SPRING_SNAPPY)}
         </p>
-        <p class="kit-note">标准缓动控制点：{EASING_POINTS.standard.join(", ")}</p>
+        <p class="kit-note">
+          标准缓动控制点：{EASING_POINTS.standard.join(", ")}
+        </p>
 
         <Row>
           <Button onClick={bump}>重放动效</Button>
@@ -267,9 +298,27 @@ export function DevKit(): JSX.Element {
           的 `anim.cancel(); anim.play()` 简单得多。
         */}
         <Row>
-          <For each={[replay()]}>{(_, i) => <div class="kit-motion-box kit-motion-box--fade" data-run={i()}>淡入 180ms</div>}</For>
-          <For each={[replay()]}>{(_, i) => <div class="kit-motion-box kit-motion-box--slide" data-run={i()}>滑入 240ms</div>}</For>
-          <For each={[replay()]}>{(_, i) => <div class="kit-motion-box kit-motion-box--scale" data-run={i()}>缩放 180ms</div>}</For>
+          <For each={[replay()]}>
+            {(_, i) => (
+              <div class="kit-motion-box kit-motion-box--fade" data-run={i()}>
+                淡入 180ms
+              </div>
+            )}
+          </For>
+          <For each={[replay()]}>
+            {(_, i) => (
+              <div class="kit-motion-box kit-motion-box--slide" data-run={i()}>
+                滑入 240ms
+              </div>
+            )}
+          </For>
+          <For each={[replay()]}>
+            {(_, i) => (
+              <div class="kit-motion-box kit-motion-box--scale" data-run={i()}>
+                缩放 180ms
+              </div>
+            )}
+          </For>
         </Row>
       </Section>
 
@@ -283,7 +332,9 @@ export function DevKit(): JSX.Element {
             {(color, index) => (
               <div class="kit-heat">
                 <div class="kit-heat__cell" style={{ background: color }} />
-                <span class="kit-heat__label">第 {formatNumber(index())} 档</span>
+                <span class="kit-heat__label">
+                  第 {formatNumber(index())} 档
+                </span>
               </div>
             )}
           </For>
@@ -313,7 +364,14 @@ export function DevKit(): JSX.Element {
                     role="img"
                     aria-label={`${item.label} ${item.value} / ${item.max}`}
                   >
-                    <circle cx="24" cy="24" r={radius} fill="none" stroke="var(--c-border)" stroke-width={strokeWidth} />
+                    <circle
+                      cx="24"
+                      cy="24"
+                      r={radius}
+                      fill="none"
+                      stroke="var(--c-border)"
+                      stroke-width={strokeWidth}
+                    />
                     <circle
                       cx="24"
                       cy="24"
@@ -336,12 +394,21 @@ export function DevKit(): JSX.Element {
       </Section>
 
       {/* ---------- 弹层实例 ---------- */}
-      <Dialog open={dialogOpen()} onClose={() => setDialogOpen(false)} title="对话框标题">
+      <Dialog
+        open={dialogOpen()}
+        onClose={() => setDialogOpen(false)}
+        title="对话框标题"
+      >
         <p>这是对话框内容。焦点会被陷阱在内部，Esc 可关闭。</p>
         <Button onClick={() => setDialogOpen(false)}>关闭</Button>
       </Dialog>
 
-      <Drawer open={drawerOpen()} side="right" onClose={() => setDrawerOpen(false)} title="抽屉标题">
+      <Drawer
+        open={drawerOpen()}
+        side="right"
+        onClose={() => setDrawerOpen(false)}
+        title="抽屉标题"
+      >
         <p>抽屉从右侧滑入。</p>
         <Button onClick={() => setDrawerOpen(false)}>关闭</Button>
       </Drawer>

@@ -30,7 +30,11 @@ import {
   springKeyframeOffsets,
   springValue,
 } from "./primitives";
-import { MAX_CONCURRENT_ANIMATIONS, SPRING_SNAPPY, SPRING_SOFT } from "./tokens";
+import {
+  MAX_CONCURRENT_ANIMATIONS,
+  SPRING_SNAPPY,
+  SPRING_SOFT,
+} from "./tokens";
 
 /** 记录一次 animate 调用的全部细节。 */
 interface AnimCall {
@@ -153,7 +157,9 @@ describe("fadeIn / fadeOut", () => {
     expect(calls).toHaveLength(1);
     const frames = calls[0]!.keyframes;
     for (const frame of frames) {
-      expect(Object.keys(frame).filter((k) => k !== "offset")).toEqual(["opacity"]);
+      expect(Object.keys(frame).filter((k) => k !== "offset")).toEqual([
+        "opacity",
+      ]);
     }
     expect(frames[0]!.opacity).toBe(0);
     expect(frames[1]!.opacity).toBe(1);
@@ -226,7 +232,9 @@ describe("slideIn", () => {
     attach(el);
     void slideIn(el, { reducedMotion: false, direction: "up", distance: 8 });
     expect(calls[0]!.keyframes[0]!.transform).toBe("translateY(8px)");
-    expect(calls[0]!.keyframes[1]!.transform).toBe("translateX(0) translateY(0)");
+    expect(calls[0]!.keyframes[1]!.transform).toBe(
+      "translateX(0) translateY(0)",
+    );
   });
 
   it("四个方向各自映射到正确的位移轴", () => {
@@ -240,7 +248,11 @@ describe("slideIn", () => {
       calls = [];
       const el = document.createElement("div");
       attach(el);
-      void slideIn(el, { reducedMotion: false, direction: dir as "up", distance: 10 });
+      void slideIn(el, {
+        reducedMotion: false,
+        direction: dir as "up",
+        distance: 10,
+      });
       expect(calls[0]!.keyframes[0]!.transform, dir).toBe(expected);
     }
   });
@@ -312,7 +324,12 @@ describe("flip", () => {
   it("按首末位置差生成位移关键帧", () => {
     const el = document.createElement("div");
     attach(el);
-    void flip(el, { left: 10, top: 60 }, { left: 10, top: 20 }, { reducedMotion: false });
+    void flip(
+      el,
+      { left: 10, top: 60 },
+      { left: 10, top: 20 },
+      { reducedMotion: false },
+    );
 
     expect(calls).toHaveLength(1);
     const first = calls[0]!.keyframes[0]!;
@@ -333,7 +350,12 @@ describe("flip", () => {
   it("关键帧 offset 单调递增且覆盖 0..1", () => {
     const el = document.createElement("div");
     attach(el);
-    void flip(el, { left: 0, top: 100 }, { left: 0, top: 0 }, { reducedMotion: false });
+    void flip(
+      el,
+      { left: 0, top: 100 },
+      { left: 0, top: 0 },
+      { reducedMotion: false },
+    );
     const offsets = calls[0]!.keyframes.map((f) => Number(f.offset));
     expect(offsets[0]).toBe(0);
     expect(offsets.at(-1)).toBe(1);
@@ -345,7 +367,12 @@ describe("flip", () => {
   it("reduced-motion 时不产生位移动画", () => {
     const el = document.createElement("div");
     attach(el);
-    void flip(el, { left: 0, top: 100 }, { left: 0, top: 0 }, { reducedMotion: true });
+    void flip(
+      el,
+      { left: 0, top: 100 },
+      { left: 0, top: 0 },
+      { reducedMotion: true },
+    );
     for (const frame of calls[0]!.keyframes) {
       expect(frame.transform).toBeUndefined();
     }
@@ -385,7 +412,9 @@ describe("pressFeedback / rollNumber / fadeInContainer", () => {
   it("热力图整体淡入用 page 时长，且作用在容器上", () => {
     const svg = document.createElementNS("http://www.w3.org/2000/svg", "svg");
     attach(svg as unknown as HTMLElement);
-    void fadeInContainer(svg as unknown as HTMLElement, { reducedMotion: false });
+    void fadeInContainer(svg as unknown as HTMLElement, {
+      reducedMotion: false,
+    });
     expect(calls).toHaveLength(1);
     expect(calls[0]!.options.duration).toBe(320);
     expect(calls[0]!.el).toBe(svg);
@@ -460,8 +489,13 @@ describe("自研弹簧", () => {
   });
 
   it("足够长的时间后收敛到 1", () => {
-    expect(springValue(SPRING_SOFT, springDuration(SPRING_SOFT))).toBeCloseTo(1, 2);
-    expect(springValue(SPRING_SNAPPY, springDuration(SPRING_SNAPPY))).toBeCloseTo(1, 2);
+    expect(springValue(SPRING_SOFT, springDuration(SPRING_SOFT))).toBeCloseTo(
+      1,
+      2,
+    );
+    expect(
+      springValue(SPRING_SNAPPY, springDuration(SPRING_SNAPPY)),
+    ).toBeCloseTo(1, 2);
   });
 
   it("软弹簧会产生超过 1 的回弹", () => {

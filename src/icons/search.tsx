@@ -17,7 +17,7 @@ export function SearchIcon(props: SvgIconProps) {
   return (
     <svg {...iconProps(props)}>
       <circle cx="10.8" cy="10.8" r="6.3" />
-    <path d="M15.5 15.5l4.4 4.4" />
+      <path d="M15.5 15.5l4.4 4.4" />
     </svg>
   );
 }

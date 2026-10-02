@@ -37,13 +37,43 @@ export const DEFAULT_BINDINGS: readonly KeyBinding[] = [
   { id: "replace", keys: "Mod+H", label: "本章内替换", group: "编辑器" },
   { id: "save", keys: "Mod+S", label: "立即保存", group: "写作" },
   { id: "newChapter", keys: "Mod+Alt+N", label: "新建一章", group: "写作" },
-  { id: "focusMode", keys: "Mod+Shift+Enter", label: "切换专注模式", group: "视图" },
-  { id: "toggleLeft", keys: "Mod+B", label: "折叠 / 展开卷章栏", group: "视图" },
-  { id: "toggleRight", keys: "Mod+Shift+B", label: "折叠 / 展开信息栏", group: "视图" },
+  {
+    id: "focusMode",
+    keys: "Mod+Shift+Enter",
+    label: "切换专注模式",
+    group: "视图",
+  },
+  {
+    id: "toggleLeft",
+    keys: "Mod+B",
+    label: "折叠 / 展开卷章栏",
+    group: "视图",
+  },
+  {
+    id: "toggleRight",
+    keys: "Mod+Shift+B",
+    label: "折叠 / 展开信息栏",
+    group: "视图",
+  },
   { id: "shortcutPanel", keys: "Mod+/", label: "查看快捷键", group: "导航" },
-  { id: "wordCountMode", keys: "Mod+Alt+W", label: "切换字数口径", group: "写作" },
-  { id: "prevChapter", keys: "Mod+Alt+ArrowUp", label: "上一章", group: "导航" },
-  { id: "nextChapter", keys: "Mod+Alt+ArrowDown", label: "下一章", group: "导航" },
+  {
+    id: "wordCountMode",
+    keys: "Mod+Alt+W",
+    label: "切换字数口径",
+    group: "写作",
+  },
+  {
+    id: "prevChapter",
+    keys: "Mod+Alt+ArrowUp",
+    label: "上一章",
+    group: "导航",
+  },
+  {
+    id: "nextChapter",
+    keys: "Mod+Alt+ArrowDown",
+    label: "下一章",
+    group: "导航",
+  },
 ];
 
 /**
@@ -101,7 +131,8 @@ function isAltGraph(event: KeyboardEvent): boolean {
 function normalizeKey(event: KeyboardEvent, isMac: boolean): string {
   const { key, code } = event;
   // 只按下了修饰键：不构成组合
-  if (key === "Control" || key === "Shift" || key === "Alt" || key === "Meta") return "";
+  if (key === "Control" || key === "Shift" || key === "Alt" || key === "Meta")
+    return "";
 
   // 字母键用 code（KeyA → A），这样 Shift+字母 得到的是大写字母，
   // 与绑定表里写的 `Mod+Shift+F` 一致
@@ -127,7 +158,9 @@ function normalizeKey(event: KeyboardEvent, isMac: boolean): string {
  * 返回「同一个组合键被绑定给多个动作」的分组。
  * 快捷键面板用它给冲突项标红 —— 作者改键之后必须能立刻知道撞了。
  */
-export function findConflicts(bindings: readonly KeyBinding[]): Map<string, KeyBinding[]> {
+export function findConflicts(
+  bindings: readonly KeyBinding[],
+): Map<string, KeyBinding[]> {
   const byChord = new Map<string, KeyBinding[]>();
   for (const b of bindings) {
     const list = byChord.get(b.keys);
@@ -158,7 +191,10 @@ export function applyOverrides(
 }
 
 /** 按 id 查绑定。 */
-export function bindingById(bindings: readonly KeyBinding[], id: string): KeyBinding | undefined {
+export function bindingById(
+  bindings: readonly KeyBinding[],
+  id: string,
+): KeyBinding | undefined {
   return bindings.find((b) => b.id === id);
 }
 
@@ -166,7 +202,9 @@ export function bindingById(bindings: readonly KeyBinding[], id: string): KeyBin
 export function detectMac(): boolean {
   if (typeof navigator === "undefined") return false;
   // userAgentData 是新的标准，拿不到就退回 platform
-  const uaData = (navigator as unknown as { userAgentData?: { platform?: string } }).userAgentData;
+  const uaData = (
+    navigator as unknown as { userAgentData?: { platform?: string } }
+  ).userAgentData;
   const platform = uaData?.platform ?? navigator.platform ?? "";
   return /mac/i.test(platform);
 }

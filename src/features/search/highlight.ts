@@ -38,12 +38,18 @@ export type Range = readonly [number, number];
  * 相邻也算合并（`[0,2]` 与 `[2,4]` 合成 `[0,4]`）：它们渲染出来
  * 是同一段高亮，分成两个 `<mark>` 会在视觉上出现一条缝隙。
  */
-export function mergeRanges(ranges: readonly Range[], length: number): Array<[number, number]> {
+export function mergeRanges(
+  ranges: readonly Range[],
+  length: number,
+): Array<[number, number]> {
   const valid = ranges
-    .map(([start, end]) => [
-      Math.max(0, Math.min(start, length)),
-      Math.max(0, Math.min(end, length)),
-    ] as [number, number])
+    .map(
+      ([start, end]) =>
+        [
+          Math.max(0, Math.min(start, length)),
+          Math.max(0, Math.min(end, length)),
+        ] as [number, number],
+    )
     // 空区间（start >= end）直接丢弃，它们画不出任何东西
     .filter(([start, end]) => end > start)
     .sort((a, b) => a[0] - b[0] || a[1] - b[1]);
@@ -66,18 +72,23 @@ export function mergeRanges(ranges: readonly Range[], length: number): Array<[nu
  * 没有任何区间时返回单个「非命中」段，调用方不必分支处理 ——
  * 返回空数组会让渲染处出现一整块空白，那是比不高亮更糟的结果。
  */
-export function splitHighlight(text: string, ranges: readonly Range[]): Segment[] {
+export function splitHighlight(
+  text: string,
+  ranges: readonly Range[],
+): Segment[] {
   const merged = mergeRanges(ranges, text.length);
   if (merged.length === 0) return [{ text, hit: false }];
 
   const segments: Segment[] = [];
   let cursor = 0;
   for (const [start, end] of merged) {
-    if (start > cursor) segments.push({ text: text.slice(cursor, start), hit: false });
+    if (start > cursor)
+      segments.push({ text: text.slice(cursor, start), hit: false });
     segments.push({ text: text.slice(start, end), hit: true });
     cursor = end;
   }
-  if (cursor < text.length) segments.push({ text: text.slice(cursor), hit: false });
+  if (cursor < text.length)
+    segments.push({ text: text.slice(cursor), hit: false });
   return segments;
 }
 
@@ -97,7 +108,11 @@ export function splitHighlight(text: string, ranges: readonly Range[]): Segment[
  *
  * 这里刻意不做模糊匹配：跳错位置比跳到开头更让人困惑。
  */
-export function findHitOffset(body: string, snippet: string, keyword: string): number {
+export function findHitOffset(
+  body: string,
+  snippet: string,
+  keyword: string,
+): number {
   const needle = keyword.trim();
   if (needle.length === 0) return 0;
 

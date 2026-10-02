@@ -17,8 +17,8 @@ export function DividerIcon(props: SvgIconProps) {
   return (
     <svg {...iconProps(props)}>
       <path d="M3.5 12h17" />
-    <path d="M7 7h10" />
-    <path d="M9.5 16.8h5" />
+      <path d="M7 7h10" />
+      <path d="M9.5 16.8h5" />
     </svg>
   );
 }

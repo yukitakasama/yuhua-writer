@@ -49,7 +49,11 @@ interface OnboardingRecord {
 
 /** 读取「是否已引导过」。读不到或坏了都当作没引导过。 */
 export function hasCompletedOnboarding(): boolean {
-  const record = readJson<Partial<OnboardingRecord>>(ONBOARDING_KEY, {}, (v) => typeof v === "object" && v !== null);
+  const record = readJson<Partial<OnboardingRecord>>(
+    ONBOARDING_KEY,
+    {},
+    (v) => typeof v === "object" && v !== null,
+  );
   return record.done === true;
 }
 
@@ -70,7 +74,10 @@ const STEPS = ["theme", "font", "done"] as const;
 export type WizardStep = (typeof STEPS)[number];
 
 /** 主题选项与文案键。 */
-const THEME_OPTIONS: readonly { value: ThemeChoice; key: "settings.theme.light" | "settings.theme.dark" | "settings.theme.system" }[] = [
+const THEME_OPTIONS: readonly {
+  value: ThemeChoice;
+  key: "settings.theme.light" | "settings.theme.dark" | "settings.theme.system";
+}[] = [
   { value: "light", key: "settings.theme.light" },
   { value: "dark", key: "settings.theme.dark" },
   { value: "system", key: "settings.theme.system" },
@@ -137,7 +144,10 @@ export function FirstRunWizard(props: FirstRunWizardProps): JSX.Element {
           </button>
           <div class="wizard-footer__nav">
             <Show when={!isFirst()}>
-              <Button variant="ghost" onClick={() => setStepIndex((i) => Math.max(0, i - 1))}>
+              <Button
+                variant="ghost"
+                onClick={() => setStepIndex((i) => Math.max(0, i - 1))}
+              >
                 {t("settings.wizard.back")}
               </Button>
             </Show>
@@ -148,7 +158,9 @@ export function FirstRunWizard(props: FirstRunWizardProps): JSX.Element {
                 else setStepIndex((i) => i + 1);
               }}
             >
-              {isLast() ? t("settings.wizard.finish") : t("settings.wizard.next")}
+              {isLast()
+                ? t("settings.wizard.finish")
+                : t("settings.wizard.next")}
             </Button>
           </div>
         </div>
@@ -159,12 +171,18 @@ export function FirstRunWizard(props: FirstRunWizardProps): JSX.Element {
         <div class="wizard__progress" aria-hidden="true">
           <For each={STEPS}>
             {(_, index) => (
-              <span class="wizard__dot" data-active={index() === stepIndex() ? "true" : "false"} />
+              <span
+                class="wizard__dot"
+                data-active={index() === stepIndex() ? "true" : "false"}
+              />
             )}
           </For>
         </div>
         <p class="wizard__indicator">
-          {t("settings.wizard.stepIndicator", { current: stepIndex() + 1, total: STEPS.length })}
+          {t("settings.wizard.stepIndicator", {
+            current: stepIndex() + 1,
+            total: STEPS.length,
+          })}
         </p>
 
         <Show when={step() === "theme"}>
@@ -173,7 +191,11 @@ export function FirstRunWizard(props: FirstRunWizardProps): JSX.Element {
               {t("settings.wizard.stepTheme")}
             </h3>
             <p class="wizard__body">{t("settings.wizard.stepThemeBody")}</p>
-            <div class="wizard__choices" role="radiogroup" aria-label={t("settings.theme.label")}>
+            <div
+              class="wizard__choices"
+              role="radiogroup"
+              aria-label={t("settings.theme.label")}
+            >
               <For each={THEME_OPTIONS}>
                 {(option) => (
                   <button
@@ -198,7 +220,11 @@ export function FirstRunWizard(props: FirstRunWizardProps): JSX.Element {
               {t("settings.wizard.stepFont")}
             </h3>
             <p class="wizard__body">{t("settings.wizard.stepFontBody")}</p>
-            <div class="wizard__choices wizard__choices--fonts" role="radiogroup" aria-label={t("settings.font.label")}>
+            <div
+              class="wizard__choices wizard__choices--fonts"
+              role="radiogroup"
+              aria-label={t("settings.font.label")}
+            >
               <For each={familiesFor("body")}>
                 {(item) => (
                   <button

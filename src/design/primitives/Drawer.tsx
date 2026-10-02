@@ -10,7 +10,15 @@
  * 用同样的 180ms 会显得很急。只动 transform，符合 5.4。
  */
 
-import { createEffect, createSignal, createUniqueId, Show, splitProps, type Component, type JSX } from "solid-js";
+import {
+  createEffect,
+  createSignal,
+  createUniqueId,
+  Show,
+  splitProps,
+  type Component,
+  type JSX,
+} from "solid-js";
 import { ModalShell } from "./Modal";
 import { cx } from "./styles";
 
@@ -98,7 +106,9 @@ export const Drawer: Component<DrawerProps> = (props) => {
               </h2>
             </Show>
             <Show when={local.actions}>
-              <div style={{ display: "inline-flex", gap: "var(--sp-1, 4px)" }}>{local.actions}</div>
+              <div style={{ display: "inline-flex", gap: "var(--sp-1, 4px)" }}>
+                {local.actions}
+              </div>
             </Show>
           </header>
         </Show>

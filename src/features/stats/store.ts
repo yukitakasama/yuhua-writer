@@ -21,7 +21,12 @@
 import { createStore, produce } from "solid-js/store";
 
 import * as ipc from "@/lib/ipc";
-import { isFiniteNumber, isPlainObject, readJson, writeJson } from "@/app/persistent";
+import {
+  isFiniteNumber,
+  isPlainObject,
+  readJson,
+  writeJson,
+} from "@/app/persistent";
 import {
   DEFAULT_GOAL,
   GOAL_MAX,
@@ -37,7 +42,8 @@ import {
 } from "./model";
 
 /** 统计页内的分区（T8.13 的导航）。 */
-export type StatsSection = "overview" | "calendar" | "heatmap" | "goal" | "breakdown" | "privacy";
+export type StatsSection =
+  "overview" | "calendar" | "heatmap" | "goal" | "breakdown" | "privacy";
 
 /** 分区顺序：与导航渲染顺序一致，测试会断言它包含全部取值。 */
 export const STATS_SECTIONS: readonly StatsSection[] = [
@@ -89,7 +95,10 @@ export function loadGoal(): GoalConfig {
   return {
     daily: clampGoal(raw.daily, DEFAULT_GOAL.daily),
     weekly: clampGoal(raw.weekly, DEFAULT_GOAL.weekly),
-    streakThreshold: clampGoal(raw.streakThreshold, DEFAULT_GOAL.streakThreshold),
+    streakThreshold: clampGoal(
+      raw.streakThreshold,
+      DEFAULT_GOAL.streakThreshold,
+    ),
   };
 }
 
@@ -144,7 +153,12 @@ export async function loadStats(): Promise<void> {
     // 数组折成对象：日历与热力图每格都要查一次，线性扫描 365 格会变成 O(n²)
     const days: DayMap = {};
     for (const day of payload.days) {
-      days[day.date] = { date: day.date, words: day.words, minutes: day.minutes, chapters: day.chapters };
+      days[day.date] = {
+        date: day.date,
+        words: day.words,
+        minutes: day.minutes,
+        chapters: day.chapters,
+      };
     }
     setState(
       produce((s) => {
@@ -169,7 +183,10 @@ export function recomputeSummary(now: Date = new Date()): void {
   const today = todayKey(now);
   setState(
     "summary",
-    summarize(state.days, { today, streakThreshold: state.goal.streakThreshold }),
+    summarize(state.days, {
+      today,
+      streakThreshold: state.goal.streakThreshold,
+    }),
   );
 }
 
@@ -197,7 +214,9 @@ export function resetCalendarMonth(now: Date = new Date()): void {
 
 /** 热力图换年。 */
 export function shiftHeatmapYear(delta: number): void {
-  setState("heatmapYear", (year) => Math.max(1970, Math.min(9999, year + delta)));
+  setState("heatmapYear", (year) =>
+    Math.max(1970, Math.min(9999, year + delta)),
+  );
 }
 
 // ---------------------------------------------------------------------------
@@ -229,7 +248,10 @@ export function saveGoal(next: Partial<GoalConfig>): void {
  * 用**当年**的样本而不是全量样本：热力图与日历各自算各自的档位，
  * 一张图里「深色 = 那天写得多」，跨图比较本来就不是这个视图的用途。
  */
-export function thresholdsFor(samples: readonly number[]): { thresholds: number[]; hasSamples: boolean } {
+export function thresholdsFor(samples: readonly number[]): {
+  thresholds: number[];
+  hasSamples: boolean;
+} {
   const thresholds = buildThresholds(samples);
   return { thresholds, hasSamples: samples.some((w) => w > 0) };
 }

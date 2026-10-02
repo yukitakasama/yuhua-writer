@@ -83,7 +83,10 @@ export function ChapterTree(): JSX.Element {
     }
 
     const before = capturePositions();
-    const result = moveChapterOp(snapshot(), draggedId, { volumeId: containerId, index });
+    const result = moveChapterOp(snapshot(), draggedId, {
+      volumeId: containerId,
+      index,
+    });
     if (!result.changed) return;
     // FLIP 必须在 DOM 更新之后播放。Solid 的更新是同步的，
     // 但为了确保拿到的是最新布局，放到微任务里执行。
@@ -92,7 +95,9 @@ export function ChapterTree(): JSX.Element {
   });
 
   /** 把拖拽状态整理成每个卷需要的落点提示。 */
-  const dropHintFor = (volumeId: string): { active: boolean; index: number } | null => {
+  const dropHintFor = (
+    volumeId: string,
+  ): { active: boolean; index: number } | null => {
     const st = drag.state();
     const draggedId = st.draggedId;
     if (draggedId === null || draggedId.startsWith("vol:")) return null;
@@ -114,7 +119,11 @@ export function ChapterTree(): JSX.Element {
 
   const handleDeleteVolume = (volume: Volume): void => {
     const hasChapters = chaptersOf(snapshot(), volume.id).length > 0;
-    if (hasChapters && !confirmDelete(t("chapters.title"), `${volume.title}（含其下全部章节）`)) return;
+    if (
+      hasChapters &&
+      !confirmDelete(t("chapters.title"), `${volume.title}（含其下全部章节）`)
+    )
+      return;
     const before = capturePositions();
     // 本地演算仅用于让位动效立即发生，真相以后端为准
     void removeVolumeOp(snapshot(), volume.id);
@@ -139,7 +148,9 @@ export function ChapterTree(): JSX.Element {
   };
 
   const handleDeleteChapter = (chapterId: string): void => {
-    const chapter = workspaceState.document?.chapters.find((c) => c.id === chapterId);
+    const chapter = workspaceState.document?.chapters.find(
+      (c) => c.id === chapterId,
+    );
     if (!chapter) return;
     if (!confirmDelete(t("action.moveToTrash"), chapter.title)) return;
     const before = capturePositions();
@@ -213,7 +224,12 @@ export function ChapterTree(): JSX.Element {
                 registerRow={drag.registerRow}
                 registerVolumeRow={(volumeId, element) => {
                   // 卷头的行注册由 onVolumeDragStart 处理，这里只用于落点采样
-                  if (element === undefined) drag.registerRow(`vol:${volumeId}`, "__volumes__", undefined);
+                  if (element === undefined)
+                    drag.registerRow(
+                      `vol:${volumeId}`,
+                      "__volumes__",
+                      undefined,
+                    );
                 }}
                 dropHint={dropHintFor(volume.id)}
               />
@@ -254,7 +270,8 @@ export function ChapterTree(): JSX.Element {
  * 这种不可逆的批量操作没有确认实在太危险，宁可视觉不统一。
  */
 function confirmDelete(what: string, name: string): boolean {
-  if (typeof window === "undefined" || typeof window.confirm !== "function") return true;
+  if (typeof window === "undefined" || typeof window.confirm !== "function")
+    return true;
   return window.confirm(`确定要删除${what}「${name}」吗？`);
 }
 
@@ -278,6 +295,12 @@ export async function createFirstChapter(): Promise<void> {
  * 导出给测试用：组件测试需要在不经过 IPC 的前提下准备树数据，
  * 且必须与 tree-ops 的输入形状完全一致。
  */
-export function snapshotFrom(volumes: readonly Volume[], chapters: readonly ChapterSummary[]): TreeSnapshot {
-  return { volumes: volumes.map((v) => ({ ...v })), chapters: chapters.map((c) => ({ ...c })) };
+export function snapshotFrom(
+  volumes: readonly Volume[],
+  chapters: readonly ChapterSummary[],
+): TreeSnapshot {
+  return {
+    volumes: volumes.map((v) => ({ ...v })),
+    chapters: chapters.map((c) => ({ ...c })),
+  };
 }

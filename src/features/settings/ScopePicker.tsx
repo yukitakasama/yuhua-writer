@@ -85,7 +85,11 @@ export function ScopePicker(props: ScopePickerProps): JSX.Element {
   const currentStack = (): string => fontFamilyById(props.family).stack;
 
   return (
-    <section class="settings-scope" role="group" aria-label={scopeLabel(props.scope)}>
+    <section
+      class="settings-scope"
+      role="group"
+      aria-label={scopeLabel(props.scope)}
+    >
       <header class="settings-scope__head">
         <div class="settings-scope__titles">
           <h4 class="settings-scope__title">{scopeLabel(props.scope)}</h4>
@@ -107,7 +111,9 @@ export function ScopePicker(props: ScopePickerProps): JSX.Element {
           而不是一句只写在文档里的承诺。用 code 而不是 input，
           它是说明，不可编辑，也不该进入 Tab 序。 */}
       <p class="settings-scope__chain">
-        <span class="settings-scope__chain-label">{t("settings.font.fallbackChain")}</span>
+        <span class="settings-scope__chain-label">
+          {t("settings.font.fallbackChain")}
+        </span>
         <code>{currentStack()}</code>
       </p>
 
@@ -116,7 +122,11 @@ export function ScopePicker(props: ScopePickerProps): JSX.Element {
       </Show>
 
       <Show when={props.canOverride && props.overridden}>
-        <button type="button" class="settings-link" onClick={() => props.onInherit()}>
+        <button
+          type="button"
+          class="settings-link"
+          onClick={() => props.onInherit()}
+        >
           {t("settings.level.inherit")}
         </button>
       </Show>

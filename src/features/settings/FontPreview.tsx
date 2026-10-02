@@ -46,12 +46,18 @@ export function FontPreview(props: FontPreviewProps): JSX.Element {
     props.focus === undefined || props.focus === scope;
 
   return (
-    <div class="font-preview" aria-label={t("settings.font.previewTitle")} role="group">
+    <div
+      class="font-preview"
+      aria-label={t("settings.font.previewTitle")}
+      role="group"
+    >
       <p class="font-preview__label">{t("settings.font.previewTitle")}</p>
 
       {/* 标题作用域：用 .yh-heading 拿到 --font-heading 与 --lh-heading */}
       {show("heading") && (
-        <h3 class="yh-heading font-preview__heading">{props.heading ?? t("settings.font.previewHeading")}</h3>
+        <h3 class="yh-heading font-preview__heading">
+          {props.heading ?? t("settings.font.previewHeading")}
+        </h3>
       )}
 
       {/* 正文作用域：.yh-body 拿到 --font-body / --lh-body / --measure-body */}
@@ -59,16 +65,16 @@ export function FontPreview(props: FontPreviewProps): JSX.Element {
         <div class="yh-body font-preview__body">
           <p>{props.body ?? t("settings.font.previewBody")}</p>
           {/* 第二段用来展示段距设置的效果 */}
-          <p>
-            {t("settings.font.previewBody")}
-          </p>
+          <p>{t("settings.font.previewBody")}</p>
         </div>
       )}
 
       {/* 界面作用域：用 .yh-num 让数字走 tabular-nums，
           用户能顺便看到「字数变化时数字不会左右跳」这条规范是否生效。 */}
       {show("ui") && (
-        <p class="font-preview__ui yh-num">{props.ui ?? t("settings.font.previewUi")}</p>
+        <p class="font-preview__ui yh-num">
+          {props.ui ?? t("settings.font.previewUi")}
+        </p>
       )}
 
       <p class="font-preview__note">{t("settings.font.fallbackNote")}</p>

@@ -24,7 +24,10 @@ const DAY = 24 * HOUR;
  * `now` 参数可注入：测试需要固定"现在"才能断言结果，
  * 否则用例会在不同时间点跑出不同答案。
  */
-export function formatRelativeTime(iso: string, now: number = Date.now()): string {
+export function formatRelativeTime(
+  iso: string,
+  now: number = Date.now(),
+): string {
   const at = Date.parse(iso);
   // 解析失败（后端给了非法时间串）时不要显示 NaN，退回空串
   if (!Number.isFinite(at)) return "";
@@ -33,7 +36,8 @@ export function formatRelativeTime(iso: string, now: number = Date.now()): strin
 
   // 未来时间：时钟不同步或云盘改了时间戳。显示"刚刚"比"-3 天前"合理
   if (diff < MINUTE) return t("time.justNow");
-  if (diff < HOUR) return t("time.minutesAgo", { count: Math.floor(diff / MINUTE) });
+  if (diff < HOUR)
+    return t("time.minutesAgo", { count: Math.floor(diff / MINUTE) });
   if (diff < DAY) return t("time.hoursAgo", { count: Math.floor(diff / HOUR) });
   return t("time.daysAgo", { count: Math.floor(diff / DAY) });
 }

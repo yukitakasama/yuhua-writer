@@ -52,13 +52,23 @@ export function OverviewView(props: OverviewViewProps): JSX.Element {
   const cards = createMemo<CardSpec[]>(() => {
     const s = props.summary;
     const todayNote =
-      props.dailyGoal > 0 ? `/ ${props.dailyGoal.toLocaleString("zh-CN")}` : undefined;
+      props.dailyGoal > 0
+        ? `/ ${props.dailyGoal.toLocaleString("zh-CN")}`
+        : undefined;
     return [
-      { label: t("stats.cardToday"), value: format(s.today), ...(todayNote ? { note: todayNote } : {}) },
+      {
+        label: t("stats.cardToday"),
+        value: format(s.today),
+        ...(todayNote ? { note: todayNote } : {}),
+      },
       { label: t("stats.cardThisWeek"), value: format(s.thisWeek) },
       { label: t("stats.cardThisMonth"), value: format(s.thisMonth) },
       { label: t("stats.cardTotal"), value: format(s.totalWords) },
-      { label: t("stats.cardActiveDays"), value: format(s.activeDays), note: t("stats.unitDays") },
+      {
+        label: t("stats.cardActiveDays"),
+        value: format(s.activeDays),
+        note: t("stats.unitDays"),
+      },
       { label: t("stats.cardBestDay"), value: format(s.bestDay) },
       { label: t("stats.cardAverage7"), value: format(s.averagePerDay7) },
       { label: t("stats.cardMinutes"), value: formatMinutes(s.totalMinutes) },
@@ -69,7 +79,10 @@ export function OverviewView(props: OverviewViewProps): JSX.Element {
     <div class="stats-overview">
       <section class="stats-streak" aria-labelledby="stats-streak-title">
         <div class="stats-streak__flame" aria-hidden="true">
-          <Show when={props.summary.streak > 0} fallback={<span class="stats-streak__cold" />}>
+          <Show
+            when={props.summary.streak > 0}
+            fallback={<span class="stats-streak__cold" />}
+          >
             <FlameIcon size={30} />
           </Show>
         </div>
@@ -78,12 +91,17 @@ export function OverviewView(props: OverviewViewProps): JSX.Element {
             {t("stats.streakTitle")}
           </h3>
           <p class="stats-streak__value yh-num">
-            <Show when={props.summary.streak > 0} fallback={t("stats.streakZero")}>
+            <Show
+              when={props.summary.streak > 0}
+              fallback={t("stats.streakZero")}
+            >
               {t("stats.streakDays", { days: props.summary.streak })}
             </Show>
           </p>
           <p class="stats-streak__note">
-            {t("stats.streakBody", { threshold: props.summary.streakThreshold })}
+            {t("stats.streakBody", {
+              threshold: props.summary.streakThreshold,
+            })}
           </p>
         </div>
       </section>
@@ -110,8 +128,13 @@ export function OverviewView(props: OverviewViewProps): JSX.Element {
           <span>{t("stats.estimateLabel")}</span>
         </h3>
         <Show
-          when={props.summary.estimatedCompletion !== null || props.summary.remainingDays === 0}
-          fallback={<p class="stats-estimate__hint">{t("stats.estimateNone")}</p>}
+          when={
+            props.summary.estimatedCompletion !== null ||
+            props.summary.remainingDays === 0
+          }
+          fallback={
+            <p class="stats-estimate__hint">{t("stats.estimateNone")}</p>
+          }
         >
           <p class="stats-estimate__value yh-num">
             <Show
@@ -121,7 +144,9 @@ export function OverviewView(props: OverviewViewProps): JSX.Element {
               <span>{props.summary.estimatedCompletion}</span>
               <Show when={props.summary.remainingDays !== null}>
                 <span class="stats-estimate__days">
-                  {t("stats.estimateDays", { days: props.summary.remainingDays ?? 0 })}
+                  {t("stats.estimateDays", {
+                    days: props.summary.remainingDays ?? 0,
+                  })}
                 </span>
               </Show>
             </Show>
@@ -129,7 +154,9 @@ export function OverviewView(props: OverviewViewProps): JSX.Element {
         </Show>
         <p class="stats-estimate__meta">
           <ClockIcon size={13} />
-          <span class="yh-num">{formatMinutes(props.summary.totalMinutes)}</span>
+          <span class="yh-num">
+            {formatMinutes(props.summary.totalMinutes)}
+          </span>
         </p>
       </section>
     </div>

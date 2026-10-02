@@ -33,7 +33,12 @@ import {
   workspaceAppearance,
 } from "@/app/appearance-store";
 import { workspaceState } from "@/app/workspace-store";
-import { applyTheme, applyTypography, fontLoader, resolveTheme } from "@/design/fonts";
+import {
+  applyTheme,
+  applyTypography,
+  fontLoader,
+  resolveTheme,
+} from "@/design/fonts";
 
 /**
  * 把生效的外观设置同步到 DOM。
@@ -66,7 +71,11 @@ export function useAppearance(): void {
   const followSystem = createMemo(() => effectiveTheme() === "system");
   createEffect(() => {
     if (!followSystem()) return undefined;
-    if (typeof window === "undefined" || typeof window.matchMedia !== "function") return undefined;
+    if (
+      typeof window === "undefined" ||
+      typeof window.matchMedia !== "function"
+    )
+      return undefined;
 
     let query: MediaQueryList;
     try {

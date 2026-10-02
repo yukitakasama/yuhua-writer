@@ -82,10 +82,14 @@ export const MARKDOWN_SUBSET: readonly SubsetRule[] = [
 ];
 
 /** 缩写：一等公民语法名集合，供高亮与测试使用。 */
-export const FIRST_CLASS_SYNTAXES: readonly string[] = MARKDOWN_SUBSET.filter((r) => r.firstClass).map((r) => r.name);
+export const FIRST_CLASS_SYNTAXES: readonly string[] = MARKDOWN_SUBSET.filter(
+  (r) => r.firstClass,
+).map((r) => r.name);
 
 /** 缩写：会降级的语法名集合。 */
-export const DEGRADED_SYNTAXES: readonly string[] = MARKDOWN_SUBSET.filter((r) => !r.firstClass).map((r) => r.name);
+export const DEGRADED_SYNTAXES: readonly string[] = MARKDOWN_SUBSET.filter(
+  (r) => !r.firstClass,
+).map((r) => r.name);
 
 /**
  * 编辑器允许的标记字符。
@@ -93,7 +97,22 @@ export const DEGRADED_SYNTAXES: readonly string[] = MARKDOWN_SUBSET.filter((r) =
  * 即时渲染（T4.3）在非光标行上折叠标记，需要知道"哪些字符是标记"。
  * 集中在这里，而不是在渲染插件里散着写正则。
  */
-export const MARKDOWN_MARKERS = ["#", "*", "_", ">", "-", "+", "~", "`", "[", "]", "(", ")", "!", "|"] as const;
+export const MARKDOWN_MARKERS = [
+  "#",
+  "*",
+  "_",
+  ">",
+  "-",
+  "+",
+  "~",
+  "`",
+  "[",
+  "]",
+  "(",
+  ")",
+  "!",
+  "|",
+] as const;
 
 /**
  * 判断一个字符是不是 Markdown 标记。

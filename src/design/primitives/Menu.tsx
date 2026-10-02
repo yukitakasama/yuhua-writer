@@ -28,15 +28,14 @@ import { handleListNavigation } from "./keyboardNav";
 import { cx, usePrimitivesStyle } from "./styles";
 
 /** {@link MenuItem} 的 props。 */
-export interface MenuItemProps
-  extends Omit<
-    JSX.ButtonHTMLAttributes<HTMLButtonElement>,
-    // onSelect 必须一并 Omit：原生 <button> 的 onSelect 是「选中文本」事件
-    // （selectstart 系），与菜单语义的「选中该项」完全无关。
-    // 不排除的话，接口继承会因类型不兼容直接编译失败——
-    // 这个编译错误恰好帮我们避免了语义混淆。
-    "onClick" | "onSelect" | "class" | "children" | "type"
-  > {
+export interface MenuItemProps extends Omit<
+  JSX.ButtonHTMLAttributes<HTMLButtonElement>,
+  // onSelect 必须一并 Omit：原生 <button> 的 onSelect 是「选中文本」事件
+  // （selectstart 系），与菜单语义的「选中该项」完全无关。
+  // 不排除的话，接口继承会因类型不兼容直接编译失败——
+  // 这个编译错误恰好帮我们避免了语义混淆。
+  "onClick" | "onSelect" | "class" | "children" | "type"
+> {
   /** 是否禁用。禁用项仍然会被渲染，因为它常常是「为什么不能用」的解释载体。 */
   disabled?: boolean;
   /** 危险操作（删除 / 清空），用危险色与分隔线一起提示。 */
@@ -56,7 +55,13 @@ export interface MenuItemProps
  * <MenuItem onSelect={rename}>重命名章节</MenuItem>
  */
 export const MenuItem: Component<MenuItemProps> = (props) => {
-  const [local, rest] = splitProps(props, ["disabled", "danger", "onSelect", "class", "children"]);
+  const [local, rest] = splitProps(props, [
+    "disabled",
+    "danger",
+    "onSelect",
+    "class",
+    "children",
+  ]);
 
   return (
     <button
@@ -68,7 +73,11 @@ export const MenuItem: Component<MenuItemProps> = (props) => {
       aria-disabled={local.disabled ? "true" : undefined}
       disabled={local.disabled === true}
       data-active="false"
-      class={cx("yh-menu-item", local.danger ? "yh-menu-item--danger" : undefined, local.class)}
+      class={cx(
+        "yh-menu-item",
+        local.danger ? "yh-menu-item--danger" : undefined,
+        local.class,
+      )}
       onClick={(event) => {
         if (local.disabled) {
           event.preventDefault();
@@ -114,7 +123,13 @@ export interface MenuProps {
 export const Menu: Component<MenuProps> = (props) => {
   usePrimitivesStyle();
 
-  const [local, rest] = splitProps(props, ["open", "onClose", "initialFocusIndex", "class", "children"]);
+  const [local, rest] = splitProps(props, [
+    "open",
+    "onClose",
+    "initialFocusIndex",
+    "class",
+    "children",
+  ]);
 
   let list: HTMLDivElement | undefined;
 
@@ -123,17 +138,24 @@ export const Menu: Component<MenuProps> = (props) => {
     if (!list) return [];
     // 用 focusableCandidates 而非 getFocusableElements：roving tabindex 下
     // 只有一项的 tabindex 是 0，其余为 -1，但方向键必须能在全部项之间移动。
-    return focusableCandidates(list).filter((element) => element.getAttribute("aria-disabled") !== "true");
+    return focusableCandidates(list).filter(
+      (element) => element.getAttribute("aria-disabled") !== "true",
+    );
   };
 
   /** 当前高亮项。用 data-active 而不是 :hover，因为键盘移动也要能看到位置。 */
-  const [activeIndex, setActiveIndex] = createSignal(local.initialFocusIndex ?? 0);
+  const [activeIndex, setActiveIndex] = createSignal(
+    local.initialFocusIndex ?? 0,
+  );
 
   const applyActive = (index: number): void => {
     const all = items();
     all.forEach((element, position) => {
       element.setAttribute("tabindex", position === index ? "0" : "-1");
-      element.setAttribute("data-active", position === index ? "true" : "false");
+      element.setAttribute(
+        "data-active",
+        position === index ? "true" : "false",
+      );
     });
     setActiveIndex(index);
   };
@@ -145,7 +167,10 @@ export const Menu: Component<MenuProps> = (props) => {
     // 此刻 $items()$ 已经能取到全部菜单项；延后到微任务反而让
     // 「打开后按方向键」这种紧接着发生的事件先于排布到达，出现首项未聚焦。
     const list = items();
-    const index = Math.min(local.initialFocusIndex ?? 0, Math.max(list.length - 1, 0));
+    const index = Math.min(
+      local.initialFocusIndex ?? 0,
+      Math.max(list.length - 1, 0),
+    );
     applyActive(index);
     list[index]?.focus();
     return undefined;
@@ -164,7 +189,10 @@ export const Menu: Component<MenuProps> = (props) => {
       return;
     }
     const all = items();
-    const consumed = handleListNavigation(event, all, { axis: "vertical", loop: true });
+    const consumed = handleListNavigation(event, all, {
+      axis: "vertical",
+      loop: true,
+    });
     if (consumed) {
       event.preventDefault();
       applyActive(all.indexOf(document.activeElement as HTMLElement));
@@ -219,13 +247,12 @@ export interface MenuListProps extends MenuProps {
 export const MenuList: Component<MenuListProps> = (props) => {
   const [local, rest] = splitProps(props, ["anchorClass", "trigger"]);
   return (
-    <div class={cx("yh-menu-anchor", local.anchorClass)} style={{ position: "relative", display: "inline-block" }}>
+    <div
+      class={cx("yh-menu-anchor", local.anchorClass)}
+      style={{ position: "relative", display: "inline-block" }}
+    >
       {local.trigger}
-      <For each={[0]}>
-        {() => (
-          <Menu {...rest} />
-        )}
-      </For>
+      <For each={[0]}>{() => <Menu {...rest} />}</For>
     </div>
   );
 };

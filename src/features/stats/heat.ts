@@ -21,8 +21,13 @@ export function currentTheme(): ChartTheme {
   const attr = document.documentElement.getAttribute("data-theme");
   if (attr === "dark") return "dark";
   if (attr === "light") return "light";
-  if (typeof window !== "undefined" && typeof window.matchMedia === "function") {
-    return window.matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light";
+  if (
+    typeof window !== "undefined" &&
+    typeof window.matchMedia === "function"
+  ) {
+    return window.matchMedia("(prefers-color-scheme: dark)").matches
+      ? "dark"
+      : "light";
   }
   return "light";
 }
@@ -37,8 +42,13 @@ export function palette(theme: ChartTheme = currentTheme()): readonly string[] {
  *
  * 这是逐格调用的热路径函数：只做一次数组取值，不创建中间对象。
  */
-export function colorForLevel(level: number, theme: ChartTheme = currentTheme()): string {
+export function colorForLevel(
+  level: number,
+  theme: ChartTheme = currentTheme(),
+): string {
   const colors = palette(theme);
-  const index = Number.isFinite(level) ? Math.min(Math.max(Math.floor(level), 0), colors.length - 1) : 0;
+  const index = Number.isFinite(level)
+    ? Math.min(Math.max(Math.floor(level), 0), colors.length - 1)
+    : 0;
   return colors[index] ?? colors[0] ?? "#ebedea";
 }

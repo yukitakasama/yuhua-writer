@@ -46,8 +46,17 @@ export {
 } from "./geometry";
 export type { GridOptions, CellBox, DateParts } from "./geometry";
 
-export { findCell, delegateEvents, cellDataAttrs, crossHighlight } from "./delegate";
-export type { DelegatedHit, DelegatedHandler, DelegatedHandlers } from "./delegate";
+export {
+  findCell,
+  delegateEvents,
+  cellDataAttrs,
+  crossHighlight,
+} from "./delegate";
+export type {
+  DelegatedHit,
+  DelegatedHandler,
+  DelegatedHandlers,
+} from "./delegate";
 
 export {
   formatNumber,

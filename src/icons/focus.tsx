@@ -17,11 +17,11 @@ export function FocusIcon(props: SvgIconProps) {
   return (
     <svg {...iconProps(props)}>
       <circle cx="12" cy="12" r="3" />
-    <path d="M12 3.2v3.2" />
-    <path d="M12 17.6v3.2" />
-    <path d="M3.2 12h3.2" />
-    <path d="M17.6 12h3.2" />
-    <circle cx="12" cy="12" r="8.4" />
+      <path d="M12 3.2v3.2" />
+      <path d="M12 17.6v3.2" />
+      <path d="M3.2 12h3.2" />
+      <path d="M17.6 12h3.2" />
+      <circle cx="12" cy="12" r="8.4" />
     </svg>
   );
 }

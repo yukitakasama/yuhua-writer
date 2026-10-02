@@ -78,7 +78,8 @@ export const ScrollArea: Component<ScrollAreaProps> = (props) => {
       clientHeight: element.clientHeight,
       clientWidth: element.clientWidth,
       // 留 1px 容差：高分辨率屏上 scrollTop 常是小数，严格相等会永远判不到底。
-      atBottom: element.scrollHeight - element.scrollTop - element.clientHeight <= 1,
+      atBottom:
+        element.scrollHeight - element.scrollTop - element.clientHeight <= 1,
     };
     setInfo(next);
     local.onScroll?.(next);
@@ -102,7 +103,10 @@ export const ScrollArea: Component<ScrollAreaProps> = (props) => {
         {local.children}
       </div>
       {/* 供调用方与测试读取最近一次的滚动状态；不渲染任何可见内容。 */}
-      <span class="yh-visually-hidden" data-scroll-state={info()?.atBottom ? "bottom" : "not-bottom"} />
+      <span
+        class="yh-visually-hidden"
+        data-scroll-state={info()?.atBottom ? "bottom" : "not-bottom"}
+      />
     </div>
   );
 };

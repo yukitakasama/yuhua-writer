@@ -72,7 +72,9 @@ function ensureStyle(): HTMLStyleElement | null {
 }
 
 /** 把排版设置折算成 CSS 自定义属性表。纯函数，便于单测。 */
-export function typographyVariables(typo: TypographySettings): Record<string, string> {
+export function typographyVariables(
+  typo: TypographySettings,
+): Record<string, string> {
   return {
     "--font-body": fontFamilyById(typo.body.family).stack,
     "--font-heading": fontFamilyById(typo.heading.family).stack,
@@ -141,11 +143,16 @@ export function applyTheme(
 }
 
 /** 读出当前实际生效的主题（把 system 解析成真实的亮/暗）。 */
-export function resolveTheme(theme: "light" | "dark" | "system"): "light" | "dark" {
+export function resolveTheme(
+  theme: "light" | "dark" | "system",
+): "light" | "dark" {
   if (theme !== "system") return theme;
-  if (typeof window === "undefined" || typeof window.matchMedia !== "function") return "light";
+  if (typeof window === "undefined" || typeof window.matchMedia !== "function")
+    return "light";
   try {
-    return window.matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light";
+    return window.matchMedia("(prefers-color-scheme: dark)").matches
+      ? "dark"
+      : "light";
   } catch {
     return "light";
   }

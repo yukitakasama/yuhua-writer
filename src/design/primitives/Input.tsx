@@ -10,12 +10,20 @@
  * - label、hint、error 通过 aria-describedby 关联，读屏会连同错误原因一起念出。
  */
 
-import { createUniqueId, Show, splitProps, type Component, type JSX } from "solid-js";
+import {
+  createUniqueId,
+  Show,
+  splitProps,
+  type Component,
+  type JSX,
+} from "solid-js";
 import { cx, usePrimitivesStyle } from "./styles";
 
 /** {@link Input} 的 props。 */
-export interface InputProps
-  extends Omit<JSX.InputHTMLAttributes<HTMLInputElement>, "value" | "onInput" | "class"> {
+export interface InputProps extends Omit<
+  JSX.InputHTMLAttributes<HTMLInputElement>,
+  "value" | "onInput" | "class"
+> {
   /** 受控值。 */
   value?: string;
   /** 输入回调，参数为当前输入框文本。 */
@@ -39,7 +47,14 @@ export interface InputProps
 export const Input: Component<InputProps> = (props) => {
   usePrimitivesStyle();
 
-  const [local, rest] = splitProps(props, ["value", "onInput", "error", "hint", "label", "class"]);
+  const [local, rest] = splitProps(props, [
+    "value",
+    "onInput",
+    "error",
+    "hint",
+    "label",
+    "class",
+  ]);
 
   const inputId = createUniqueId();
   const errorId = inputId + "-error";
@@ -61,7 +76,11 @@ export const Input: Component<InputProps> = (props) => {
       <input
         {...rest}
         id={rest.id ?? inputId}
-        class={cx("yh-input", local.error ? "yh-input--invalid" : undefined, local.class)}
+        class={cx(
+          "yh-input",
+          local.error ? "yh-input--invalid" : undefined,
+          local.class,
+        )}
         value={local.value ?? ""}
         aria-invalid={local.error ? "true" : undefined}
         aria-describedby={describedBy()}

@@ -24,7 +24,11 @@ export function normalizeError(raw: unknown): IpcError {
   // 它跨越了"抛出"这个边界，因此和 Tauri 的 reject 值一样需要被识别。
   // 如果不先检查这里，mock 的错误码就会全部退化成 INTERNAL，
   // 界面上就无法按 code 分支给出针对性的提示。
-  if (raw instanceof Error && "error" in raw && isIpcError((raw as { error: unknown }).error)) {
+  if (
+    raw instanceof Error &&
+    "error" in raw &&
+    isIpcError((raw as { error: unknown }).error)
+  ) {
     return (raw as unknown as { error: IpcError }).error;
   }
 
@@ -50,8 +54,10 @@ export function normalizeError(raw: unknown): IpcError {
 
   if (raw !== null && typeof raw === "object") {
     const obj = raw as Record<string, unknown>;
-    const code = typeof obj["code"] === "string" ? obj["code"] : ERROR_CODES.internal;
-    const message = typeof obj["message"] === "string" ? obj["message"] : "未知错误";
+    const code =
+      typeof obj["code"] === "string" ? obj["code"] : ERROR_CODES.internal;
+    const message =
+      typeof obj["message"] === "string" ? obj["message"] : "未知错误";
     const recoverable = obj["recoverable"] === true;
     const detail = typeof obj["detail"] === "string" ? obj["detail"] : null;
     return { code, message, recoverable, detail };
@@ -69,7 +75,11 @@ export function normalizeError(raw: unknown): IpcError {
 export function isIpcError(value: unknown): value is IpcError {
   if (value === null || typeof value !== "object") return false;
   const v = value as Record<string, unknown>;
-  return typeof v["code"] === "string" && typeof v["message"] === "string" && typeof v["recoverable"] === "boolean";
+  return (
+    typeof v["code"] === "string" &&
+    typeof v["message"] === "string" &&
+    typeof v["recoverable"] === "boolean"
+  );
 }
 
 /**

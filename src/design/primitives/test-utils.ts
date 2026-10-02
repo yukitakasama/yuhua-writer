@@ -31,12 +31,20 @@ export function mockReducedMotion(reduced: boolean): void {
     removeEventListener: vi.fn(),
     dispatchEvent: vi.fn(),
   }));
-  Object.defineProperty(window, "matchMedia", { writable: true, configurable: true, value: matchMedia });
+  Object.defineProperty(window, "matchMedia", {
+    writable: true,
+    configurable: true,
+    value: matchMedia,
+  });
 }
 
 /** 移除 matchMedia，用于测试「宿主环境没有 matchMedia」的兜底路径。 */
 export function removeMatchMedia(): void {
-  Object.defineProperty(window, "matchMedia", { writable: true, configurable: true, value: undefined });
+  Object.defineProperty(window, "matchMedia", {
+    writable: true,
+    configurable: true,
+    value: undefined,
+  });
 }
 
 /** 恢复 host 提供的 matchMedia。 */
@@ -61,7 +69,10 @@ afterEach(() => {
 });
 
 /** 断言元素拥有某个 class。 */
-export function hasClass(element: Element | null | undefined, className: string): boolean {
+export function hasClass(
+  element: Element | null | undefined,
+  className: string,
+): boolean {
   return element instanceof Element && element.classList.contains(className);
 }
 
@@ -71,8 +82,17 @@ export function hasClass(element: Element | null | undefined, className: string)
  * 用真实 KeyboardEvent 而不是测试库的合成事件：焦点陷阱与键盘导航
  * 都挂在 document 的捕获阶段，只有真实的事件对象才会走完整条冒泡链路。
  */
-export function pressKey(target: EventTarget, key: string, options: KeyboardEventInit = {}): void {
+export function pressKey(
+  target: EventTarget,
+  key: string,
+  options: KeyboardEventInit = {},
+): void {
   target.dispatchEvent(
-    new KeyboardEvent("keydown", { key, bubbles: true, cancelable: true, ...options }),
+    new KeyboardEvent("keydown", {
+      key,
+      bubbles: true,
+      cancelable: true,
+      ...options,
+    }),
   );
 }

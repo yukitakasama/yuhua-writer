@@ -55,7 +55,9 @@ export interface HeatmapViewProps {
 
 /** 年热力图。 */
 export function HeatmapView(props: HeatmapViewProps): JSX.Element {
-  const cells = createMemo(() => yearGrid(props.days, props.year, props.thresholds, props.hasSamples));
+  const cells = createMemo(() =>
+    yearGrid(props.days, props.year, props.thresholds, props.hasSamples),
+  );
   const canvas = heatmapCanvas();
   const ticks = createMemo(() => monthTicks(props.year));
 
@@ -72,19 +74,29 @@ export function HeatmapView(props: HeatmapViewProps): JSX.Element {
     return { words, active, best };
   });
 
-  const xOf = (column: number): number => HEATMAP_HEAD_WIDTH + column * (HEATMAP_CELL + HEATMAP_GAP);
-  const yOf = (row: number): number => HEATMAP_HEAD_HEIGHT + row * (HEATMAP_CELL + HEATMAP_GAP);
+  const xOf = (column: number): number =>
+    HEATMAP_HEAD_WIDTH + column * (HEATMAP_CELL + HEATMAP_GAP);
+  const yOf = (row: number): number =>
+    HEATMAP_HEAD_HEIGHT + row * (HEATMAP_CELL + HEATMAP_GAP);
 
   return (
     <div class="stats-heat">
       <div class="stats-cal__head">
         <p class="stats-cal__total yh-num">
-          {t("stats.heatmapTotal", { words: total().words.toLocaleString("zh-CN") })}
+          {t("stats.heatmapTotal", {
+            words: total().words.toLocaleString("zh-CN"),
+          })}
         </p>
         <ul class="stats-legend" aria-label={t("stats.heatmapLegend")}>
           <li class="stats-legend__text">{t("stats.heatmapLess")}</li>
           <For each={palette()}>
-            {(color) => <li class="stats-legend__swatch" style={{ background: color }} aria-hidden="true" />}
+            {(color) => (
+              <li
+                class="stats-legend__swatch"
+                style={{ background: color }}
+                aria-hidden="true"
+              />
+            )}
           </For>
           <li class="stats-legend__text">{t("stats.heatmapMore")}</li>
         </ul>
@@ -101,9 +113,15 @@ export function HeatmapView(props: HeatmapViewProps): JSX.Element {
       </div>
 
       <p class="stats-heat__meta">
-        <span class="yh-num">{t("stats.heatmapActiveDays", { days: total().active })}</span>
+        <span class="yh-num">
+          {t("stats.heatmapActiveDays", { days: total().active })}
+        </span>
         <span aria-hidden="true"> · </span>
-        <span class="yh-num">{t("stats.heatmapBestDay", { words: total().best.toLocaleString("zh-CN") })}</span>
+        <span class="yh-num">
+          {t("stats.heatmapBestDay", {
+            words: total().best.toLocaleString("zh-CN"),
+          })}
+        </span>
       </p>
 
       {/* 月份表头与行标签：跟着 SVG 的坐标系走，因此也用 SVG 画 */}
@@ -125,10 +143,20 @@ export function HeatmapView(props: HeatmapViewProps): JSX.Element {
         </svg>
 
         <div class="stats-heat__row">
-          <svg class="stats-heat__labels" width={HEATMAP_HEAD_WIDTH} height={canvas.height} viewBox={`0 0 ${HEATMAP_HEAD_WIDTH} ${canvas.height}`} aria-hidden="true">
+          <svg
+            class="stats-heat__labels"
+            width={HEATMAP_HEAD_WIDTH}
+            height={canvas.height}
+            viewBox={`0 0 ${HEATMAP_HEAD_WIDTH} ${canvas.height}`}
+            aria-hidden="true"
+          >
             <For each={HEATMAP_ROW_LABELS}>
               {(label) => (
-                <text class="stats-heat__weekday" x={0} y={yOf(label.row) + HEATMAP_CELL - 1}>
+                <text
+                  class="stats-heat__weekday"
+                  x={0}
+                  y={yOf(label.row) + HEATMAP_CELL - 1}
+                >
                   {label.text}
                 </text>
               )}
@@ -149,9 +177,15 @@ export function HeatmapView(props: HeatmapViewProps): JSX.Element {
             height={canvas.height - HEATMAP_HEAD_HEIGHT}
             label={t("stats.heatmapGrid", { year: props.year })}
             tooltip={(cell) => (
-              <Show when={cell.inRange} fallback={<p class="stats-pop__muted">{cell.date}</p>}>
+              <Show
+                when={cell.inRange}
+                fallback={<p class="stats-pop__muted">{cell.date}</p>}
+              >
                 <p class="stats-pop__value yh-num">
-                  {t("stats.heatmapCellA11y", { date: cell.date, words: cell.words.toLocaleString("zh-CN") })}
+                  {t("stats.heatmapCellA11y", {
+                    date: cell.date,
+                    words: cell.words.toLocaleString("zh-CN"),
+                  })}
                 </p>
               </Show>
             )}

@@ -9,12 +9,20 @@
  *    （Ctrl+Enter 由调用方在 onKeyDown 里接管）。
  */
 
-import { createUniqueId, Show, splitProps, type Component, type JSX } from "solid-js";
+import {
+  createUniqueId,
+  Show,
+  splitProps,
+  type Component,
+  type JSX,
+} from "solid-js";
 import { cx, usePrimitivesStyle } from "./styles";
 
 /** {@link Textarea} 的 props。 */
-export interface TextareaProps
-  extends Omit<JSX.TextareaHTMLAttributes<HTMLTextAreaElement>, "value" | "onInput" | "class"> {
+export interface TextareaProps extends Omit<
+  JSX.TextareaHTMLAttributes<HTMLTextAreaElement>,
+  "value" | "onInput" | "class"
+> {
   /** 受控值。 */
   value?: string;
   /** 输入回调。 */
@@ -40,7 +48,14 @@ export interface TextareaProps
 export const Textarea: Component<TextareaProps> = (props) => {
   usePrimitivesStyle();
 
-  const [local, rest] = splitProps(props, ["value", "onInput", "error", "hint", "label", "class"]);
+  const [local, rest] = splitProps(props, [
+    "value",
+    "onInput",
+    "error",
+    "hint",
+    "label",
+    "class",
+  ]);
 
   const areaId = createUniqueId();
   const errorId = areaId + "-error";
@@ -57,10 +72,16 @@ export const Textarea: Component<TextareaProps> = (props) => {
         {...rest}
         id={rest.id ?? areaId}
         rows={rest.rows ?? 4}
-        class={cx("yh-textarea", local.error ? "yh-textarea--invalid" : undefined, local.class)}
+        class={cx(
+          "yh-textarea",
+          local.error ? "yh-textarea--invalid" : undefined,
+          local.class,
+        )}
         value={local.value ?? ""}
         aria-invalid={local.error ? "true" : undefined}
-        aria-describedby={local.error ? errorId : local.hint ? hintId : undefined}
+        aria-describedby={
+          local.error ? errorId : local.hint ? hintId : undefined
+        }
         onInput={(event) => local.onInput?.(event.currentTarget.value, event)}
       />
       <Show when={local.error}>

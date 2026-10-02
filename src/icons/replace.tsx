@@ -17,10 +17,10 @@ export function ReplaceIcon(props: SvgIconProps) {
   return (
     <svg {...iconProps(props)}>
       <path d="M4.5 6.2h10" />
-    <path d="M11.5 3.4l2.8 2.8-2.8 2.8" />
-    <path d="M19.5 17.8h-10" />
-    <path d="M12.5 15l-2.8 2.8 2.8 2.8" />
-    <path d="M12 10.4v3.4" />
+      <path d="M11.5 3.4l2.8 2.8-2.8 2.8" />
+      <path d="M19.5 17.8h-10" />
+      <path d="M12.5 15l-2.8 2.8 2.8 2.8" />
+      <path d="M12 10.4v3.4" />
     </svg>
   );
 }

@@ -13,10 +13,21 @@ import { For, Show, createMemo, type JSX } from "solid-js";
 import { t } from "@/strings";
 import { IconClose } from "@/app/ui/icons";
 import { IconButton } from "@/app/ui/IconButton";
-import { DEFAULT_BINDINGS, detectMac, displayChord, findConflicts, type KeyBinding } from "./shortcuts";
+import {
+  DEFAULT_BINDINGS,
+  detectMac,
+  displayChord,
+  findConflicts,
+  type KeyBinding,
+} from "./shortcuts";
 
 /** 分组顺序。写作排第一：那是这个软件的全部意义。 */
-const GROUP_ORDER: Array<KeyBinding["group"]> = ["写作", "导航", "编辑器", "视图"];
+const GROUP_ORDER: Array<KeyBinding["group"]> = [
+  "写作",
+  "导航",
+  "编辑器",
+  "视图",
+];
 
 /** 快捷键面板。 */
 export function ShortcutPanel(props: { onClose: () => void }): JSX.Element {
@@ -31,7 +42,9 @@ export function ShortcutPanel(props: { onClose: () => void }): JSX.Element {
   );
 
   /** 冲突的键位集合。 */
-  const conflicts = createMemo(() => new Set(findConflicts(DEFAULT_BINDINGS).keys()));
+  const conflicts = createMemo(
+    () => new Set(findConflicts(DEFAULT_BINDINGS).keys()),
+  );
 
   return (
     <div
@@ -59,14 +72,28 @@ export function ShortcutPanel(props: { onClose: () => void }): JSX.Element {
                 <dl class="shortcut-list">
                   <For each={entry.items}>
                     {(binding) => (
-                      <div class="shortcut-row" classList={{ "shortcut-row--conflict": conflicts().has(binding.keys) }}>
+                      <div
+                        class="shortcut-row"
+                        classList={{
+                          "shortcut-row--conflict": conflicts().has(
+                            binding.keys,
+                          ),
+                        }}
+                      >
                         <dt class="shortcut-row__label">{binding.label}</dt>
                         <dd class="shortcut-row__keys">
                           <Show
                             when={conflicts().has(binding.keys)}
-                            fallback={<kbd class="kbd">{displayChord(binding.keys, isMac)}</kbd>}
+                            fallback={
+                              <kbd class="kbd">
+                                {displayChord(binding.keys, isMac)}
+                              </kbd>
+                            }
                           >
-                            <kbd class="kbd kbd--conflict" title={t("shortcuts.conflict")}>
+                            <kbd
+                              class="kbd kbd--conflict"
+                              title={t("shortcuts.conflict")}
+                            >
                               {displayChord(binding.keys, isMac)}
                             </kbd>
                           </Show>

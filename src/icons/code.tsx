@@ -17,8 +17,8 @@ export function CodeIcon(props: SvgIconProps) {
   return (
     <svg {...iconProps(props)}>
       <path d="M8.5 8.5L4.5 12l4 3.5" />
-    <path d="M15.5 8.5l4 3.5-4 3.5" />
-    <path d="M13.6 5.5l-3.2 13" />
+      <path d="M15.5 8.5l4 3.5-4 3.5" />
+      <path d="M13.6 5.5l-3.2 13" />
     </svg>
   );
 }

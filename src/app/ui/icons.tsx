@@ -123,7 +123,9 @@ export function IconPanelRight(props: IconProps): JSX.Element {
 }
 
 /** 三角：展开 / 折叠树节点。 */
-export function IconChevron(props: IconProps & { open?: boolean }): JSX.Element {
+export function IconChevron(
+  props: IconProps & { open?: boolean },
+): JSX.Element {
   return (
     <Svg {...props}>
       {/* 用一条直角折线表示，旋转由 CSS 的 transform 完成（只动画 transform） */}

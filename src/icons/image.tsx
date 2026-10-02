@@ -17,9 +17,9 @@ export function ImageIcon(props: SvgIconProps) {
   return (
     <svg {...iconProps(props)}>
       <rect x="3.5" y="5" width="17" height="14" rx="2" />
-    <circle cx="9" cy="10" r="1.6" />
-    <path d="M3.5 16.5l4.6-4.2a2 2 0 0 1 2.7 0l3.3 3" />
-    <path d="M12.6 14.4l2.2-2a2 2 0 0 1 2.7 0l2.9 2.6" />
+      <circle cx="9" cy="10" r="1.6" />
+      <path d="M3.5 16.5l4.6-4.2a2 2 0 0 1 2.7 0l3.3 3" />
+      <path d="M12.6 14.4l2.2-2a2 2 0 0 1 2.7 0l2.9 2.6" />
     </svg>
   );
 }

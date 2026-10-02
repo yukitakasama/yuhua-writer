@@ -37,18 +37,26 @@ type Mode = "volume" | "chapter";
 export function BreakdownView(props: BreakdownViewProps): JSX.Element {
   const [mode, setMode] = createSignal<Mode>("volume");
 
-  const volumes = createMemo<BreakdownInput[]>(() => props.volumes.filter((v) => v.volumeWords > 0 || v.chapters.length > 0));
+  const volumes = createMemo<BreakdownInput[]>(() =>
+    props.volumes.filter((v) => v.volumeWords > 0 || v.chapters.length > 0),
+  );
 
   const rows = createMemo<BreakdownRow[]>(() => {
     const all = breakdownRows(volumes());
     return mode() === "volume" ? all.filter((row) => row.depth === 0) : all;
   });
 
-  const maxWords = createMemo(() => rows().reduce((max, row) => Math.max(max, row.words), 0));
+  const maxWords = createMemo(() =>
+    rows().reduce((max, row) => Math.max(max, row.words), 0),
+  );
 
   return (
     <div class="stats-breakdown">
-      <div class="stats-breakdown__tabs" role="tablist" aria-label={t("stats.breakdownTitle")}>
+      <div
+        class="stats-breakdown__tabs"
+        role="tablist"
+        aria-label={t("stats.breakdownTitle")}
+      >
         <button
           type="button"
           role="tab"
@@ -69,11 +77,17 @@ export function BreakdownView(props: BreakdownViewProps): JSX.Element {
         </button>
       </div>
 
-      <Show when={rows().length > 0} fallback={<p class="stats-empty-inline">{t("stats.breakdownEmpty")}</p>}>
+      <Show
+        when={rows().length > 0}
+        fallback={<p class="stats-empty-inline">{t("stats.breakdownEmpty")}</p>}
+      >
         <ul class="stats-bars" aria-label={t("stats.breakdownChart")}>
           <For each={rows()}>
             {(row) => (
-              <li class="stats-bar" classList={{ "is-chapter": row.depth === 1 }}>
+              <li
+                class="stats-bar"
+                classList={{ "is-chapter": row.depth === 1 }}
+              >
                 <span class="stats-bar__label" title={row.label}>
                   {row.label}
                 </span>
@@ -87,8 +101,12 @@ export function BreakdownView(props: BreakdownViewProps): JSX.Element {
                     }}
                   />
                 </span>
-                <span class="stats-bar__value yh-num">{row.words.toLocaleString("zh-CN")}</span>
-                <span class="stats-bar__share yh-num">{formatShare(row.share)}</span>
+                <span class="stats-bar__value yh-num">
+                  {row.words.toLocaleString("zh-CN")}
+                </span>
+                <span class="stats-bar__share yh-num">
+                  {formatShare(row.share)}
+                </span>
               </li>
             )}
           </For>

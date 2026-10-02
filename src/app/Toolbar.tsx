@@ -72,7 +72,11 @@ export function Toolbar(props: ToolbarProps): JSX.Element {
           <IconBack size={17} />
         </IconButton>
         <IconButton
-          label={layout.leftCollapsed ? t("toolbar.toggleLeft") : t("toolbar.toggleLeft")}
+          label={
+            layout.leftCollapsed
+              ? t("toolbar.toggleLeft")
+              : t("toolbar.toggleLeft")
+          }
           active={!layout.leftCollapsed}
           onClick={toggleLeft}
         >
@@ -100,7 +104,11 @@ export function Toolbar(props: ToolbarProps): JSX.Element {
 
       <div class="toolbar__group toolbar__group--right">
         <Button
-          variant={props.saveState === "dirty" || props.saveState === "failed" ? "solid" : "ghost"}
+          variant={
+            props.saveState === "dirty" || props.saveState === "failed"
+              ? "solid"
+              : "ghost"
+          }
           size="sm"
           onClick={props.onSave}
           disabled={props.saveState === "saving"}
@@ -122,7 +130,11 @@ export function Toolbar(props: ToolbarProps): JSX.Element {
           <IconStats size={17} />
         </IconButton>
         <IconButton
-          label={layout.rightCollapsed ? t("toolbar.toggleRight") : t("toolbar.toggleRight")}
+          label={
+            layout.rightCollapsed
+              ? t("toolbar.toggleRight")
+              : t("toolbar.toggleRight")
+          }
           active={!layout.rightCollapsed}
           onClick={toggleRight}
         >
@@ -152,7 +164,12 @@ function SaveIndicator(props: { state: SaveState }): JSX.Element {
   };
 
   return (
-    <span class={`save-dot save-dot--${props.state}`} role="status" aria-live="polite" title={label()}>
+    <span
+      class={`save-dot save-dot--${props.state}`}
+      role="status"
+      aria-live="polite"
+      title={label()}
+    >
       <span class="save-dot__mark" aria-hidden="true" />
       <span class="save-dot__text">{label()}</span>
     </span>
@@ -166,7 +183,11 @@ function SaveIndicator(props: { state: SaveState }): JSX.Element {
  * （书架没有"新建卷"，有的是"打开已有工作区"）。
  * 用一个组件加一堆条件判断会让每个按钮都得考虑"在不在书架"。
  */
-export function LibraryToolbar(props: { onSearch: () => void; onSettings: () => void; onNewWorkspace: () => void }): JSX.Element {
+export function LibraryToolbar(props: {
+  onSearch: () => void;
+  onSettings: () => void;
+  onNewWorkspace: () => void;
+}): JSX.Element {
   return (
     <header class="toolbar toolbar--library">
       <div class="toolbar__group toolbar__group--left">

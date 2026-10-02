@@ -26,7 +26,9 @@ describe("组件预览页：整体渲染", () => {
 
   it("渲染出计划书要求的主要分区", () => {
     render(() => <DevKit />);
-    const headings = screen.getAllByRole("heading", { level: 2 }).map((h) => h.textContent ?? "");
+    const headings = screen
+      .getAllByRole("heading", { level: 2 })
+      .map((h) => h.textContent ?? "");
     // 至少要有按钮、输入、容器、动效、图表这几个分区
     expect(headings.length).toBeGreaterThanOrEqual(5);
     expect(headings.some((h) => h.includes("按钮"))).toBe(true);
@@ -155,7 +157,8 @@ describe("组件预览页：无障碍", () => {
     const { container } = render(() => <DevKit />);
     // 覆盖常见 emoji 区段。全仓零 emoji 是计划书 A8 的要求
     const text = container.textContent ?? "";
-    const emojiPattern = /[\u{1F300}-\u{1FAFF}\u{2600}-\u{27BF}\u{2190}-\u{21FF}\u{2B00}-\u{2BFF}]/u;
+    const emojiPattern =
+      /[\u{1F300}-\u{1FAFF}\u{2600}-\u{27BF}\u{2190}-\u{21FF}\u{2B00}-\u{2BFF}]/u;
     expect(emojiPattern.test(text)).toBe(false);
   });
 

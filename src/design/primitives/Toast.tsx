@@ -121,7 +121,8 @@ export const toast = {
 /** 生成提示 id。优先用 crypto.randomUUID，测试环境没有则退化为计数器。 */
 let fallbackCounter = 0;
 function cryptoId(): string {
-  const cryptoApi = (globalThis as { crypto?: { randomUUID?: () => string } }).crypto;
+  const cryptoApi = (globalThis as { crypto?: { randomUUID?: () => string } })
+    .crypto;
   if (cryptoApi?.randomUUID) return cryptoApi.randomUUID();
   fallbackCounter += 1;
   return "toast-" + fallbackCounter;
@@ -130,7 +131,8 @@ function cryptoId(): string {
 // ---- 组件 ----
 
 /** 提示锚点位置。默认右下角，远离正文主要视觉动线。 */
-export type ToastPlacement = "top-left" | "top-right" | "bottom-left" | "bottom-right";
+export type ToastPlacement =
+  "top-left" | "top-right" | "bottom-left" | "bottom-right";
 
 /** {@link Toast} 的 props。 */
 export interface ToastProps {
@@ -148,7 +150,11 @@ export const Toast: Component<ToastProps> = (props) => {
 
   return (
     <div
-      class={cx("yh-toast", "yh-toast--" + (local.item.tone ?? "info"), local.class)}
+      class={cx(
+        "yh-toast",
+        "yh-toast--" + (local.item.tone ?? "info"),
+        local.class,
+      )}
       data-state="open"
       data-toast-id={local.item.id}
       style={{
@@ -223,11 +229,19 @@ export const ToastRegion: Component<ToastRegionProps> = (props) => {
 
   return (
     <div
-      class={cx("yh-toast-region", "yh-toast-region--" + (local.placement ?? "bottom-right"), local.class)}
+      class={cx(
+        "yh-toast-region",
+        "yh-toast-region--" + (local.placement ?? "bottom-right"),
+        local.class,
+      )}
       aria-live="polite"
       aria-label="通知"
     >
-      <For each={source().slice()}>{(item) => <Toast item={item} onClose={local.onClose ?? dismissToast} />}</For>
+      <For each={source().slice()}>
+        {(item) => (
+          <Toast item={item} onClose={local.onClose ?? dismissToast} />
+        )}
+      </For>
     </div>
   );
 };

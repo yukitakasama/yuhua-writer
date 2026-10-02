@@ -30,7 +30,16 @@
  * 不划算，而且 Tauri 里没有 URL 语义。
  */
 
-import { Match, Show, Switch, createEffect, createMemo, createSignal, onMount, type JSX } from "solid-js";
+import {
+  Match,
+  Show,
+  Switch,
+  createEffect,
+  createMemo,
+  createSignal,
+  onMount,
+  type JSX,
+} from "solid-js";
 
 import { t } from "@/strings";
 import { isTauri } from "@/lib/ipc";
@@ -44,7 +53,10 @@ import { LibraryToolbar, Toolbar, type SaveState } from "./app/Toolbar";
 import { IconClose, IconWarning } from "./app/ui/icons";
 import { IconButton } from "./app/ui/IconButton";
 import { SearchPanel } from "@/features/search/SearchPanel";
-import { CommandPalette, type CommandItem } from "@/features/command/CommandPalette";
+import {
+  CommandPalette,
+  type CommandItem,
+} from "@/features/command/CommandPalette";
 import { StatsView } from "@/features/stats/StatsView";
 import { ShortcutPanel } from "@/features/editor/ShortcutPanel";
 import { useShortcuts } from "@/features/editor/shortcut-bindings";
@@ -75,8 +87,16 @@ import {
   createFirstChapter,
   volumes,
 } from "./app/workspace-store";
-import { allChaptersInOrder, defaultVolumeTitle } from "@/features/chapters/tree-ops";
-import { FirstRunWizard, SettingsPanel, hasCompletedOnboarding, useAppearance } from "@/features/settings";
+import {
+  allChaptersInOrder,
+  defaultVolumeTitle,
+} from "@/features/chapters/tree-ops";
+import {
+  FirstRunWizard,
+  SettingsPanel,
+  hasCompletedOnboarding,
+  useAppearance,
+} from "@/features/settings";
 
 /** 应用外壳。 */
 export function App(): JSX.Element {
@@ -90,7 +110,8 @@ export function App(): JSX.Element {
   const [shortcutsOpen, setShortcutsOpen] = createSignal(false);
   // 首次启动向导（T9.7）：只在「从未引导过」时展示，走完或跳过都会写标记
   const [wizardOpen, setWizardOpen] = createSignal(!hasCompletedOnboarding());
-  const [editorSaveState, setEditorSaveState] = createSignal<EditorSaveState>("idle");
+  const [editorSaveState, setEditorSaveState] =
+    createSignal<EditorSaveState>("idle");
   let saveEditor: (() => Promise<void>) | undefined;
 
   // 把生效的外观设置写进 CSS 变量与 html[data-theme]。
@@ -113,14 +134,42 @@ export function App(): JSX.Element {
     { id: "commandPalette", run: () => setCommandOpen(true) },
     { id: "search", run: () => setSearchOpen(true) },
     { id: "shortcutPanel", run: () => setShortcutsOpen(true) },
-    { id: "save", run: () => void saveEditor?.(), enabled: () => hasOpenWorkspace() && editorSaveState() !== "saving" },
-    { id: "focusMode", run: toggleFocusMode, enabled: () => layout.view === "workspace" },
-    { id: "toggleLeft", run: toggleLeft, enabled: () => layout.view === "workspace" },
-    { id: "toggleRight", run: toggleRight, enabled: () => layout.view === "workspace" },
-    { id: "newChapter", run: () => void createFirstChapter(), enabled: () => hasOpenWorkspace() },
+    {
+      id: "save",
+      run: () => void saveEditor?.(),
+      enabled: () => hasOpenWorkspace() && editorSaveState() !== "saving",
+    },
+    {
+      id: "focusMode",
+      run: toggleFocusMode,
+      enabled: () => layout.view === "workspace",
+    },
+    {
+      id: "toggleLeft",
+      run: toggleLeft,
+      enabled: () => layout.view === "workspace",
+    },
+    {
+      id: "toggleRight",
+      run: toggleRight,
+      enabled: () => layout.view === "workspace",
+    },
+    {
+      id: "newChapter",
+      run: () => void createFirstChapter(),
+      enabled: () => hasOpenWorkspace(),
+    },
     // 「下一章 / 上一章」按顺序在卷章树里走
-    { id: "nextChapter", run: () => stepChapter(1), enabled: () => hasOpenWorkspace() },
-    { id: "prevChapter", run: () => stepChapter(-1), enabled: () => hasOpenWorkspace() },
+    {
+      id: "nextChapter",
+      run: () => stepChapter(1),
+      enabled: () => hasOpenWorkspace(),
+    },
+    {
+      id: "prevChapter",
+      run: () => stepChapter(-1),
+      enabled: () => hasOpenWorkspace(),
+    },
   ]);
 
   // 有打开的章节就切到写作台，否则停在书架。
@@ -147,7 +196,10 @@ export function App(): JSX.Element {
     void openWorkspace(root);
   };
 
-  const handleCreateWorkspace = async (root: string, title: string): Promise<boolean> => {
+  const handleCreateWorkspace = async (
+    root: string,
+    title: string,
+  ): Promise<boolean> => {
     const ok = await createWorkspace(root, title);
     if (ok) setCreatingWorkspace(false);
     return ok;
@@ -158,7 +210,8 @@ export function App(): JSX.Element {
     const list = allChaptersInOrder(workspaceState.document);
     if (list.length === 0) return;
     const currentId = selectedChapterId();
-    const at = currentId === null ? -1 : list.findIndex((c) => c.id === currentId);
+    const at =
+      currentId === null ? -1 : list.findIndex((c) => c.id === currentId);
     // 没选中时：往后走取第一章，往前走取最后一章。
     // 这样两个方向都不会"按了没反应"
     const nextIndex = at < 0 ? (delta > 0 ? 0 : list.length - 1) : at + delta;
@@ -263,7 +316,9 @@ export function App(): JSX.Element {
         {/* 写作统计（M8）：独立的一屏，因为它有六个分区与两张整幅的图，
             塞进三栏布局里的任何一栏都放不下 */}
         <Match when={layout.view === "stats" && !creatingWorkspace()}>
-          <StatsView onBack={() => setView(hasOpenWorkspace() ? "workspace" : "library")} />
+          <StatsView
+            onBack={() => setView(hasOpenWorkspace() ? "workspace" : "library")}
+          />
         </Match>
 
         <Match when={layout.view === "library" || creatingWorkspace()}>
@@ -281,7 +336,11 @@ export function App(): JSX.Element {
               />
             }
           >
-            <LibraryView recents={workspaceState.recents} onOpen={handleOpen} onNewWorkspace={() => setCreatingWorkspace(true)} />
+            <LibraryView
+              recents={workspaceState.recents}
+              onOpen={handleOpen}
+              onNewWorkspace={() => setCreatingWorkspace(true)}
+            />
           </Show>
         </Match>
 
@@ -312,12 +371,22 @@ export function App(): JSX.Element {
               "--right-w": `${layout.rightWidth}px`,
             }}
           >
-            <div class="shell__left" aria-label={t("a11y.leftPanel")} aria-hidden={layout.leftCollapsed}>
+            <div
+              class="shell__left"
+              aria-label={t("a11y.leftPanel")}
+              aria-hidden={layout.leftCollapsed}
+            >
               <ChapterTree />
             </div>
 
             <Show when={!layout.leftCollapsed}>
-              <Resizer side="left" getWidth={() => layout.leftWidth} setWidth={setLeftWidth} min={LEFT_MIN} max={LEFT_MAX} />
+              <Resizer
+                side="left"
+                getWidth={() => layout.leftWidth}
+                setWidth={setLeftWidth}
+                min={LEFT_MIN}
+                max={LEFT_MAX}
+              />
             </Show>
 
             <EditorPane
@@ -328,10 +397,20 @@ export function App(): JSX.Element {
             />
 
             <Show when={!layout.rightCollapsed}>
-              <Resizer side="right" getWidth={() => layout.rightWidth} setWidth={setRightWidth} min={RIGHT_MIN} max={RIGHT_MAX} />
+              <Resizer
+                side="right"
+                getWidth={() => layout.rightWidth}
+                setWidth={setRightWidth}
+                min={RIGHT_MIN}
+                max={RIGHT_MAX}
+              />
             </Show>
 
-            <div class="shell__right" aria-label={t("a11y.rightPanel")} aria-hidden={layout.rightCollapsed}>
+            <div
+              class="shell__right"
+              aria-label={t("a11y.rightPanel")}
+              aria-hidden={layout.rightCollapsed}
+            >
               <MetaPanel />
             </div>
           </div>
@@ -342,13 +421,23 @@ export function App(): JSX.Element {
       <SearchPanel open={searchOpen()} onClose={() => setSearchOpen(false)} />
 
       {/* 命令面板（T5.7）：Ctrl/Cmd + K */}
-      <CommandPalette open={commandOpen()} onClose={() => setCommandOpen(false)} commands={commands()} />
+      <CommandPalette
+        open={commandOpen()}
+        onClose={() => setCommandOpen(false)}
+        commands={commands()}
+      />
 
       {/* 设置面板（M9）：外观 / 字体 / 排版 / 关于四个分区，全部即时生效 */}
-      <SettingsPanel open={settingsOpen()} onClose={() => setSettingsOpen(false)} />
+      <SettingsPanel
+        open={settingsOpen()}
+        onClose={() => setSettingsOpen(false)}
+      />
 
       {/* 首次启动向导：可跳过，跳过与走完的效果完全相同 */}
-      <FirstRunWizard open={wizardOpen()} onFinish={() => setWizardOpen(false)} />
+      <FirstRunWizard
+        open={wizardOpen()}
+        onFinish={() => setWizardOpen(false)}
+      />
 
       <Show when={shortcutsOpen()}>
         <ShortcutPanel onClose={() => setShortcutsOpen(false)} />
@@ -393,4 +482,3 @@ function ErrorBanner(props: { onDismiss: () => void }): JSX.Element {
     </div>
   );
 }
-

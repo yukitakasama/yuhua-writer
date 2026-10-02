@@ -17,10 +17,10 @@ export function HeadingIcon(props: SvgIconProps) {
   return (
     <svg {...iconProps(props)}>
       <path d="M4.5 5.5v13" />
-    <path d="M12.5 5.5v13" />
-    <path d="M4.5 12h8" />
-    <path d="M16.4 11.2l2.2-1.6v9.4" />
-    <path d="M15.9 19h5.2" />
+      <path d="M12.5 5.5v13" />
+      <path d="M4.5 12h8" />
+      <path d="M16.4 11.2l2.2-1.6v9.4" />
+      <path d="M15.9 19h5.2" />
     </svg>
   );
 }

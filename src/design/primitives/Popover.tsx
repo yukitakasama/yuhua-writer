@@ -12,7 +12,15 @@
  * 适合「贴在按钮下方」的短生命周期面板。
  */
 
-import { createEffect, createSignal, onCleanup, Show, splitProps, type Component, type JSX } from "solid-js";
+import {
+  createEffect,
+  createSignal,
+  onCleanup,
+  Show,
+  splitProps,
+  type Component,
+  type JSX,
+} from "solid-js";
 import { focusableCandidates, getFocusableElements } from "./focusTrap";
 import { motionPolicy } from "./reducedMotion";
 import { cx, usePrimitivesStyle } from "./styles";
@@ -113,7 +121,9 @@ export const Popover: Component<PopoverProps> = (props) => {
   createEffect(() => {
     if (local.open) return;
     if (panel?.contains(document.activeElement) && wrapper) {
-      const trigger = getFocusableElements(wrapper).find((element) => !panel?.contains(element));
+      const trigger = getFocusableElements(wrapper).find(
+        (element) => !panel?.contains(element),
+      );
       trigger?.focus();
     }
   });

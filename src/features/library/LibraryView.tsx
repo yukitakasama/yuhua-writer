@@ -68,7 +68,12 @@ export function LibraryView(props: LibraryViewProps): JSX.Element {
           >
             <ul class="recents">
               <For each={usableRecents()}>
-                {(item) => <RecentRow item={item} onOpen={() => props.onOpen(item.root)} />}
+                {(item) => (
+                  <RecentRow
+                    item={item}
+                    onOpen={() => props.onOpen(item.root)}
+                  />
+                )}
               </For>
             </ul>
           </Show>
@@ -78,10 +83,16 @@ export function LibraryView(props: LibraryViewProps): JSX.Element {
           <h2 class="library__heading">{t("library.allBooks")}</h2>
           <ul class="shelf">
             <For each={props.recents}>
-              {(item) => <ShelfCard item={item} onOpen={() => props.onOpen(item.root)} />}
+              {(item) => (
+                <ShelfCard item={item} onOpen={() => props.onOpen(item.root)} />
+              )}
             </For>
             <li class="shelf__add">
-              <button type="button" class="shelf__add-btn" onClick={props.onNewWorkspace}>
+              <button
+                type="button"
+                class="shelf__add-btn"
+                onClick={props.onNewWorkspace}
+              >
                 <IllustrationEmptyLibrary size={44} />
                 <span>{t("library.newWorkspace")}</span>
               </button>
@@ -94,11 +105,22 @@ export function LibraryView(props: LibraryViewProps): JSX.Element {
 }
 
 /** 最近打开列表里的一行。 */
-function RecentRow(props: { item: WorkspaceSummary; onOpen: () => void }): JSX.Element {
-  const time = () => (props.item.lastOpened === null ? t("library.neverOpened") : formatRelativeTime(props.item.lastOpened));
+function RecentRow(props: {
+  item: WorkspaceSummary;
+  onOpen: () => void;
+}): JSX.Element {
+  const time = () =>
+    props.item.lastOpened === null
+      ? t("library.neverOpened")
+      : formatRelativeTime(props.item.lastOpened);
   return (
     <li>
-      <button type="button" class="recent" disabled={!props.item.available} onClick={props.onOpen}>
+      <button
+        type="button"
+        class="recent"
+        disabled={!props.item.available}
+        onClick={props.onOpen}
+      >
         <span class="recent__cover" aria-hidden="true">
           <BookCover title={props.item.title} width={34} showTitle={false} />
         </span>
@@ -117,14 +139,27 @@ function RecentRow(props: { item: WorkspaceSummary; onOpen: () => void }): JSX.E
 }
 
 /** 书籍网格里的一张卡片。 */
-function ShelfCard(props: { item: WorkspaceSummary; onOpen: () => void }): JSX.Element {
+function ShelfCard(props: {
+  item: WorkspaceSummary;
+  onOpen: () => void;
+}): JSX.Element {
   return (
     <li class={`shelf__card${props.item.available ? "" : " is-unavailable"}`}>
-      <button type="button" class="shelf__card-btn" disabled={!props.item.available} onClick={props.onOpen}>
+      <button
+        type="button"
+        class="shelf__card-btn"
+        disabled={!props.item.available}
+        onClick={props.onOpen}
+      >
         <BookCover title={props.item.title} width={132} />
         <span class="shelf__title">{props.item.title}</span>
         <span class="shelf__meta">
-          <Show when={!props.item.available} fallback={formatRelativeTime(props.item.lastOpened ?? props.item.created)}>
+          <Show
+            when={!props.item.available}
+            fallback={formatRelativeTime(
+              props.item.lastOpened ?? props.item.created,
+            )}
+          >
             {t("library.unavailable")}
           </Show>
         </span>

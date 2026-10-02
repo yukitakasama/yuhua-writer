@@ -26,7 +26,12 @@
 
 import { createStore, produce } from "solid-js/store";
 
-import { isFiniteNumber, isPlainObject, readJson, writeJson } from "./persistent";
+import {
+  isFiniteNumber,
+  isPlainObject,
+  readJson,
+  writeJson,
+} from "./persistent";
 
 /** 三个字体作用域，与 tokens.css 的 --font-body / --font-heading / --font-ui 一一对应。 */
 export type FontScope = "body" | "heading" | "ui";
@@ -38,7 +43,11 @@ export const FONT_SCOPES: readonly FontScope[] = ["body", "heading", "ui"];
 export type ThemeChoice = "light" | "dark" | "system";
 
 /** 全部主题选项。 */
-export const THEME_CHOICES: readonly ThemeChoice[] = ["light", "dark", "system"];
+export const THEME_CHOICES: readonly ThemeChoice[] = [
+  "light",
+  "dark",
+  "system",
+];
 
 /** 一个字体作用域的三项选择：字体族、字号、行距。 */
 export interface ScopeTypography {
@@ -107,7 +116,9 @@ export const MEASURE_MIN = 480;
 export const MEASURE_MAX = 1120;
 
 /** 各作用域的取值范围查表，供界面与夹紧逻辑共用。 */
-export const SIZE_RANGE: Readonly<Record<FontScope, { min: number; max: number }>> = {
+export const SIZE_RANGE: Readonly<
+  Record<FontScope, { min: number; max: number }>
+> = {
   body: { min: BODY_SIZE_MIN, max: BODY_SIZE_MAX },
   heading: { min: HEADING_SIZE_MIN, max: HEADING_SIZE_MAX },
   ui: { min: UI_SIZE_MIN, max: UI_SIZE_MAX },
@@ -137,7 +148,13 @@ const WORKSPACE_PREFIX = "appearance.workspace.v1.";
 // ---------------------------------------------------------------------------
 
 /** 把任意值夹到区间内；非有限数字则退回 fallback。 */
-function clampNumber(value: unknown, min: number, max: number, fallback: number, digits = 2): number {
+function clampNumber(
+  value: unknown,
+  min: number,
+  max: number,
+  fallback: number,
+  digits = 2,
+): number {
   if (!isFiniteNumber(value)) return fallback;
   const clamped = Math.min(max, Math.max(min, value));
   // 保留固定小数位：字号/行距用滑块调，两位已经够细，且避免浮点尾巴写进 JSON
@@ -161,12 +178,20 @@ function normalizeScope(
 ): ScopeTypography {
   const source = isPlainObject(raw) ? raw : {};
   const range = SIZE_RANGE[scope];
-  const family = typeof source.family === "string" && source.family.length > 0 ? source.family : undefined;
+  const family =
+    typeof source.family === "string" && source.family.length > 0
+      ? source.family
+      : undefined;
   const size = isFiniteNumber(source.size)
     ? clampNumber(source.size, range.min, range.max, fallback.size, 1)
     : undefined;
   const lineHeight = isFiniteNumber(source.lineHeight)
-    ? clampNumber(source.lineHeight, LINE_HEIGHT_MIN, LINE_HEIGHT_MAX, fallback.lineHeight)
+    ? clampNumber(
+        source.lineHeight,
+        LINE_HEIGHT_MIN,
+        LINE_HEIGHT_MAX,
+        fallback.lineHeight,
+      )
     : undefined;
 
   if (allowInherit) {
@@ -220,20 +245,35 @@ export function normalizeAppearance(raw: unknown): AppearanceSettings {
   const fallback = DEFAULT_APPEARANCE.typography;
 
   return {
-    theme: isThemeChoice(source.theme) ? source.theme : DEFAULT_APPEARANCE.theme,
+    theme: isThemeChoice(source.theme)
+      ? source.theme
+      : DEFAULT_APPEARANCE.theme,
     locale: "zh-CN",
     typography: {
       body: normalizeScope(typo.body, "body", fallback.body, false),
       heading: normalizeScope(typo.heading, "heading", fallback.heading, false),
       ui: normalizeScope(typo.ui, "ui", fallback.ui, false),
-      paragraphGap: clampNumber(typo.paragraphGap, PARAGRAPH_GAP_MIN, PARAGRAPH_GAP_MAX, fallback.paragraphGap),
-      measure: clampNumber(typo.measure, MEASURE_MIN, MEASURE_MAX, fallback.measure, 0),
+      paragraphGap: clampNumber(
+        typo.paragraphGap,
+        PARAGRAPH_GAP_MIN,
+        PARAGRAPH_GAP_MAX,
+        fallback.paragraphGap,
+      ),
+      measure: clampNumber(
+        typo.measure,
+        MEASURE_MIN,
+        MEASURE_MAX,
+        fallback.measure,
+        0,
+      ),
     },
   };
 }
 
 /** 归一化工作区级设置：所有字段都可缺省。 */
-export function normalizeWorkspaceAppearance(raw: unknown): WorkspaceAppearance {
+export function normalizeWorkspaceAppearance(
+  raw: unknown,
+): WorkspaceAppearance {
   if (!isPlainObject(raw)) return {};
   const result: WorkspaceAppearance = {};
 
@@ -247,18 +287,42 @@ export function normalizeWorkspaceAppearance(raw: unknown): WorkspaceAppearance 
       if (!isPlainObject(scopeRaw)) continue;
       const range = SIZE_RANGE[scope];
       const entry: PartialScopeTypography = {};
-      if (typeof scopeRaw.family === "string" && scopeRaw.family.length > 0) entry.family = scopeRaw.family;
-      if (isFiniteNumber(scopeRaw.size)) entry.size = clampNumber(scopeRaw.size, range.min, range.max, range.min, 1);
+      if (typeof scopeRaw.family === "string" && scopeRaw.family.length > 0)
+        entry.family = scopeRaw.family;
+      if (isFiniteNumber(scopeRaw.size))
+        entry.size = clampNumber(
+          scopeRaw.size,
+          range.min,
+          range.max,
+          range.min,
+          1,
+        );
       if (isFiniteNumber(scopeRaw.lineHeight)) {
-        entry.lineHeight = clampNumber(scopeRaw.lineHeight, LINE_HEIGHT_MIN, LINE_HEIGHT_MAX, LINE_HEIGHT_MIN);
+        entry.lineHeight = clampNumber(
+          scopeRaw.lineHeight,
+          LINE_HEIGHT_MIN,
+          LINE_HEIGHT_MAX,
+          LINE_HEIGHT_MIN,
+        );
       }
       if (Object.keys(entry).length > 0) partial[scope] = entry;
     }
     if (isFiniteNumber(typo.paragraphGap)) {
-      partial.paragraphGap = clampNumber(typo.paragraphGap, PARAGRAPH_GAP_MIN, PARAGRAPH_GAP_MAX, PARAGRAPH_GAP_MIN);
+      partial.paragraphGap = clampNumber(
+        typo.paragraphGap,
+        PARAGRAPH_GAP_MIN,
+        PARAGRAPH_GAP_MAX,
+        PARAGRAPH_GAP_MIN,
+      );
     }
     if (isFiniteNumber(typo.measure)) {
-      partial.measure = clampNumber(typo.measure, MEASURE_MIN, MEASURE_MAX, MEASURE_MIN, 0);
+      partial.measure = clampNumber(
+        typo.measure,
+        MEASURE_MIN,
+        MEASURE_MAX,
+        MEASURE_MIN,
+        0,
+      );
     }
     if (Object.keys(partial).length > 0) result.typography = partial;
   }
@@ -272,10 +336,13 @@ export function normalizeWorkspaceAppearance(raw: unknown): WorkspaceAppearance 
 
 /** 从 localStorage 读取全局外观设置。 */
 export function loadAppearance(): AppearanceSettings {
-  return normalizeAppearance(readJson<unknown>(GLOBAL_KEY, null, isPlainObject));
+  return normalizeAppearance(
+    readJson<unknown>(GLOBAL_KEY, null, isPlainObject),
+  );
 }
 
-const [appearance, setAppearanceStore] = createStore<AppearanceSettings>(loadAppearance());
+const [appearance, setAppearanceStore] =
+  createStore<AppearanceSettings>(loadAppearance());
 
 export { appearance as appearanceSettings };
 
@@ -299,12 +366,21 @@ export function setTheme(theme: ThemeChoice): void {
  * @param scope 作用域
  * @param patch 要写入的字段
  */
-export function setScopeTypography(scope: FontScope, patch: Partial<ScopeTypography>): void {
+export function setScopeTypography(
+  scope: FontScope,
+  patch: Partial<ScopeTypography>,
+): void {
   const range = SIZE_RANGE[scope];
   const next: Partial<ScopeTypography> = {};
   if (patch.family !== undefined) next.family = patch.family;
   if (patch.size !== undefined) {
-    next.size = clampNumber(patch.size, range.min, range.max, appearance.typography[scope].size, 1);
+    next.size = clampNumber(
+      patch.size,
+      range.min,
+      range.max,
+      appearance.typography[scope].size,
+      1,
+    );
   }
   if (patch.lineHeight !== undefined) {
     next.lineHeight = clampNumber(
@@ -323,7 +399,12 @@ export function setParagraphGap(gap: number): void {
   setAppearanceStore(
     "typography",
     "paragraphGap",
-    clampNumber(gap, PARAGRAPH_GAP_MIN, PARAGRAPH_GAP_MAX, DEFAULT_APPEARANCE.typography.paragraphGap),
+    clampNumber(
+      gap,
+      PARAGRAPH_GAP_MIN,
+      PARAGRAPH_GAP_MAX,
+      DEFAULT_APPEARANCE.typography.paragraphGap,
+    ),
   );
   persistAppearance();
 }
@@ -333,7 +414,13 @@ export function setMeasure(measure: number): void {
   setAppearanceStore(
     "typography",
     "measure",
-    clampNumber(measure, MEASURE_MIN, MEASURE_MAX, DEFAULT_APPEARANCE.typography.measure, 0),
+    clampNumber(
+      measure,
+      MEASURE_MIN,
+      MEASURE_MAX,
+      DEFAULT_APPEARANCE.typography.measure,
+      0,
+    ),
   );
   persistAppearance();
 }
@@ -373,10 +460,15 @@ export function workspaceKey(root: string): string {
 /** 读取某个工作区的覆盖设置。 */
 export function loadWorkspaceAppearance(root: string): WorkspaceAppearance {
   if (root === "") return {};
-  return normalizeWorkspaceAppearance(readJson<unknown>(workspaceKey(root), null, isPlainObject));
+  return normalizeWorkspaceAppearance(
+    readJson<unknown>(workspaceKey(root), null, isPlainObject),
+  );
 }
 
-const [wsAppearance, setWsStore] = createStore<{ root: string; value: WorkspaceAppearance }>({
+const [wsAppearance, setWsStore] = createStore<{
+  root: string;
+  value: WorkspaceAppearance;
+}>({
   root: "",
   value: {},
 });
@@ -420,16 +512,22 @@ export function syncAppearanceWorkspace(root: string): void {
 }
 
 /** 写入工作区级某个作用域的覆盖。字段传 undefined 表示恢复继承全局。 */
-export function setWorkspaceScope(scope: FontScope, patch: PartialScopeTypography): void {
+export function setWorkspaceScope(
+  scope: FontScope,
+  patch: PartialScopeTypography,
+): void {
   if (wsAppearance.root === "") return;
-  const current = wsAppearance.value.typography && wsAppearance.value.typography[scope];
+  const current =
+    wsAppearance.value.typography && wsAppearance.value.typography[scope];
   const merged: PartialScopeTypography = { ...(current ?? {}), ...patch };
   // 显式传 undefined 的字段视为「删除这一项覆盖」
   for (const key of ["family", "size", "lineHeight"] as const) {
     if (key in patch && patch[key] === undefined) delete merged[key];
   }
 
-  const typography: PartialTypography = { ...(wsAppearance.value.typography ?? {}) };
+  const typography: PartialTypography = {
+    ...(wsAppearance.value.typography ?? {}),
+  };
   if (Object.keys(merged).length === 0) delete typography[scope];
   else typography[scope] = merged;
 
@@ -457,7 +555,10 @@ export function setWorkspaceTypography(
   patch: Partial<Pick<PartialTypography, "paragraphGap" | "measure">>,
 ): void {
   if (wsAppearance.root === "") return;
-  const typography: PartialTypography = { ...(wsAppearance.value.typography ?? {}), ...patch };
+  const typography: PartialTypography = {
+    ...(wsAppearance.value.typography ?? {}),
+    ...patch,
+  };
   for (const key of ["paragraphGap", "measure"] as const) {
     if (key in patch && patch[key] === undefined) delete typography[key];
   }
@@ -489,7 +590,9 @@ export function setWorkspaceTheme(theme: ThemeChoice | undefined): void {
 }
 
 /** 清除某个工作区的全部外观覆盖。 */
-export function clearWorkspaceAppearance(root: string = wsAppearance.root): void {
+export function clearWorkspaceAppearance(
+  root: string = wsAppearance.root,
+): void {
   if (root === "") return;
   writeJson(workspaceKey(root), {});
   if (root === wsAppearance.root) {

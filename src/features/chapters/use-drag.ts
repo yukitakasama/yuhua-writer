@@ -71,9 +71,16 @@ export interface DragController {
   /** 在某一行的抓取手柄上按下指针，开始"预备拖拽"。 */
   begin: (event: PointerEvent, row: DragRow) => void;
   /** 供容器注册自身的元素，落点计算需要它的矩形。 */
-  registerContainer: (containerId: string, element: HTMLElement | undefined) => void;
+  registerContainer: (
+    containerId: string,
+    element: HTMLElement | undefined,
+  ) => void;
   /** 供行注册自身的元素。 */
-  registerRow: (rowId: string, containerId: string, element: HTMLElement | undefined) => void;
+  registerRow: (
+    rowId: string,
+    containerId: string,
+    element: HTMLElement | undefined,
+  ) => void;
 }
 
 /**
@@ -82,7 +89,9 @@ export interface DragController {
  * `onDrop` 在用户松手且确实发生了位置变化时调用；
  * 若只是点了一下没拖动，不会触发。
  */
-export function createDragController(onDrop: (draggedId: string, containerId: string, index: number) => void): DragController {
+export function createDragController(
+  onDrop: (draggedId: string, containerId: string, index: number) => void,
+): DragController {
   const [state, setState] = createSignal<DragState>(IDLE);
 
   // 行与容器的元素注册表。用 Map 而不是遍历 DOM 查询：
@@ -91,7 +100,12 @@ export function createDragController(onDrop: (draggedId: string, containerId: st
   const containers = new Map<string, HTMLElement>();
 
   /** 预备状态：记录了按下位置，等指针移动超过阈值才真正开始。 */
-  let pending: { id: string; startX: number; startY: number; row: DragRow } | null = null;
+  let pending: {
+    id: string;
+    startX: number;
+    startY: number;
+    row: DragRow;
+  } | null = null;
 
   /** 采集当前某个容器下的所有行几何。 */
   function collectRows(containerId: string): DragRow[] {
@@ -167,7 +181,10 @@ export function createDragController(onDrop: (draggedId: string, containerId: st
     const current = state();
     if (current.draggedId === null) return;
 
-    setState((prev) => ({ ...prev, pointer: { x: event.clientX, y: event.clientY } }));
+    setState((prev) => ({
+      ...prev,
+      pointer: { x: event.clientX, y: event.clientY },
+    }));
     updateDropTarget(event.clientX, event.clientY, current.draggedId);
   };
 
@@ -187,7 +204,11 @@ export function createDragController(onDrop: (draggedId: string, containerId: st
       const list = collectRows(containerId);
       const index = clampIndex(
         resolveDropIndex(
-          list.map((r) => ({ id: r.id, top: r.rect.top, height: r.rect.height })),
+          list.map((r) => ({
+            id: r.id,
+            top: r.rect.top,
+            height: r.rect.height,
+          })),
           event.clientY,
           current.draggedId,
         ),
@@ -232,7 +253,12 @@ export function createDragController(onDrop: (draggedId: string, containerId: st
       if (event.button !== 0) return;
       // 阻止默认行为，避免拖动时选中文本
       event.preventDefault();
-      pending = { id: row.id, startX: event.clientX, startY: event.clientY, row };
+      pending = {
+        id: row.id,
+        startX: event.clientX,
+        startY: event.clientY,
+        row,
+      };
     },
     registerContainer(containerId, element) {
       if (element) containers.set(containerId, element);

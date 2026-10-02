@@ -33,7 +33,12 @@ import { mockReducedMotion, pressKey } from "./test-utils";
 describe("Dialog", () => {
   it("打开时渲染标题、正文与页脚，并标记为模态", () => {
     render(() => (
-      <Dialog open onClose={() => {}} title="删除章节" footer={<Button>确定</Button>}>
+      <Dialog
+        open
+        onClose={() => {}}
+        title="删除章节"
+        footer={<Button>确定</Button>}
+      >
         <p>删除后可在回收站找回。</p>
       </Dialog>
     ));
@@ -53,7 +58,9 @@ describe("Dialog", () => {
     const dialog = screen.getByRole("dialog");
     const labelledBy = dialog.getAttribute("aria-labelledby");
     expect(labelledBy).not.toBeNull();
-    expect(document.getElementById(labelledBy as string)?.textContent).toBe("删除章节");
+    expect(document.getElementById(labelledBy as string)?.textContent).toBe(
+      "删除章节",
+    );
   });
 
   it("按 Esc 触发 onClose", () => {
@@ -89,12 +96,19 @@ describe("Dialog", () => {
 
   it("焦点陷阱：Tab 在最后一个元素上绕回第一个", () => {
     render(() => (
-      <Dialog open onClose={() => {}} title="确认" footer={<Button>取消</Button>}>
+      <Dialog
+        open
+        onClose={() => {}}
+        title="确认"
+        footer={<Button>取消</Button>}
+      >
         <Button>第一个</Button>
       </Dialog>
     ));
     const dialog = screen.getByRole("dialog");
-    const focusables = Array.from(dialog.querySelectorAll<HTMLElement>("button"));
+    const focusables = Array.from(
+      dialog.querySelectorAll<HTMLElement>("button"),
+    );
     expect(focusables.length).toBeGreaterThanOrEqual(2);
 
     const last = focusables[focusables.length - 1] as HTMLElement;
@@ -143,7 +157,9 @@ describe("Drawer", () => {
         <p>结果</p>
       </Drawer>
     ));
-    expect(screen.getByRole("dialog").classList.contains("yh-drawer--left")).toBe(true);
+    expect(
+      screen.getByRole("dialog").classList.contains("yh-drawer--left"),
+    ).toBe(true);
   });
 
   it("按 Esc 关闭", () => {
@@ -171,7 +187,11 @@ describe("Drawer", () => {
 describe("Popover", () => {
   it("打开时渲染内容并把焦点移入面板", async () => {
     render(() => (
-      <Popover open onOpenChange={() => {}} content={<Button>面板内按钮</Button>}>
+      <Popover
+        open
+        onOpenChange={() => {}}
+        content={<Button>面板内按钮</Button>}
+      >
         <Button>触发</Button>
       </Popover>
     ));
@@ -331,7 +351,9 @@ describe("Tabs", () => {
     render(() => <Tabs items={items} value="draft" onChange={() => {}} />);
     expect(screen.getByRole("tablist")).not.toBeNull();
     expect(screen.getAllByRole("tab")).toHaveLength(3);
-    expect(screen.getByRole("tab", { selected: true }).textContent).toBe("正文");
+    expect(screen.getByRole("tab", { selected: true }).textContent).toBe(
+      "正文",
+    );
   });
 
   it("roving tabindex：只有选中项进入 Tab 序", () => {
@@ -390,7 +412,9 @@ describe("ScrollArea", () => {
         <div style={{ height: "2000px" }}>长内容</div>
       </ScrollArea>
     ));
-    const viewport = document.querySelector(".yh-scroll-area__viewport") as HTMLElement;
+    const viewport = document.querySelector(
+      ".yh-scroll-area__viewport",
+    ) as HTMLElement;
     expect(viewport.getAttribute("tabindex")).toBe("0");
     expect(viewport.getAttribute("role")).toBe("region");
   });
@@ -402,10 +426,15 @@ describe("ScrollArea", () => {
         <div>内容</div>
       </ScrollArea>
     ));
-    const viewport = document.querySelector(".yh-scroll-area__viewport") as HTMLElement;
+    const viewport = document.querySelector(
+      ".yh-scroll-area__viewport",
+    ) as HTMLElement;
     fireEvent.scroll(viewport);
     expect(onScroll).toHaveBeenCalledTimes(1);
-    const info = onScroll.mock.calls[0]?.[0] as { scrollTop: number; atBottom: boolean };
+    const info = onScroll.mock.calls[0]?.[0] as {
+      scrollTop: number;
+      atBottom: boolean;
+    };
     // jsdom 没有布局，scrollHeight 与 clientHeight 均为 0，
     // 因此这里断言的是「差值为 0 即到底」这条容差逻辑本身。
     expect(info.scrollTop).toBe(0);
@@ -503,7 +532,13 @@ describe("Toast 队列", () => {
     resetToastStore();
     const onAction = vi.fn();
     render(() => <ToastRegion />);
-    pushToast({ id: "t1", title: "已删除", actionLabel: "撤销", onAction, duration: 0 });
+    pushToast({
+      id: "t1",
+      title: "已删除",
+      actionLabel: "撤销",
+      onAction,
+      duration: 0,
+    });
 
     fireEvent.click(screen.getByText("撤销"));
     expect(onAction).toHaveBeenCalledTimes(1);

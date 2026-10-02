@@ -25,7 +25,12 @@
  * 记录状态供设置页显示、把字族标记为不可用、让 CSS 回退接管。
  */
 
-import { FONT_CATALOG, fontFamilyById, type FontFamily, type FontWeightFile } from "./catalog";
+import {
+  FONT_CATALOG,
+  fontFamilyById,
+  type FontFamily,
+  type FontWeightFile,
+} from "./catalog";
 
 /** 同时常驻的字族上限（计划书 5.3 第 6 条）。 */
 export const MAX_LOADED_FAMILIES = 2;
@@ -86,19 +91,25 @@ interface LoadedFamily {
  */
 const browserHost: FontHost = {
   createFace: (family, source, descriptors) => {
-    const Ctor = (globalThis as { FontFace?: new (...args: unknown[]) => FontFaceLike }).FontFace;
+    const Ctor = (
+      globalThis as { FontFace?: new (...args: unknown[]) => FontFaceLike }
+    ).FontFace;
     if (!Ctor) throw new Error("当前环境不支持 FontFace API");
     return new Ctor(family, source, descriptors);
   },
   fontSet: () => {
-    const fonts = (globalThis as { document?: Document }).document?.fonts as FontSetLike | undefined;
+    const fonts = (globalThis as { document?: Document }).document?.fonts as
+      FontSetLike | undefined;
     return fonts ?? null;
   },
 };
 
 /** 调试用的 __DEV__ 判定（不依赖 vite 的 import.meta.env，保持模块可在 node 下直接跑）。 */
 function isDev(): boolean {
-  return (globalThis as { process?: { env?: { NODE_ENV?: string } } }).process?.env?.NODE_ENV !== "production";
+  return (
+    (globalThis as { process?: { env?: { NODE_ENV?: string } } }).process?.env
+      ?.NODE_ENV !== "production"
+  );
 }
 
 /**
@@ -130,7 +141,9 @@ export class FontLoader {
 
   /** 当前常驻的字族 id（按 LRU 顺序，最久未用在前）。 */
   residentIds(): string[] {
-    return [...this.loaded.values()].sort((a, b) => a.lastUsed - b.lastUsed).map((entry) => entry.family.id);
+    return [...this.loaded.values()]
+      .sort((a, b) => a.lastUsed - b.lastUsed)
+      .map((entry) => entry.family.id);
   }
 
   /** 查询某个字族的状态。未加载过返回 idle。 */
@@ -229,19 +242,28 @@ export class FontLoader {
       entry.error = err instanceof Error ? err.message : String(err);
       if (isDev()) {
         // 开发期把原因说清楚：多半是没跑 pnpm fonts:fetch
-        console.warn(`[字体] ${family.label}(${family.id}) 加载失败，已回退系统字体：${entry.error}`);
+        console.warn(
+          `[字体] ${family.label}(${family.id}) 加载失败，已回退系统字体：${entry.error}`,
+        );
       }
       return false;
     }
   }
 
   /** 加载单个字重文件。 */
-  private async loadWeight(family: FontFamily, file: FontWeightFile): Promise<FontFaceLike> {
-    const face = this.host.createFace(family.stack.split(",")[0]?.trim().replace(/^"|"$/g, "") ?? family.id, `url("${file.url}")`, {
-      weight: String(file.weight),
-      style: "normal",
-      display: "swap",
-    });
+  private async loadWeight(
+    family: FontFamily,
+    file: FontWeightFile,
+  ): Promise<FontFaceLike> {
+    const face = this.host.createFace(
+      family.stack.split(",")[0]?.trim().replace(/^"|"$/g, "") ?? family.id,
+      `url("${file.url}")`,
+      {
+        weight: String(file.weight),
+        style: "normal",
+        display: "swap",
+      },
+    );
     return withTimeout(face.load(), LOAD_TIMEOUT_MS);
   }
 
@@ -308,7 +330,10 @@ export class FontLoader {
 /** 给一个 Promise 加超时；超时视为失败。 */
 function withTimeout<T>(promise: Promise<T>, ms: number): Promise<T> {
   return new Promise<T>((resolve, reject) => {
-    const timer = setTimeout(() => reject(new Error(`字体加载超时（${ms}ms）`)), ms);
+    const timer = setTimeout(
+      () => reject(new Error(`字体加载超时（${ms}ms）`)),
+      ms,
+    );
     promise.then(
       (value) => {
         clearTimeout(timer);
@@ -323,4 +348,6 @@ function withTimeout<T>(promise: Promise<T>, ms: number): Promise<T> {
 }
 
 /** 全部需要被加载器管理的字族 id（供「完整字形模式」之类功能使用）。 */
-export const BUNDLED_FAMILY_IDS: readonly string[] = FONT_CATALOG.filter((f) => f.bundled).map((f) => f.id);
+export const BUNDLED_FAMILY_IDS: readonly string[] = FONT_CATALOG.filter(
+  (f) => f.bundled,
+).map((f) => f.id);

@@ -37,7 +37,8 @@ export function BookCover(props: BookCoverProps): JSX.Element {
   const width = () => props.width ?? 120;
   const height = () => Math.round(width() * 1.4);
   // 用书名哈希做渐变 id 后缀：同一本书的 id 稳定，不会与其它书冲突
-  const gradientId = () => `cover-grad-${Math.abs(design().hue)}${design().pattern}`;
+  const gradientId = () =>
+    `cover-grad-${Math.abs(design().hue)}${design().pattern}`;
 
   const shortTitle = (): string => {
     const chars = [...props.title.trim()];
@@ -85,7 +86,12 @@ export function BookCover(props: BookCoverProps): JSX.Element {
           {shortTitle()}
         </text>
         {/* 分隔短线：让文字与图案之间有个停顿 */}
-        <path d="M46 130h28" stroke={colors().ink} stroke-width="0.8" opacity="0.35" />
+        <path
+          d="M46 130h28"
+          stroke={colors().ink}
+          stroke-width="0.8"
+          opacity="0.35"
+        />
       </Show>
 
       {/* 首字大标：作为没有自定义封面时的视觉识别点 */}
@@ -105,7 +111,10 @@ export function BookCover(props: BookCoverProps): JSX.Element {
 }
 
 /** 四种几何图案。 */
-function CoverPattern(props: { pattern: number; density: number }): JSX.Element {
+function CoverPattern(props: {
+  pattern: number;
+  density: number;
+}): JSX.Element {
   const lines = () => Array.from({ length: props.density }, (_, i) => i);
 
   switch (props.pattern) {

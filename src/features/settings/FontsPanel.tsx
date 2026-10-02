@@ -67,7 +67,8 @@ export function FontsPanel(props: FontsPanelProps): JSX.Element {
     syncAppearanceWorkspace(workspaceState.root);
   });
 
-  const typo = (): ReturnType<typeof effectiveTypography> => effectiveTypography();
+  const typo = (): ReturnType<typeof effectiveTypography> =>
+    effectiveTypography();
 
   const canOverride = (): boolean => hasOpenWorkspace();
 
@@ -83,7 +84,11 @@ export function FontsPanel(props: FontsPanelProps): JSX.Element {
 
   /** 取消本书覆盖。 */
   const inherit = (scope: FontScope): void => {
-    setWorkspaceScope(scope, { family: undefined, size: undefined, lineHeight: undefined });
+    setWorkspaceScope(scope, {
+      family: undefined,
+      size: undefined,
+      lineHeight: undefined,
+    });
   };
 
   return (
@@ -93,7 +98,11 @@ export function FontsPanel(props: FontsPanelProps): JSX.Element {
       {/* 预览聚焦：三个作用域全看，还是只看一个。
           用 tablist 语义会与顶层设置分区冲突（tablist 嵌套），
           因此这里用一组 aria-pressed 的切换按钮，语义更准确。 */}
-      <div class="font-focus" role="group" aria-label={t("settings.font.previewTitle")}>
+      <div
+        class="font-focus"
+        role="group"
+        aria-label={t("settings.font.previewTitle")}
+      >
         <button
           type="button"
           class="font-focus__item"
@@ -116,7 +125,10 @@ export function FontsPanel(props: FontsPanelProps): JSX.Element {
         </For>
       </div>
 
-      <Show when={focus() === "all"} fallback={<FontPreview focus={focus() as FontScope} />}>
+      <Show
+        when={focus() === "all"}
+        fallback={<FontPreview focus={focus() as FontScope} />}
+      >
         <FontPreview />
       </Show>
 
@@ -164,7 +176,10 @@ export function FontsPanel(props: FontsPanelProps): JSX.Element {
 
       {/* 内置字体清单：让「有哪些内置字体」这件事可查，
           也顺便说明它们随包分发、不联网。 */}
-      <section class="settings-note" aria-label={t("settings.font.bundledGroup")}>
+      <section
+        class="settings-note"
+        aria-label={t("settings.font.bundledGroup")}
+      >
         <p class="settings-note__body">{t("settings.font.bundledNote")}</p>
         <p class="settings-note__body">
           {familiesFor("body")
@@ -175,7 +190,12 @@ export function FontsPanel(props: FontsPanelProps): JSX.Element {
       </section>
 
       {/* 供测试与调试读取的隐藏状态：确认面板确实读的是生效值 */}
-      <Show when={appearanceSettings.theme !== undefined && workspaceAppearance.root !== ""}>
+      <Show
+        when={
+          appearanceSettings.theme !== undefined &&
+          workspaceAppearance.root !== ""
+        }
+      >
         <span class="yh-visually-hidden" data-testid="font-panel-workspace">
           {workspaceAppearance.root}
         </span>

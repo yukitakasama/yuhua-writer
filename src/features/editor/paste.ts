@@ -98,14 +98,32 @@ export function htmlToMarkdown(html: string): string {
   out = out.replace(/<(code)[^>]*>([\s\S]*?)<\/\1>/gi, "`$2`");
   // 标题的 `\n` 收在标记内部会产生多余空行，因此两侧都加、
   // 最后统一靠 `\n{3,}` 压缩
-  out = out.replace(/<h([1-6])[^>]*>([\s\S]*?)<\/h\1>/gi, (_m, level: string, text: string) => `\n${"#".repeat(Number(level))} ${text.trim()}\n`);
-  out = out.replace(/<a[^>]*href="([^"]*)"[^>]*>([\s\S]*?)<\/a>/gi, (_m, href: string, text: string) => (isSafeHref(href) ? `[${text}](${href})` : text));
-  out = out.replace(/<img[^>]*alt="([^"]*)"[^>]*src="([^"]*)"[^>]*>/gi, (_m, alt: string, src: string) => (isSafeSrc(src) ? `![${alt}](${src})` : `［图片：${alt}］`));
-  out = out.replace(/<li[^>]*>([\s\S]*?)<\/li>/gi, (_m, text: string) => `- ${text.trim()}\n`);
+  out = out.replace(
+    /<h([1-6])[^>]*>([\s\S]*?)<\/h\1>/gi,
+    (_m, level: string, text: string) =>
+      `\n${"#".repeat(Number(level))} ${text.trim()}\n`,
+  );
+  out = out.replace(
+    /<a[^>]*href="([^"]*)"[^>]*>([\s\S]*?)<\/a>/gi,
+    (_m, href: string, text: string) =>
+      isSafeHref(href) ? `[${text}](${href})` : text,
+  );
+  out = out.replace(
+    /<img[^>]*alt="([^"]*)"[^>]*src="([^"]*)"[^>]*>/gi,
+    (_m, alt: string, src: string) =>
+      isSafeSrc(src) ? `![${alt}](${src})` : `［图片：${alt}］`,
+  );
+  out = out.replace(
+    /<li[^>]*>([\s\S]*?)<\/li>/gi,
+    (_m, text: string) => `- ${text.trim()}\n`,
+  );
 
   // 剩下的块级标签换算行。`li`/`h[1-6]` 已被上面处理掉，
   // 这里再出现只会是它们的**闭合**标签，换成换行即可
-  out = out.replace(/<\/?(p|div|section|article|ul|ol|tr|blockquote)[^>]*>/gi, "\n");
+  out = out.replace(
+    /<\/?(p|div|section|article|ul|ol|tr|blockquote)[^>]*>/gi,
+    "\n",
+  );
   out = out.replace(/<br\s*\/?>/gi, "\n");
 
   // 剩下的标签一律剥掉（包括它们的属性 —— 属性是最脏的部分）
@@ -114,7 +132,9 @@ export function htmlToMarkdown(html: string): string {
   // HTML 实体：只解最常见的那几个，其余交给浏览器语义
   out = decodeBasicEntities(out);
 
-  return normalizePastedText(out).replace(/\n{3,}/g, "\n\n").trim();
+  return normalizePastedText(out)
+    .replace(/\n{3,}/g, "\n\n")
+    .trim();
 }
 
 /** 解基本 HTML 实体。 */
@@ -128,7 +148,10 @@ function decodeBasicEntities(text: string): string {
     "&#39;": "'",
     "&apos;": "'",
   };
-  return text.replace(/&(?:nbsp|amp|lt|gt|quot|apos|#39);/g, (m) => map[m] ?? m);
+  return text.replace(
+    /&(?:nbsp|amp|lt|gt|quot|apos|#39);/g,
+    (m) => map[m] ?? m,
+  );
 }
 
 /**
@@ -140,7 +163,12 @@ function decodeBasicEntities(text: string): string {
  */
 export function isSafeHref(href: string): boolean {
   const trimmed = href.trim().toLowerCase();
-  if (trimmed.startsWith("http://") || trimmed.startsWith("https://") || trimmed.startsWith("mailto:")) return true;
+  if (
+    trimmed.startsWith("http://") ||
+    trimmed.startsWith("https://") ||
+    trimmed.startsWith("mailto:")
+  )
+    return true;
   // 相对路径：不含协议分隔符，也不是协议相对地址
   return !trimmed.includes(":") && !trimmed.startsWith("//");
 }
@@ -161,12 +189,18 @@ export function isSafeSrc(src: string): boolean {
 }
 
 /** 从剪贴板事件里取出该用的文本。 */
-export function pickPastedText(data: DataTransfer): { text: string; wasHtml: boolean } {
+export function pickPastedText(data: DataTransfer): {
+  text: string;
+  wasHtml: boolean;
+} {
   const html = data.getData("text/html");
   if (html && html.trim().length > 0) {
     const converted = htmlToMarkdown(html);
     // HTML 转换后没剩下东西（比如整块都是样式）就退回纯文本
     if (converted.length > 0) return { text: converted, wasHtml: true };
   }
-  return { text: normalizePastedText(data.getData("text/plain")), wasHtml: false };
+  return {
+    text: normalizePastedText(data.getData("text/plain")),
+    wasHtml: false,
+  };
 }

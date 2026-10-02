@@ -53,7 +53,14 @@ export function fnv1a(text: string): number {
   for (let i = 0; i < text.length; i += 1) {
     hash ^= text.charCodeAt(i);
     // 乘以 16777619，用移位与加法避免大整数精度问题
-    hash = (hash + (hash << 1) + (hash << 4) + (hash << 7) + (hash << 8) + (hash << 24)) >>> 0;
+    hash =
+      (hash +
+        (hash << 1) +
+        (hash << 4) +
+        (hash << 7) +
+        (hash << 8) +
+        (hash << 24)) >>>
+      0;
   }
   return hash >>> 0;
 }
@@ -87,7 +94,11 @@ export function designCover(title: string): CoverDesign {
 }
 
 /** 生成封面的两个颜色。 */
-export function coverColors(design: CoverDesign): { from: string; to: string; ink: string } {
+export function coverColors(design: CoverDesign): {
+  from: string;
+  to: string;
+  ink: string;
+} {
   return {
     from: `hsl(${design.hue} 32% ${design.lightness}%)`,
     to: `hsl(${design.accentHue} 38% ${design.lightness + 10}%)`,

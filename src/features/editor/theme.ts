@@ -64,9 +64,10 @@ export const editorTheme: Extension = EditorView.theme({
     borderLeftColor: "var(--c-accent)",
     borderLeftWidth: "2px",
   },
-  "&.cm-focused .cm-selectionBackground, .cm-selectionBackground, .cm-content ::selection": {
-    backgroundColor: "var(--c-accent-subtle)",
-  },
+  "&.cm-focused .cm-selectionBackground, .cm-selectionBackground, .cm-content ::selection":
+    {
+      backgroundColor: "var(--c-accent-subtle)",
+    },
   ".cm-activeLine": {
     // 当前行高亮做到几乎看不见：写作时视线在字上，不该有一块色带
     backgroundColor: "transparent",
@@ -104,16 +105,31 @@ export const editorTheme: Extension = EditorView.theme({
 
 /** 语法高亮样式：一律走 CSS 变量。 */
 export const highlightTheme: Extension = EditorView.theme({
-  ".cm-heading-1": { fontFamily: "var(--font-heading)", fontSize: "1.6em", fontWeight: "700" },
-  ".cm-heading-2": { fontFamily: "var(--font-heading)", fontSize: "1.35em", fontWeight: "700" },
-  ".cm-heading-3": { fontFamily: "var(--font-heading)", fontSize: "1.15em", fontWeight: "700" },
+  ".cm-heading-1": {
+    fontFamily: "var(--font-heading)",
+    fontSize: "1.6em",
+    fontWeight: "700",
+  },
+  ".cm-heading-2": {
+    fontFamily: "var(--font-heading)",
+    fontSize: "1.35em",
+    fontWeight: "700",
+  },
+  ".cm-heading-3": {
+    fontFamily: "var(--font-heading)",
+    fontSize: "1.15em",
+    fontWeight: "700",
+  },
   ".cm-heading-4, .cm-heading-5, .cm-heading-6": {
     fontFamily: "var(--font-heading)",
     fontWeight: "700",
   },
   ".cm-strong": { fontWeight: "700" },
   ".cm-emphasis": { fontStyle: "italic" },
-  ".cm-strikethrough": { textDecoration: "line-through", color: "var(--c-text-muted)" },
+  ".cm-strikethrough": {
+    textDecoration: "line-through",
+    color: "var(--c-text-muted)",
+  },
   ".cm-link": { color: "var(--c-accent)", textDecoration: "underline" },
   ".cm-url": { color: "var(--c-text-muted)" },
   ".cm-monospace": {

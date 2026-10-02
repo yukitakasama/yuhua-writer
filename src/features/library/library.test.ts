@@ -56,7 +56,13 @@ describe("designCover", () => {
   });
 
   it("色相在 0..359", () => {
-    for (const title of ["一", "二", "三", "很长的书名测试用例", "English Title"]) {
+    for (const title of [
+      "一",
+      "二",
+      "三",
+      "很长的书名测试用例",
+      "English Title",
+    ]) {
       const d = designCover(title);
       expect(d.hue).toBeGreaterThanOrEqual(0);
       expect(d.hue).toBeLessThan(360);
@@ -122,7 +128,14 @@ describe("coverColors", () => {
   });
 
   it("副色比起色更亮（形成渐变）", () => {
-    const colors = coverColors({ hue: 100, accentHue: 140, pattern: 0, density: 3, initial: "x", lightness: 30 });
+    const colors = coverColors({
+      hue: 100,
+      accentHue: 140,
+      pattern: 0,
+      density: 3,
+      initial: "x",
+      lightness: 30,
+    });
     expect(colors.to).toContain("40%");
     expect(colors.from).toContain("30%");
   });
@@ -136,11 +149,15 @@ describe("formatRelativeTime", () => {
   });
 
   it("分钟级", () => {
-    expect(formatRelativeTime("2026-09-25T11:30:00+08:00", now)).toBe("30 分钟前");
+    expect(formatRelativeTime("2026-09-25T11:30:00+08:00", now)).toBe(
+      "30 分钟前",
+    );
   });
 
   it("小时级", () => {
-    expect(formatRelativeTime("2026-09-25T09:00:00+08:00", now)).toBe("3 小时前");
+    expect(formatRelativeTime("2026-09-25T09:00:00+08:00", now)).toBe(
+      "3 小时前",
+    );
   });
 
   it("天级", () => {
@@ -158,7 +175,9 @@ describe("formatRelativeTime", () => {
 
   it("中文字符不干扰解析", () => {
     // ISO 串本身是 ASCII，这里确认函数不会被外部的中文包住而误判
-    expect(formatRelativeTime("2026-09-25T11:00:00+08:00", now)).toBe("1 小时前");
+    expect(formatRelativeTime("2026-09-25T11:00:00+08:00", now)).toBe(
+      "1 小时前",
+    );
   });
 });
 

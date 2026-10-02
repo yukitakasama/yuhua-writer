@@ -12,18 +12,36 @@
  * - 向导可以跳过，且跳过不写入任何外观值。
  */
 
-import { cleanup, fireEvent, render, screen, within } from "@solidjs/testing-library";
+import {
+  cleanup,
+  fireEvent,
+  render,
+  screen,
+  within,
+} from "@solidjs/testing-library";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-import { __resetAppearance, appearanceSettings, effectiveTypography } from "@/app/appearance-store";
-import { __resetWorkspaceState, workspaceState, setWorkspaceState } from "@/app/workspace-store";
+import {
+  __resetAppearance,
+  appearanceSettings,
+  effectiveTypography,
+} from "@/app/appearance-store";
+import {
+  __resetWorkspaceState,
+  workspaceState,
+  setWorkspaceState,
+} from "@/app/workspace-store";
 import { pressKey } from "@/design/primitives/test-utils";
 import { SettingsPanel } from "./SettingsPanel";
 import { AppearancePanel } from "./AppearancePanel";
 import { FontsPanel } from "./FontsPanel";
 import { TypographyPanel } from "./TypographyPanel";
 import { AboutPanel } from "./AboutPanel";
-import { FirstRunWizard, hasCompletedOnboarding, resetOnboarding } from "./FirstRunWizard";
+import {
+  FirstRunWizard,
+  hasCompletedOnboarding,
+  resetOnboarding,
+} from "./FirstRunWizard";
 import { loadAboutInfo, buildChannel } from "./about-info";
 import { LevelToggle } from "./LevelToggle";
 import { RangeField } from "./RangeField";
@@ -72,7 +90,9 @@ function openFakeWorkspace(root = "D:/书/甲"): void {
 
 /** 找一个按钮（不分大小写地按文本）。 */
 function buttonByText(container: HTMLElement, text: string): HTMLButtonElement {
-  const found = [...container.querySelectorAll("button")].find((b) => b.textContent?.trim() === text);
+  const found = [...container.querySelectorAll("button")].find(
+    (b) => b.textContent?.trim() === text,
+  );
   if (!found) throw new Error("找不到按钮：" + text);
   return found as HTMLButtonElement;
 }
@@ -82,12 +102,19 @@ describe("设置面板结构", () => {
     render(() => <SettingsPanel open onClose={() => {}} />);
     const tabs = screen.getAllByRole("tab");
     expect(tabs).toHaveLength(4);
-    expect(tabs.map((tab) => tab.textContent)).toEqual(["外观", "字体", "排版", "关于"]);
+    expect(tabs.map((tab) => tab.textContent)).toEqual([
+      "外观",
+      "字体",
+      "排版",
+      "关于",
+    ]);
   });
 
   it("默认选中「外观」分区", () => {
     render(() => <SettingsPanel open onClose={() => {}} />);
-    expect(screen.getByRole("tab", { selected: true }).textContent).toBe("外观");
+    expect(screen.getByRole("tab", { selected: true }).textContent).toBe(
+      "外观",
+    );
   });
 
   it("面板是模态对话框", () => {
@@ -127,12 +154,18 @@ describe("设置面板结构", () => {
   it("右侧方向键在分区之间移动（selection follows focus）", () => {
     render(() => <SettingsPanel open onClose={() => {}} />);
     pressKey(screen.getByRole("tablist"), "ArrowRight");
-    expect(screen.getByRole("tab", { selected: true }).textContent).toBe("字体");
+    expect(screen.getByRole("tab", { selected: true }).textContent).toBe(
+      "字体",
+    );
   });
 
   it("初始分区可以由 initialTab 指定", () => {
-    render(() => <SettingsPanel open onClose={() => {}} initialTab="typography" />);
-    expect(screen.getByRole("tab", { selected: true }).textContent).toBe("排版");
+    render(() => (
+      <SettingsPanel open onClose={() => {}} initialTab="typography" />
+    ));
+    expect(screen.getByRole("tab", { selected: true }).textContent).toBe(
+      "排版",
+    );
   });
 });
 
@@ -162,7 +195,9 @@ describe("主题选择（T9.1 的界面入口）", () => {
     fireEvent.click(buttonByText(container, "暗色"));
     expect(document.documentElement.getAttribute("data-theme")).toBe("dark");
     // 「跟随系统」的按钮文本带当前解析结果，用 data 属性定位更稳
-    const follow = container.querySelector('[data-theme-choice="system"]') as HTMLButtonElement;
+    const follow = container.querySelector(
+      '[data-theme-choice="system"]',
+    ) as HTMLButtonElement;
     fireEvent.click(follow);
     expect(document.documentElement.hasAttribute("data-theme")).toBe(false);
   });
@@ -173,12 +208,18 @@ describe("主题选择（T9.1 的界面入口）", () => {
     pressKey(group, "ArrowRight");
     // 从 system 往右循环到 light
     expect(appearanceSettings.theme).toBe("light");
-    expect(container.querySelector('[data-theme-choice="light"]')?.getAttribute("aria-checked")).toBe("true");
+    expect(
+      container
+        .querySelector('[data-theme-choice="light"]')
+        ?.getAttribute("aria-checked"),
+    ).toBe("true");
   });
 
   it("roving tabindex：只有选中项进入 Tab 序", () => {
     const { container } = render(() => <AppearancePanel />);
-    const items = [...container.querySelectorAll<HTMLElement>("[data-theme-choice]")];
+    const items = [
+      ...container.querySelectorAll<HTMLElement>("[data-theme-choice]"),
+    ];
     const zero = items.filter((item) => item.getAttribute("tabindex") === "0");
     expect(zero).toHaveLength(1);
   });
@@ -201,10 +242,14 @@ describe("字体选择与即时预览（T9.2 / T9.3）", () => {
   it("三个作用域互相独立：改正文不影响标题", () => {
     render(() => <FontsPanel level="global" onLevelChange={() => {}} />);
     const selects = screen.getAllByRole("combobox");
-    fireEvent.change(selects[0] as HTMLSelectElement, { target: { value: "yuhua-kai" } });
+    fireEvent.change(selects[0] as HTMLSelectElement, {
+      target: { value: "yuhua-kai" },
+    });
     expect(effectiveTypography().body.family).toBe("yuhua-kai");
     expect(effectiveTypography().heading.family).toBe("yuhua-kai");
-    fireEvent.change(selects[1] as HTMLSelectElement, { target: { value: "system-serif" } });
+    fireEvent.change(selects[1] as HTMLSelectElement, {
+      target: { value: "system-serif" },
+    });
     expect(effectiveTypography().heading.family).toBe("system-serif");
     expect(effectiveTypography().body.family).toBe("yuhua-kai");
   });
@@ -242,9 +287,13 @@ describe("字体选择与即时预览（T9.2 / T9.3）", () => {
   });
 
   it("聚焦切换按钮同样让预览只显示一个作用域", () => {
-    const { container } = render(() => <FontsPanel level="global" onLevelChange={() => {}} />);
+    const { container } = render(() => (
+      <FontsPanel level="global" onLevelChange={() => {}} />
+    ));
     const focusGroup = container.querySelector(".font-focus") as HTMLElement;
-    const uiButton = within(focusGroup).getAllByRole("button").at(-1) as HTMLButtonElement;
+    const uiButton = within(focusGroup)
+      .getAllByRole("button")
+      .at(-1) as HTMLButtonElement;
     fireEvent.click(uiButton);
     expect(container.querySelector(".font-preview__ui")).not.toBeNull();
     expect(container.querySelector(".yh-body")).toBeNull();
@@ -358,13 +407,17 @@ describe("排版设置（T9.5）", () => {
   });
 
   it("排版分区带实时预览", () => {
-    const { container } = render(() => <TypographyPanel level="global" onLevelChange={() => {}} />);
+    const { container } = render(() => (
+      <TypographyPanel level="global" onLevelChange={() => {}} />
+    ));
     expect(container.querySelector(".font-preview")).not.toBeNull();
   });
 
   it("「恢复默认排版」把两项都还原", () => {
     render(() => <TypographyPanel level="global" onLevelChange={() => {}} />);
-    fireEvent.input(screen.getAllByRole("slider")[1] as HTMLInputElement, { target: { value: "1000" } });
+    fireEvent.input(screen.getAllByRole("slider")[1] as HTMLInputElement, {
+      target: { value: "1000" },
+    });
     expect(effectiveTypography().measure).toBe(1000);
     fireEvent.click(screen.getByText("恢复默认排版"));
     expect(effectiveTypography().measure).toBe(720);
@@ -373,21 +426,48 @@ describe("排版设置（T9.5）", () => {
 
 describe("RangeField 无障碍", () => {
   it("标签通过 for/id 关联到滑杆", () => {
-    render(() => <RangeField label="字号" value={17} min={14} max={24} step={1} onChange={() => {}} />);
+    render(() => (
+      <RangeField
+        label="字号"
+        value={17}
+        min={14}
+        max={24}
+        step={1}
+        onChange={() => {}}
+      />
+    ));
     const slider = screen.getByRole("slider");
     expect(screen.getByText("字号").getAttribute("for")).toBe(slider.id);
   });
 
   it("数值变化回调收到数字而不是字符串", () => {
     const onChange = vi.fn();
-    render(() => <RangeField label="字号" value={17} min={14} max={24} step={1} onChange={onChange} />);
+    render(() => (
+      <RangeField
+        label="字号"
+        value={17}
+        min={14}
+        max={24}
+        step={1}
+        onChange={onChange}
+      />
+    ));
     fireEvent.input(screen.getByRole("slider"), { target: { value: "20" } });
     expect(onChange).toHaveBeenCalledWith(20);
   });
 
   it("回调只收到有限数字（非数字输入被拦下）", () => {
     const onChange = vi.fn();
-    render(() => <RangeField label="字号" value={17} min={14} max={24} step={1} onChange={onChange} />);
+    render(() => (
+      <RangeField
+        label="字号"
+        value={17}
+        min={14}
+        max={24}
+        step={1}
+        onChange={onChange}
+      />
+    ));
     fireEvent.input(screen.getByRole("slider"), { target: { value: "abc" } });
     // jsdom 对 range 的非法值会回落到区间内的某个数，因此这里断言
     // 「凡是传出去的必定是有限数字」，这才是组件真正的契约。
@@ -507,7 +587,9 @@ describe("首次启动向导（T9.7）", () => {
   it("第一步是主题选择，选了立刻生效", () => {
     render(() => <FirstRunWizard open onFinish={() => {}} />);
     // Dialog 通过 portal 挂到 document.body，因此查询要走 document 而不是 render 的 container
-    const dark = document.querySelector('[data-wizard-theme="dark"]') as HTMLButtonElement;
+    const dark = document.querySelector(
+      '[data-wizard-theme="dark"]',
+    ) as HTMLButtonElement;
     expect(dark).not.toBeNull();
     fireEvent.click(dark);
     expect(document.documentElement.getAttribute("data-theme")).toBe("dark");
@@ -522,7 +604,9 @@ describe("首次启动向导（T9.7）", () => {
   it("字体步骤选择后立刻作用于正文与标题", () => {
     render(() => <FirstRunWizard open onFinish={() => {}} />);
     fireEvent.click(screen.getByText("下一步"));
-    const kai = document.querySelector('[data-wizard-family="yuhua-kai"]') as HTMLButtonElement;
+    const kai = document.querySelector(
+      '[data-wizard-family="yuhua-kai"]',
+    ) as HTMLButtonElement;
     expect(kai).not.toBeNull();
     fireEvent.click(kai);
     expect(effectiveTypography().body.family).toBe("yuhua-kai");
@@ -589,25 +673,33 @@ describe("首次启动向导（T9.7）", () => {
 
 describe("设置变更不走内联样式（T1.12 的前提）", () => {
   it("字体面板不给任何元素写内联 font-family", () => {
-    const { container } = render(() => <FontsPanel level="global" onLevelChange={() => {}} />);
-    const inline = [...container.querySelectorAll<HTMLElement>("[style]")].filter(
-      (el) => el.style.fontFamily !== "",
-    );
+    const { container } = render(() => (
+      <FontsPanel level="global" onLevelChange={() => {}} />
+    ));
+    const inline = [
+      ...container.querySelectorAll<HTMLElement>("[style]"),
+    ].filter((el) => el.style.fontFamily !== "");
     // 预览块靠 .yh-body / .yh-heading 类读 CSS 变量，不应写内联样式
     expect(inline).toHaveLength(0);
   });
 
   it("排版滑块不写内联样式，只改设置值与 CSS 变量", () => {
-    const { container } = render(() => <TypographyPanel level="global" onLevelChange={() => {}} />);
-    fireEvent.input(screen.getAllByRole("slider")[1] as HTMLInputElement, { target: { value: "960" } });
-    const inline = [...container.querySelectorAll<HTMLElement>("[style]")].filter(
-      (el) => el.style.width !== "",
-    );
+    const { container } = render(() => (
+      <TypographyPanel level="global" onLevelChange={() => {}} />
+    ));
+    fireEvent.input(screen.getAllByRole("slider")[1] as HTMLInputElement, {
+      target: { value: "960" },
+    });
+    const inline = [
+      ...container.querySelectorAll<HTMLElement>("[style]"),
+    ].filter((el) => el.style.width !== "");
     expect(inline).toHaveLength(0);
   });
 
   it("workpsaceState 未打开时面板仍可渲染（不抛异常）", () => {
     expect(workspaceState.root).toBe("");
-    expect(() => render(() => <FontsPanel level="global" onLevelChange={() => {}} />)).not.toThrow();
+    expect(() =>
+      render(() => <FontsPanel level="global" onLevelChange={() => {}} />),
+    ).not.toThrow();
   });
 });

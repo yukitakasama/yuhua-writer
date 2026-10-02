@@ -17,8 +17,8 @@ export function ItalicIcon(props: SvgIconProps) {
   return (
     <svg {...iconProps(props)}>
       <path d="M15.5 4.5h-5" />
-    <path d="M13.5 19.5h-5" />
-    <path d="M14.2 4.5l-4.4 15" />
+      <path d="M13.5 19.5h-5" />
+      <path d="M14.2 4.5l-4.4 15" />
     </svg>
   );
 }

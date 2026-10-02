@@ -17,7 +17,14 @@
 import { For, Show, createSignal, type JSX } from "solid-js";
 
 import type { ChapterSummary, Volume } from "@/lib/ipc";
-import { IconChevron, IconGrip, IconPencil, IconPlus, IconTrash, IconVolume } from "@/app/ui/icons";
+import {
+  IconChevron,
+  IconGrip,
+  IconPencil,
+  IconPlus,
+  IconTrash,
+  IconVolume,
+} from "@/app/ui/icons";
 import { IconButton } from "@/app/ui/IconButton";
 import { EmptyState } from "@/app/ui/EmptyState";
 import { IllustrationEmptyVolume } from "@/app/ui/illustrations";
@@ -51,15 +58,33 @@ export interface VolumeGroupProps {
   /** 删除章。 */
   onDeleteChapter: (chapterId: string) => void;
   /** 章行的拖拽开始。 */
-  onChapterDragStart: (event: PointerEvent, chapter: ChapterSummary, element: HTMLElement) => void;
+  onChapterDragStart: (
+    event: PointerEvent,
+    chapter: ChapterSummary,
+    element: HTMLElement,
+  ) => void;
   /** 卷头的拖拽开始。 */
-  onVolumeDragStart: (event: PointerEvent, volume: Volume, element: HTMLElement) => void;
+  onVolumeDragStart: (
+    event: PointerEvent,
+    volume: Volume,
+    element: HTMLElement,
+  ) => void;
   /** 注册卷体元素（作为 drop 容器）。 */
-  registerContainer: (volumeId: string, element: HTMLElement | undefined) => void;
+  registerContainer: (
+    volumeId: string,
+    element: HTMLElement | undefined,
+  ) => void;
   /** 注册章行元素。 */
-  registerRow: (chapterId: string, volumeId: string, element: HTMLElement | undefined) => void;
+  registerRow: (
+    chapterId: string,
+    volumeId: string,
+    element: HTMLElement | undefined,
+  ) => void;
   /** 卷头元素注册（用于卷拖拽的几何计算）。 */
-  registerVolumeRow: (volumeId: string, element: HTMLElement | undefined) => void;
+  registerVolumeRow: (
+    volumeId: string,
+    element: HTMLElement | undefined,
+  ) => void;
   /** 当前落点是否在本卷，以及落点索引。 */
   dropHint: { active: boolean; index: number } | null;
 }
@@ -71,7 +96,8 @@ export function VolumeGroup(props: VolumeGroupProps): JSX.Element {
   const [error, setError] = createSignal<string | null>(null);
   let headerRef: HTMLLIElement | undefined;
 
-  const totalWords = () => props.chapters.reduce((sum, c) => sum + c.wordCount, 0);
+  const totalWords = () =>
+    props.chapters.reduce((sum, c) => sum + c.wordCount, 0);
 
   return (
     <li
@@ -79,7 +105,12 @@ export function VolumeGroup(props: VolumeGroupProps): JSX.Element {
         headerRef = el;
         props.registerVolumeRow(props.volume.id, el);
       }}
-      class={["tree-group", props.draggingVolumeId === props.volume.id ? "is-dragging" : ""].filter(Boolean).join(" ")}
+      class={[
+        "tree-group",
+        props.draggingVolumeId === props.volume.id ? "is-dragging" : "",
+      ]
+        .filter(Boolean)
+        .join(" ")}
       data-flip-id={`vol:${props.volume.id}`}
       role="treeitem"
       aria-expanded={open()}
@@ -100,7 +131,8 @@ export function VolumeGroup(props: VolumeGroupProps): JSX.Element {
           aria-label={t("chapters.dragHandle")}
           title={t("chapters.dragHandle")}
           onPointerDown={(event) => {
-            if (headerRef) props.onVolumeDragStart(event, props.volume, headerRef);
+            if (headerRef)
+              props.onVolumeDragStart(event, props.volume, headerRef);
           }}
         >
           <IconGrip size={14} />
@@ -133,7 +165,9 @@ export function VolumeGroup(props: VolumeGroupProps): JSX.Element {
 
         <Show when={!editing()}>
           <span class="tree-group__meta">
-            <span class="tree-group__words">{totalWords().toLocaleString("zh-CN")}</span>
+            <span class="tree-group__words">
+              {totalWords().toLocaleString("zh-CN")}
+            </span>
           </span>
         </Show>
 
@@ -181,7 +215,12 @@ export function VolumeGroup(props: VolumeGroupProps): JSX.Element {
 
       <Show when={open()}>
         <ul
-          class={["tree-group__body", props.dropHint?.active ? "is-drop-target" : ""].filter(Boolean).join(" ")}
+          class={[
+            "tree-group__body",
+            props.dropHint?.active ? "is-drop-target" : "",
+          ]
+            .filter(Boolean)
+            .join(" ")}
           ref={(el) => props.registerContainer(props.volume.id, el)}
           role="group"
         >
@@ -195,7 +234,11 @@ export function VolumeGroup(props: VolumeGroupProps): JSX.Element {
                   illustration={<IllustrationEmptyVolume size={24} />}
                   title={t("chapters.volumeEmpty")}
                   action={
-                    <Button variant="ghost" size="sm" onClick={() => props.onAddChapter()}>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => props.onAddChapter()}
+                    >
                       {t("chapters.addChapter")}
                     </Button>
                   }
@@ -207,7 +250,11 @@ export function VolumeGroup(props: VolumeGroupProps): JSX.Element {
               {(chapter, index) => (
                 <>
                   {/* 落点指示线：插在两个行之间的缝隙上 */}
-                  <Show when={props.dropHint?.active && props.dropHint.index === index()}>
+                  <Show
+                    when={
+                      props.dropHint?.active && props.dropHint.index === index()
+                    }
+                  >
                     <li class="drop-line" aria-hidden="true" />
                   </Show>
                   <ChapterRow
@@ -216,16 +263,27 @@ export function VolumeGroup(props: VolumeGroupProps): JSX.Element {
                     selected={props.selectedChapterId === chapter.id}
                     dragging={props.draggingId === chapter.id}
                     onSelect={() => props.onSelectChapter(chapter.id)}
-                    onRename={(title) => props.onRenameChapter(chapter.id, title)}
+                    onRename={(title) =>
+                      props.onRenameChapter(chapter.id, title)
+                    }
                     onDelete={() => props.onDeleteChapter(chapter.id)}
-                    onDragStart={(event, element) => props.onChapterDragStart(event, chapter, element)}
-                    registerRef={(element) => props.registerRow(chapter.id, props.volume.id, element)}
+                    onDragStart={(event, element) =>
+                      props.onChapterDragStart(event, chapter, element)
+                    }
+                    registerRef={(element) =>
+                      props.registerRow(chapter.id, props.volume.id, element)
+                    }
                   />
                 </>
               )}
             </For>
             {/* 末尾落点线：拖到卷内最后一行下方 */}
-            <Show when={props.dropHint?.active && props.dropHint.index >= props.chapters.length}>
+            <Show
+              when={
+                props.dropHint?.active &&
+                props.dropHint.index >= props.chapters.length
+              }
+            >
               <li class="drop-line" aria-hidden="true" />
             </Show>
           </Show>

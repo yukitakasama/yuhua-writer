@@ -113,7 +113,12 @@ export interface MockBackend {
     degradations: Array<{ chapterTitle: string; kind: string; detail: string }>;
   }>;
   listExportFormats(): Promise<
-    Array<{ id: string; displayName: string; extension: string; available: boolean }>
+    Array<{
+      id: string;
+      displayName: string;
+      extension: string;
+      available: boolean;
+    }>
   >;
 }
 
@@ -785,10 +790,15 @@ export function createMockBackend(): MockBackend {
     ): Promise<{
       path: string;
       bytes: number;
-      degradations: Array<{ chapterTitle: string; kind: string; detail: string }>;
+      degradations: Array<{
+        chapterTitle: string;
+        kind: string;
+        detail: string;
+      }>;
     }> {
       // Mock 实现：返回模拟结果，不实际写文件
-      const mockBytes = 1024 * (format === "pdf" ? 50 : format === "docx" ? 30 : 10);
+      const mockBytes =
+        1024 * (format === "pdf" ? 50 : format === "docx" ? 30 : 10);
       return {
         path: outputPath,
         bytes: mockBytes,
@@ -797,15 +807,35 @@ export function createMockBackend(): MockBackend {
     },
 
     async listExportFormats(): Promise<
-      Array<{ id: string; displayName: string; extension: string; available: boolean }>
+      Array<{
+        id: string;
+        displayName: string;
+        extension: string;
+        available: boolean;
+      }>
     > {
       return [
         { id: "txt", displayName: "纯文本", extension: "txt", available: true },
-        { id: "markdown", displayName: "Markdown", extension: "md", available: true },
+        {
+          id: "markdown",
+          displayName: "Markdown",
+          extension: "md",
+          available: true,
+        },
         { id: "html", displayName: "网页", extension: "html", available: true },
-        { id: "docx", displayName: "Word 文档", extension: "docx", available: true },
+        {
+          id: "docx",
+          displayName: "Word 文档",
+          extension: "docx",
+          available: true,
+        },
         { id: "pdf", displayName: "PDF", extension: "pdf", available: true },
-        { id: "epub", displayName: "电子书", extension: "epub", available: true },
+        {
+          id: "epub",
+          displayName: "电子书",
+          extension: "epub",
+          available: true,
+        },
       ];
     },
   };

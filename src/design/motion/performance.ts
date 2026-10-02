@@ -1,4 +1,4 @@
-/**
+﻿/**
  * 动效性能测量工具（T1.10）。
  *
  * ## 为什么需要这个模块
@@ -81,9 +81,20 @@ export class FrameRateMonitor {
       this.rafId = null;
     }
 
+    if (!this.running && this.frameTimestamps.length === 0) {
+      return {
+        avgFps: 0,
+        minFps: 0,
+        droppedFrames: 0,
+        duration: 0,
+        totalFrames: 0,
+        passed: true,
+      };
+    }
+
     this.running = false;
     const endTime = performance.now();
-    const duration = endTime - this.startTime;
+    const duration = Math.max(0, endTime - this.startTime);
     const totalFrames = this.frameTimestamps.length;
 
     // 平均帧率
@@ -93,7 +104,8 @@ export class FrameRateMonitor {
     const minFps = this.calculateMinFps();
 
     // P2 指标：任意 1 秒内掉帧 ≤ 2
-    const passed = this.droppedCount <= 2 || duration < FrameRateMonitor.WINDOW_SIZE;
+    const passed =
+      this.droppedCount <= 2 || duration < FrameRateMonitor.WINDOW_SIZE;
 
     return {
       avgFps: Math.round(avgFps * 10) / 10,
@@ -118,7 +130,10 @@ export class FrameRateMonitor {
     const interval = now - this.lastFrameTime;
 
     // 掉帧判定：帧间隔超过阈值
-    if (interval > FrameRateMonitor.DROP_THRESHOLD && this.lastFrameTime !== this.startTime) {
+    if (
+      interval > FrameRateMonitor.DROP_THRESHOLD &&
+      this.lastFrameTime !== this.startTime
+    ) {
       this.droppedCount += 1;
     }
 
@@ -156,7 +171,9 @@ export class FrameRateMonitor {
     }
 
     // 窗口内帧数即为该秒的 fps
-    return minFramesInWindow === Number.POSITIVE_INFINITY ? 0 : minFramesInWindow;
+    return minFramesInWindow === Number.POSITIVE_INFINITY
+      ? 0
+      : minFramesInWindow;
   }
 }
 

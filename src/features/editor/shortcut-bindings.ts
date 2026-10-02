@@ -19,7 +19,12 @@
 
 import { onCleanup, onMount } from "solid-js";
 
-import { detectMac, eventToChord, DEFAULT_BINDINGS, type KeyBinding } from "@/features/editor/shortcuts";
+import {
+  detectMac,
+  eventToChord,
+  DEFAULT_BINDINGS,
+  type KeyBinding,
+} from "@/features/editor/shortcuts";
 
 /** 一个快捷键处理器的注册项。 */
 export interface ShortcutRegistration {
@@ -44,7 +49,12 @@ export interface ShortcutRegistration {
  * 保存、打开命令面板、退出专注模式。而 Ctrl+B（折叠左栏）
  * 在写一段加粗文字时可能是有歧义的，因此不放行。
  */
-const THROUGH_INPUT_IDS = new Set(["save", "commandPalette", "shortcutPanel", "focusMode"]);
+const THROUGH_INPUT_IDS = new Set([
+  "save",
+  "commandPalette",
+  "shortcutPanel",
+  "focusMode",
+]);
 
 /** 判断事件目标是不是一个文本输入上下文。 */
 export function isTextInput(target: EventTarget | null): boolean {
@@ -59,7 +69,9 @@ export function isTextInput(target: EventTarget | null): boolean {
  *
  * 返回一个解绑函数（`onCleanup` 里调，或者由组件自己管理）。
  */
-export function registerShortcuts(registrations: ShortcutRegistration[]): () => void {
+export function registerShortcuts(
+  registrations: ShortcutRegistration[],
+): () => void {
   const isMac = detectMac();
   const byChord = new Map<string, ShortcutRegistration>();
   for (const reg of registrations) {
@@ -74,7 +86,10 @@ export function registerShortcuts(registrations: ShortcutRegistration[]): () => 
     if (chord === "") return;
     const reg = byChord.get(chord);
     if (!reg) return;
-    if (isTextInput(event.target) && !(reg.throughInput ?? THROUGH_INPUT_IDS.has(reg.id))) {
+    if (
+      isTextInput(event.target) &&
+      !(reg.throughInput ?? THROUGH_INPUT_IDS.has(reg.id))
+    ) {
       // 还要放行一种情况：焦点就在编辑器里。编辑器的 DOM 是 contenteditable，
       // 上面那个判断会把它当成"输入上下文"，于是 Ctrl+S 就失效了。
       // 编辑器内的键由 CodeMirror 的 keymap 处理，应用级只处理
@@ -96,7 +111,9 @@ export function registerShortcuts(registrations: ShortcutRegistration[]): () => 
  * 注册表可能在运行时变化（比如"下一章"的可用性取决于有没有下一章），
  * 因此每次渲染都重建 —— 键的查找是 O(1) 的 Map，重建成本可以忽略。
  */
-export function useShortcuts(registrations: () => ShortcutRegistration[]): void {
+export function useShortcuts(
+  registrations: () => ShortcutRegistration[],
+): void {
   onMount(() => {
     const unbind = registerShortcuts(registrations());
     onCleanup(unbind);

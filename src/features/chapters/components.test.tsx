@@ -25,11 +25,23 @@ import { IllustrationEmptyTree } from "@/app/ui/illustrations";
 
 /** 造一个卷。 */
 function vol(id: string, sort: number, title = id): Volume {
-  return { id, bookId: "bk_1", title, sort, created: "2026-01-01T09:00:00+08:00" };
+  return {
+    id,
+    bookId: "bk_1",
+    title,
+    sort,
+    created: "2026-01-01T09:00:00+08:00",
+  };
 }
 
 /** 造一章摘要。 */
-function ch(id: string, volumeId: string, sort: number, title = id, wordCount = 100): ChapterSummary {
+function ch(
+  id: string,
+  volumeId: string,
+  sort: number,
+  title = id,
+  wordCount = 100,
+): ChapterSummary {
   return {
     id,
     volumeId,
@@ -45,7 +57,10 @@ function ch(id: string, volumeId: string, sort: number, title = id, wordCount = 
 }
 
 /** 把组件渲染到一个临时的 DOM 节点里，返回清理函数。 */
-function mount(component: () => unknown): { root: HTMLElement; dispose: () => void } {
+function mount(component: () => unknown): {
+  root: HTMLElement;
+  dispose: () => void;
+} {
   const root = document.createElement("div");
   document.body.appendChild(root);
   const dispose = render(component as never, root);
@@ -80,7 +95,9 @@ describe("ChapterRow", () => {
   });
 
   it("设置为 treeitem 角色并带选中态", () => {
-    const { root, dispose } = mount(() => <ChapterRow {...baseProps} selected={true} />);
+    const { root, dispose } = mount(() => (
+      <ChapterRow {...baseProps} selected={true} />
+    ));
     const item = root.querySelector("[role='treeitem']");
     expect(item?.getAttribute("aria-selected")).toBe("true");
     dispose();
@@ -88,21 +105,29 @@ describe("ChapterRow", () => {
 
   it("未选中时 aria-selected 为 false", () => {
     const { root, dispose } = mount(() => <ChapterRow {...baseProps} />);
-    expect(root.querySelector("[role='treeitem']")?.getAttribute("aria-selected")).toBe("false");
+    expect(
+      root.querySelector("[role='treeitem']")?.getAttribute("aria-selected"),
+    ).toBe("false");
     dispose();
   });
 
   it("点击行触发 onSelect", () => {
     const onSelect = vi.fn();
-    const { root, dispose } = mount(() => <ChapterRow {...baseProps} onSelect={onSelect} />);
-    root.querySelector("li")?.dispatchEvent(new MouseEvent("click", { bubbles: true }));
+    const { root, dispose } = mount(() => (
+      <ChapterRow {...baseProps} onSelect={onSelect} />
+    ));
+    root
+      .querySelector("li")
+      ?.dispatchEvent(new MouseEvent("click", { bubbles: true }));
     expect(onSelect).toHaveBeenCalledTimes(1);
     dispose();
   });
 
   it("双击标题进入内联编辑（出现输入框）", () => {
     const { root, dispose } = mount(() => <ChapterRow {...baseProps} />);
-    root.querySelector(".tree-row__title")?.dispatchEvent(new MouseEvent("dblclick", { bubbles: true }));
+    root
+      .querySelector(".tree-row__title")
+      ?.dispatchEvent(new MouseEvent("dblclick", { bubbles: true }));
     const input = root.querySelector("input.inline-edit");
     expect(input).not.toBeNull();
     dispose();
@@ -110,28 +135,40 @@ describe("ChapterRow", () => {
 
   it("改名按钮也进入编辑态", () => {
     const { root, dispose } = mount(() => <ChapterRow {...baseProps} />);
-    root.querySelector("button[aria-label='重命名']")?.dispatchEvent(new MouseEvent("click", { bubbles: true }));
+    root
+      .querySelector("button[aria-label='重命名']")
+      ?.dispatchEvent(new MouseEvent("click", { bubbles: true }));
     expect(root.querySelector("input.inline-edit")).not.toBeNull();
     dispose();
   });
 
   it("删除按钮触发 onDelete", () => {
     const onDelete = vi.fn();
-    const { root, dispose } = mount(() => <ChapterRow {...baseProps} onDelete={onDelete} />);
-    root.querySelector("button[aria-label='移到回收站']")?.dispatchEvent(new MouseEvent("click", { bubbles: true }));
+    const { root, dispose } = mount(() => (
+      <ChapterRow {...baseProps} onDelete={onDelete} />
+    ));
+    root
+      .querySelector("button[aria-label='移到回收站']")
+      ?.dispatchEvent(new MouseEvent("click", { bubbles: true }));
     expect(onDelete).toHaveBeenCalledTimes(1);
     dispose();
   });
 
   it("拖拽手柄存在且带无障碍标签", () => {
     const { root, dispose } = mount(() => <ChapterRow {...baseProps} />);
-    expect(root.querySelector(".tree-row__grip")?.getAttribute("aria-label")).toBe("拖动以调整顺序");
+    expect(
+      root.querySelector(".tree-row__grip")?.getAttribute("aria-label"),
+    ).toBe("拖动以调整顺序");
     dispose();
   });
 
   it("正在拖动时带上 is-dragging 类（用于降透明度）", () => {
-    const { root, dispose } = mount(() => <ChapterRow {...baseProps} dragging={true} />);
-    expect(root.querySelector(".tree-row")?.classList.contains("is-dragging")).toBe(true);
+    const { root, dispose } = mount(() => (
+      <ChapterRow {...baseProps} dragging={true} />
+    ));
+    expect(
+      root.querySelector(".tree-row")?.classList.contains("is-dragging"),
+    ).toBe(true);
     dispose();
   });
 
@@ -142,7 +179,10 @@ describe("ChapterRow", () => {
   });
 
   it("渲染状态点（三种状态形状不同）", () => {
-    const done = { ...baseProps, chapter: { ...baseProps.chapter, status: "done" as const } };
+    const done = {
+      ...baseProps,
+      chapter: { ...baseProps.chapter, status: "done" as const },
+    };
     const { root, dispose } = mount(() => <ChapterRow {...done} />);
     expect(root.querySelector(".status-dot--done")).not.toBeNull();
     dispose();
@@ -151,7 +191,10 @@ describe("ChapterRow", () => {
 
 describe("VolumeGroup", () => {
   const volume = vol("v1", 0, "第一卷 落羽");
-  const chapters = [ch("c1", "v1", 0, "第一章", 1000), ch("c2", "v1", 1, "第二章", 2000)];
+  const chapters = [
+    ch("c1", "v1", 0, "第一章", 1000),
+    ch("c2", "v1", 1, "第二章", 2000),
+  ];
 
   const baseProps = {
     volume,
@@ -190,42 +233,60 @@ describe("VolumeGroup", () => {
 
   it("默认展开（aria-expanded 为 true）", () => {
     const { root, dispose } = mount(() => <VolumeGroup {...baseProps} />);
-    expect(root.querySelector("[role='treeitem']")?.getAttribute("aria-expanded")).toBe("true");
+    expect(
+      root.querySelector("[role='treeitem']")?.getAttribute("aria-expanded"),
+    ).toBe("true");
     dispose();
   });
 
   it("点击折叠按钮收起章列表", () => {
     const { root, dispose } = mount(() => <VolumeGroup {...baseProps} />);
-    root.querySelector(".tree-group__toggle")?.dispatchEvent(new MouseEvent("click", { bubbles: true }));
-    expect(root.querySelector("[role='treeitem']")?.getAttribute("aria-expanded")).toBe("false");
+    root
+      .querySelector(".tree-group__toggle")
+      ?.dispatchEvent(new MouseEvent("click", { bubbles: true }));
+    expect(
+      root.querySelector("[role='treeitem']")?.getAttribute("aria-expanded"),
+    ).toBe("false");
     dispose();
   });
 
   it("空卷显示空状态而不是空白", () => {
-    const { root, dispose } = mount(() => <VolumeGroup {...baseProps} chapters={[]} />);
+    const { root, dispose } = mount(() => (
+      <VolumeGroup {...baseProps} chapters={[]} />
+    ));
     expect(root.querySelector(".empty")).not.toBeNull();
     dispose();
   });
 
   it("空卷提示中有新建章的按钮", () => {
     const onAddChapter = vi.fn();
-    const { root, dispose } = mount(() => <VolumeGroup {...baseProps} chapters={[]} onAddChapter={onAddChapter} />);
-    const buttons = [...root.querySelectorAll("button")].filter((b) => b.textContent?.includes("在此卷新建章"));
+    const { root, dispose } = mount(() => (
+      <VolumeGroup {...baseProps} chapters={[]} onAddChapter={onAddChapter} />
+    ));
+    const buttons = [...root.querySelectorAll("button")].filter((b) =>
+      b.textContent?.includes("在此卷新建章"),
+    );
     expect(buttons.length).toBeGreaterThan(0);
     dispose();
   });
 
   it("卷头的新建章按钮触发回调", () => {
     const onAddChapter = vi.fn();
-    const { root, dispose } = mount(() => <VolumeGroup {...baseProps} onAddChapter={onAddChapter} />);
-    root.querySelector("button[aria-label='在此卷新建章']")?.dispatchEvent(new MouseEvent("click", { bubbles: true }));
+    const { root, dispose } = mount(() => (
+      <VolumeGroup {...baseProps} onAddChapter={onAddChapter} />
+    ));
+    root
+      .querySelector("button[aria-label='在此卷新建章']")
+      ?.dispatchEvent(new MouseEvent("click", { bubbles: true }));
     expect(onAddChapter).toHaveBeenCalledTimes(1);
     dispose();
   });
 
   it("双击卷名进入内联编辑", () => {
     const { root, dispose } = mount(() => <VolumeGroup {...baseProps} />);
-    root.querySelector(".tree-group__title")?.dispatchEvent(new MouseEvent("dblclick", { bubbles: true }));
+    root
+      .querySelector(".tree-group__title")
+      ?.dispatchEvent(new MouseEvent("dblclick", { bubbles: true }));
     expect(root.querySelector("input.inline-edit")).not.toBeNull();
     dispose();
   });
@@ -237,14 +298,18 @@ describe("VolumeGroup", () => {
   });
 
   it("落点提示为激活态时出现指示线", () => {
-    const { root, dispose } = mount(() => <VolumeGroup {...baseProps} dropHint={{ active: true, index: 1 }} />);
+    const { root, dispose } = mount(() => (
+      <VolumeGroup {...baseProps} dropHint={{ active: true, index: 1 }} />
+    ));
     expect(root.querySelectorAll(".drop-line").length).toBeGreaterThan(0);
     dispose();
   });
 
   it("卷体是 drop 容器（注册回调被调用）", () => {
     const registerContainer = vi.fn();
-    const { dispose } = mount(() => <VolumeGroup {...baseProps} registerContainer={registerContainer} />);
+    const { dispose } = mount(() => (
+      <VolumeGroup {...baseProps} registerContainer={registerContainer} />
+    ));
     expect(registerContainer).toHaveBeenCalled();
     const [firstArg] = registerContainer.mock.calls[0] ?? [];
     expect(firstArg).toBe("v1");
@@ -254,7 +319,9 @@ describe("VolumeGroup", () => {
 
 describe("BookCover", () => {
   it("渲染出 SVG 且尺寸正确", () => {
-    const { root, dispose } = mount(() => <BookCover title="羽化录" width={120} />);
+    const { root, dispose } = mount(() => (
+      <BookCover title="羽化录" width={120} />
+    ));
     const svg = root.querySelector("svg");
     expect(svg).not.toBeNull();
     expect(svg?.getAttribute("width")).toBe("120");
@@ -265,7 +332,9 @@ describe("BookCover", () => {
 
   it("带可读的 aria-label", () => {
     const { root, dispose } = mount(() => <BookCover title="羽化录" />);
-    expect(root.querySelector("svg")?.getAttribute("aria-label")).toBe("羽化录 的封面");
+    expect(root.querySelector("svg")?.getAttribute("aria-label")).toBe(
+      "羽化录 的封面",
+    );
     dispose();
   });
 
@@ -276,13 +345,17 @@ describe("BookCover", () => {
   });
 
   it("长书名被截断并加省略号", () => {
-    const { root, dispose } = mount(() => <BookCover title="一个非常非常长的书名需要被截断处理" />);
+    const { root, dispose } = mount(() => (
+      <BookCover title="一个非常非常长的书名需要被截断处理" />
+    ));
     expect(root.textContent).toContain("…");
     dispose();
   });
 
   it("showTitle=false 时不渲染书名文字但仍渲染首字", () => {
-    const { root, dispose } = mount(() => <BookCover title="羽化录" showTitle={false} />);
+    const { root, dispose } = mount(() => (
+      <BookCover title="羽化录" showTitle={false} />
+    ));
     expect(root.textContent).toContain("羽");
     expect(root.textContent).not.toContain("羽化录");
     dispose();
@@ -311,7 +384,11 @@ describe("BookCover", () => {
 describe("空状态", () => {
   it("渲染插画、标题与说明", () => {
     const { root, dispose } = mount(() => (
-      <EmptyState illustration={<IllustrationEmptyTree />} title="还没有任何章节" body="先建一卷" />
+      <EmptyState
+        illustration={<IllustrationEmptyTree />}
+        title="还没有任何章节"
+        body="先建一卷"
+      />
     ));
     expect(root.querySelector("svg")).not.toBeNull();
     expect(root.textContent).toContain("还没有任何章节");
@@ -320,20 +397,28 @@ describe("空状态", () => {
   });
 
   it("带 role=status 供屏幕阅读器播报", () => {
-    const { root, dispose } = mount(() => <EmptyState illustration={<IllustrationEmptyTree />} title="空" />);
+    const { root, dispose } = mount(() => (
+      <EmptyState illustration={<IllustrationEmptyTree />} title="空" />
+    ));
     expect(root.querySelector("[role='status']")).not.toBeNull();
     dispose();
   });
 
   it("插画标记为装饰性（aria-hidden），避免朗读冗余", () => {
-    const { root, dispose } = mount(() => <EmptyState illustration={<IllustrationEmptyTree />} title="空" />);
+    const { root, dispose } = mount(() => (
+      <EmptyState illustration={<IllustrationEmptyTree />} title="空" />
+    ));
     expect(root.querySelector("svg")?.getAttribute("aria-hidden")).toBe("true");
     dispose();
   });
 
   it("插画是自绘 SVG，不含 emoji 文本", () => {
     const { root, dispose } = mount(() => (
-      <EmptyState illustration={<IllustrationEmptyTree />} title="空" body="说明" />
+      <EmptyState
+        illustration={<IllustrationEmptyTree />}
+        title="空"
+        body="说明"
+      />
     ));
     // 空状态里除了标题与说明，没有别的文本节点
     expect(root.textContent).toBe("空说明");
@@ -341,7 +426,9 @@ describe("空状态", () => {
   });
 
   it("可选的 action 不传时不渲染操作区", () => {
-    const { root, dispose } = mount(() => <EmptyState illustration={<IllustrationEmptyTree />} title="空" />);
+    const { root, dispose } = mount(() => (
+      <EmptyState illustration={<IllustrationEmptyTree />} title="空" />
+    ));
     expect(root.querySelector(".empty__action")).toBeNull();
     dispose();
   });

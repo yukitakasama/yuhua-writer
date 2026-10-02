@@ -17,7 +17,7 @@ export function ClockIcon(props: SvgIconProps) {
   return (
     <svg {...iconProps(props)}>
       <circle cx="12" cy="12" r="8.5" />
-    <path d="M12 6.8V12l3.6 2.2" />
+      <path d="M12 6.8V12l3.6 2.2" />
     </svg>
   );
 }

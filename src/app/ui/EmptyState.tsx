@@ -32,15 +32,26 @@ export interface EmptyStateProps {
 
 /** 一块空状态提示。 */
 export function EmptyState(props: EmptyStateProps): JSX.Element {
-  const classes = () => ["empty", props.compact ? "empty--compact" : "", props.align === "start" ? "empty--start" : ""].filter(Boolean).join(" ");
+  const classes = () =>
+    [
+      "empty",
+      props.compact ? "empty--compact" : "",
+      props.align === "start" ? "empty--start" : "",
+    ]
+      .filter(Boolean)
+      .join(" ");
   return (
     <div class={classes()} role="status">
       <div class="empty__art" aria-hidden="true">
         {props.illustration}
       </div>
       <p class="empty__title">{props.title}</p>
-      {props.body !== undefined ? <p class="empty__body">{props.body}</p> : null}
-      {props.action !== undefined ? <div class="empty__action">{props.action}</div> : null}
+      {props.body !== undefined ? (
+        <p class="empty__body">{props.body}</p>
+      ) : null}
+      {props.action !== undefined ? (
+        <div class="empty__action">{props.action}</div>
+      ) : null}
     </div>
   );
 }

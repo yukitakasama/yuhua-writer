@@ -17,14 +17,14 @@ export function CalendarIcon(props: SvgIconProps) {
   return (
     <svg {...iconProps(props)}>
       <rect x="3.5" y="5.5" width="17" height="15" rx="2" />
-    <path d="M3.5 10h17" />
-    <path d="M8 3.5v4" />
-    <path d="M16 3.5v4" />
-    <path d="M7.5 14h1.5" />
-    <path d="M12 14h1.5" />
-    <path d="M16.5 14H18" />
-    <path d="M7.5 17.2h1.5" />
-    <path d="M12 17.2h1.5" />
+      <path d="M3.5 10h17" />
+      <path d="M8 3.5v4" />
+      <path d="M16 3.5v4" />
+      <path d="M7.5 14h1.5" />
+      <path d="M12 14h1.5" />
+      <path d="M16.5 14H18" />
+      <path d="M7.5 17.2h1.5" />
+      <path d="M12 17.2h1.5" />
     </svg>
   );
 }

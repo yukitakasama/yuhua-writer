@@ -24,7 +24,10 @@ import {
 
 /** 可被动画的元素：真实 DOM 元素或任何有 animate 方法的对象（便于测试打桩）。 */
 export type Animatable = Element & {
-  animate?: (keyframes: Keyframe[], options: KeyframeAnimationOptions) => Animation;
+  animate?: (
+    keyframes: Keyframe[],
+    options: KeyframeAnimationOptions,
+  ) => Animation;
 };
 
 /** 动效方向。 */
@@ -120,7 +123,10 @@ export function springValue(config: SpringConfig, timeMs: number): number {
     const omegaD = omega0 * Math.sqrt(1 - zeta * zeta);
     const envelope = Math.exp(-zeta * omega0 * t);
     return (
-      1 - envelope * (Math.cos(omegaD * t) + ((zeta * omega0) / omegaD) * Math.sin(omegaD * t))
+      1 -
+      envelope *
+        (Math.cos(omegaD * t) +
+          ((zeta * omega0) / omegaD) * Math.sin(omegaD * t))
     );
   }
 
@@ -277,11 +283,10 @@ function run(
   // 降级路径①：环境不要求动效时用最短的纯透明度变化
   if (reduced) {
     if (!canAnimate(el)) return Promise.resolve();
-    const anim = (el as Required<Animatable>).animate(reducedFrames, optionsFor(
-      resolveDuration(duration, true),
-      "linear",
-      delay,
-    ));
+    const anim = (el as Required<Animatable>).animate(
+      reducedFrames,
+      optionsFor(resolveDuration(duration, true), "linear", delay),
+    );
     return finish(el, anim, opts.clearOnFinish !== false);
   }
 
@@ -348,7 +353,10 @@ function finish(
  * @param opts 动效选项
  * @returns 动画结束的 Promise
  */
-export function fadeIn(el: Animatable | null | undefined, opts: MotionOptions = {}): Promise<void> {
+export function fadeIn(
+  el: Animatable | null | undefined,
+  opts: MotionOptions = {},
+): Promise<void> {
   return run(
     el,
     [{ opacity: 0 }, { opacity: 1 }],
@@ -364,7 +372,10 @@ export function fadeIn(el: Animatable | null | undefined, opts: MotionOptions = 
  * @param opts 动效选项
  * @returns 动画结束的 Promise
  */
-export function fadeOut(el: Animatable | null | undefined, opts: MotionOptions = {}): Promise<void> {
+export function fadeOut(
+  el: Animatable | null | undefined,
+  opts: MotionOptions = {},
+): Promise<void> {
   return run(
     el,
     [{ opacity: 1 }, { opacity: 0 }],
@@ -479,7 +490,11 @@ export function flip(
   if (dx === 0 && dy === 0) return Promise.resolve();
 
   const reduced = rest.reducedMotion ?? prefersReducedMotion();
-  const frameOpts = optionsFor(springDuration(spring), "linear", rest.delay ?? 0);
+  const frameOpts = optionsFor(
+    springDuration(spring),
+    "linear",
+    rest.delay ?? 0,
+  );
 
   if (reduced) {
     return run(el, [{ opacity: 1 }, { opacity: 1 }], [], {
@@ -491,10 +506,12 @@ export function flip(
   if (!el || !canAnimate(el) || !acquireSlot()) return Promise.resolve();
 
   lock(el);
-  const frames: Keyframe[] = springKeyframeOffsets(spring, 1, 0, 24).map((f) => ({
-    offset: f.offset,
-    transform: `translate(${Math.round(dx * f.value)}px, ${Math.round(dy * f.value)}px)`,
-  }));
+  const frames: Keyframe[] = springKeyframeOffsets(spring, 1, 0, 24).map(
+    (f) => ({
+      offset: f.offset,
+      transform: `translate(${Math.round(dx * f.value)}px, ${Math.round(dy * f.value)}px)`,
+    }),
+  );
   const anim = (el as Required<Animatable>).animate(frames, frameOpts);
   return finish(el, anim, true, releaseSlot);
 }
@@ -506,7 +523,10 @@ export function flip(
  * @param opts 动效选项
  * @returns 动画结束的 Promise
  */
-export function pressFeedback(el: Animatable | null | undefined, opts: MotionOptions = {}): Promise<void> {
+export function pressFeedback(
+  el: Animatable | null | undefined,
+  opts: MotionOptions = {},
+): Promise<void> {
   return run(
     el,
     [{ opacity: 1 }, { opacity: 1 }],
@@ -529,7 +549,10 @@ export function pressFeedback(el: Animatable | null | undefined, opts: MotionOpt
  * @param opts 动效选项
  * @returns 动画结束的 Promise
  */
-export function rollNumber(el: Animatable | null | undefined, opts: MotionOptions = {}): Promise<void> {
+export function rollNumber(
+  el: Animatable | null | undefined,
+  opts: MotionOptions = {},
+): Promise<void> {
   return run(
     el,
     [{ opacity: 0.4 }, { opacity: 1 }],
@@ -551,6 +574,13 @@ export function rollNumber(el: Animatable | null | undefined, opts: MotionOption
  * @param opts 动效选项
  * @returns 动画结束的 Promise
  */
-export function fadeInContainer(el: Animatable | null | undefined, opts: MotionOptions = {}): Promise<void> {
-  return fadeIn(el, { duration: DURATION.page, easing: EASING.decelerate, ...opts });
+export function fadeInContainer(
+  el: Animatable | null | undefined,
+  opts: MotionOptions = {},
+): Promise<void> {
+  return fadeIn(el, {
+    duration: DURATION.page,
+    easing: EASING.decelerate,
+    ...opts,
+  });
 }

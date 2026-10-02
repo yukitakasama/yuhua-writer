@@ -17,11 +17,11 @@ export function ListIcon(props: SvgIconProps) {
   return (
     <svg {...iconProps(props)}>
       <path d="M9 6.5h11" />
-    <path d="M9 12h11" />
-    <path d="M9 17.5h11" />
-    <circle cx="5" cy="6.5" r="1" />
-    <circle cx="5" cy="12" r="1" />
-    <circle cx="5" cy="17.5" r="1" />
+      <path d="M9 12h11" />
+      <path d="M9 17.5h11" />
+      <circle cx="5" cy="6.5" r="1" />
+      <circle cx="5" cy="12" r="1" />
+      <circle cx="5" cy="17.5" r="1" />
     </svg>
   );
 }

@@ -113,7 +113,10 @@ export class AutosaveScheduler {
   private schedule(now: number): void {
     this.cancelTimer();
     // 已经超过"最长等待"就直接保存，不再等防抖
-    if (this.firstDirtyAt !== null && now - this.firstDirtyAt >= this.maxWaitMs) {
+    if (
+      this.firstDirtyAt !== null &&
+      now - this.firstDirtyAt >= this.maxWaitMs
+    ) {
       void this.performSave();
       return;
     }
@@ -166,7 +169,16 @@ export class AutosaveScheduler {
  *
  * 因此判据是「文档变了 **且** 这次变化来自用户输入」。
  */
-export function isUserEdit(docChanged: boolean, isUserEvent: (event: string) => boolean): boolean {
+export function isUserEdit(
+  docChanged: boolean,
+  isUserEvent: (event: string) => boolean,
+): boolean {
   if (!docChanged) return false;
-  return isUserEvent("input") || isUserEvent("delete") || isUserEvent("input.type") || isUserEvent("input.paste") || isUserEvent("input.drop");
+  return (
+    isUserEvent("input") ||
+    isUserEvent("delete") ||
+    isUserEvent("input.type") ||
+    isUserEvent("input.paste") ||
+    isUserEvent("input.drop")
+  );
 }

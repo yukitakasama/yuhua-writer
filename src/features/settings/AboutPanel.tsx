@@ -74,11 +74,15 @@ export function AboutPanel(): JSX.Element {
         <ul class="about-license-list">
           <li class="about-license">
             <div class="about-license__head">
-              <span class="about-license__asset">{t("settings.aboutPage.selfLicense")}</span>
+              <span class="about-license__asset">
+                {t("settings.aboutPage.selfLicense")}
+              </span>
               <span class="about-license__badge">{info().selfLicense}</span>
             </div>
           </li>
-          <For each={info().licenses.filter((entry) => entry.license !== "MIT")}>
+          <For
+            each={info().licenses.filter((entry) => entry.license !== "MIT")}
+          >
             {(entry) => (
               <li class="about-license">
                 <div class="about-license__head">
@@ -98,7 +102,8 @@ export function AboutPanel(): JSX.Element {
 
         <details class="about-details">
           <summary class="about-details__summary">
-            SIL Open Font License 1.1 <span class="about-details__hint">（点击展开全文）</span>
+            SIL Open Font License 1.1{" "}
+            <span class="about-details__hint">（点击展开全文）</span>
           </summary>
           <pre class="about-details__body">{info().oflText}</pre>
         </details>
@@ -116,7 +121,9 @@ export function AboutPanel(): JSX.Element {
         <h4 class="about-section__title" id="yh-about-fonts">
           {t("settings.aboutPage.fontLicenseTitle")}
         </h4>
-        <p class="about-section__note">{t("settings.aboutPage.fontLicenseIntro")}</p>
+        <p class="about-section__note">
+          {t("settings.aboutPage.fontLicenseIntro")}
+        </p>
 
         <ul class="about-fonts">
           <For each={info().fonts}>
@@ -129,7 +136,10 @@ export function AboutPanel(): JSX.Element {
                 <p class="about-font__source">
                   基于 {font.source}
                   <Show when={font.weights.length > 0}>
-                    <span class="about-font__weights"> · 字重 {font.weights.join(" / ")}</span>
+                    <span class="about-font__weights">
+                      {" "}
+                      · 字重 {font.weights.join(" / ")}
+                    </span>
                   </Show>
                 </p>
               </li>
@@ -143,7 +153,9 @@ export function AboutPanel(): JSX.Element {
         <h4 class="about-section__title" id="yh-about-thanks">
           {t("settings.aboutPage.acknowledgements")}
         </h4>
-        <p class="about-section__note">{t("settings.aboutPage.acknowledgementsBody")}</p>
+        <p class="about-section__note">
+          {t("settings.aboutPage.acknowledgementsBody")}
+        </p>
       </section>
 
       <p class="about-panel__offline">{t("settings.aboutPage.offlineNote")}</p>

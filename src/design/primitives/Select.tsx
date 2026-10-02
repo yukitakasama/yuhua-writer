@@ -11,7 +11,15 @@
  * value 为 undefined 时选中的是 placeholder 项，该项带 value=""，与真实选项区分开。
  */
 
-import { createEffect, createUniqueId, For, Show, splitProps, type Component, type JSX } from "solid-js";
+import {
+  createEffect,
+  createUniqueId,
+  For,
+  Show,
+  splitProps,
+  type Component,
+  type JSX,
+} from "solid-js";
 import { cx, usePrimitivesStyle } from "./styles";
 
 /** 单个选项。 */
@@ -25,8 +33,10 @@ export interface SelectOption {
 }
 
 /** {@link Select} 的 props。 */
-export interface SelectProps
-  extends Omit<JSX.SelectHTMLAttributes<HTMLSelectElement>, "value" | "onChange" | "class" | "children"> {
+export interface SelectProps extends Omit<
+  JSX.SelectHTMLAttributes<HTMLSelectElement>,
+  "value" | "onChange" | "class" | "children"
+> {
   /** 选项列表。 */
   options: readonly SelectOption[];
   /** 受控值。不传或传 undefined 表示未选择，展示 placeholder。 */
@@ -110,11 +120,18 @@ export const Select: Component<SelectProps> = (props) => {
             selectRef = element;
           }}
           id={rest.id ?? selectId}
-          class={cx("yh-select", local.error ? "yh-select--invalid" : undefined)}
+          class={cx(
+            "yh-select",
+            local.error ? "yh-select--invalid" : undefined,
+          )}
           value={local.value ?? ""}
           aria-invalid={local.error ? "true" : undefined}
-          aria-describedby={local.error ? errorId : local.hint ? hintId : undefined}
-          onChange={(event) => local.onChange?.(event.currentTarget.value, event)}
+          aria-describedby={
+            local.error ? errorId : local.hint ? hintId : undefined
+          }
+          onChange={(event) =>
+            local.onChange?.(event.currentTarget.value, event)
+          }
         >
           {/* placeholder 项只在未选中时出现：一旦有值还留着它，
               用户会以为可以「取消选择」，但原生 select 无法表达这个意图。 */}

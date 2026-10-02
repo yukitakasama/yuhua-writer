@@ -77,7 +77,13 @@ export function InlineEdit(props: InlineEditProps): JSX.Element {
   return (
     <input
       ref={inputRef}
-      class={["inline-edit", error() !== null ? "inline-edit--error" : "", props.class ?? ""].filter(Boolean).join(" ")}
+      class={[
+        "inline-edit",
+        error() !== null ? "inline-edit--error" : "",
+        props.class ?? "",
+      ]
+        .filter(Boolean)
+        .join(" ")}
       type="text"
       value={props.value}
       aria-label={props.label}
@@ -102,5 +108,7 @@ export function InlineEdit(props: InlineEditProps): JSX.Element {
 
 /** 重命名提示文案。 */
 export function titleErrorMessage(reason: "empty" | "tooLong"): string {
-  return reason === "empty" ? t("chapters.renameEmpty") : t("chapters.renameTooLong", { max: 200 });
+  return reason === "empty"
+    ? t("chapters.renameEmpty")
+    : t("chapters.renameTooLong", { max: 200 });
 }

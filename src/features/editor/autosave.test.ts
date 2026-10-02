@@ -1,6 +1,11 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-import { AutosaveScheduler, AUTOSAVE_DEBOUNCE_MS, AUTOSAVE_MAX_WAIT_MS, isUserEdit } from "./autosave";
+import {
+  AutosaveScheduler,
+  AUTOSAVE_DEBOUNCE_MS,
+  AUTOSAVE_MAX_WAIT_MS,
+  isUserEdit,
+} from "./autosave";
 
 describe("自动保存：防抖", () => {
   beforeEach(() => vi.useFakeTimers());
@@ -45,7 +50,12 @@ describe("自动保存：最长等待", () => {
 
   it("一直打字也会在 maxWait 后强制保存", async () => {
     const save = vi.fn().mockResolvedValue(undefined);
-    const s = new AutosaveScheduler({ save, read: () => "正文", debounceMs: 1000, maxWaitMs: 3000 });
+    const s = new AutosaveScheduler({
+      save,
+      read: () => "正文",
+      debounceMs: 1000,
+      maxWaitMs: 3000,
+    });
     let now = 0;
     s.markDirty(now);
     // 每 500ms 打一次字，防抖永远触发不了
@@ -114,7 +124,11 @@ describe("自动保存：IME 门控", () => {
   it("组合期间不保存", async () => {
     const save = vi.fn().mockResolvedValue(undefined);
     let composing = true;
-    const s = new AutosaveScheduler({ save, read: () => "拼音", canSave: () => !composing });
+    const s = new AutosaveScheduler({
+      save,
+      read: () => "拼音",
+      canSave: () => !composing,
+    });
     s.markDirty();
     await vi.advanceTimersByTimeAsync(AUTOSAVE_DEBOUNCE_MS * 2);
     expect(save).not.toHaveBeenCalled();
@@ -125,7 +139,11 @@ describe("自动保存：IME 门控", () => {
   it("组合结束后能正常保存", async () => {
     const save = vi.fn().mockResolvedValue(undefined);
     let composing = true;
-    const s = new AutosaveScheduler({ save, read: () => "你好", canSave: () => !composing });
+    const s = new AutosaveScheduler({
+      save,
+      read: () => "你好",
+      canSave: () => !composing,
+    });
     s.markDirty();
     await vi.advanceTimersByTimeAsync(AUTOSAVE_DEBOUNCE_MS + 1);
     composing = false;
@@ -148,7 +166,10 @@ describe("自动保存：失败处理", () => {
   });
 
   it("失败后再次 markDirty 会重试", async () => {
-    const save = vi.fn().mockRejectedValueOnce(new Error("临时失败")).mockResolvedValue(undefined);
+    const save = vi
+      .fn()
+      .mockRejectedValueOnce(new Error("临时失败"))
+      .mockResolvedValue(undefined);
     const s = new AutosaveScheduler({ save, read: () => "正文" });
     s.markDirty();
     await vi.advanceTimersByTimeAsync(AUTOSAVE_DEBOUNCE_MS + 1);

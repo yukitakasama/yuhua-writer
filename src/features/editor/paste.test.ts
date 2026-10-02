@@ -1,6 +1,11 @@
 import { describe, expect, it } from "vitest";
 
-import { normalizePastedText, htmlToMarkdown, isSafeHref, isSafeSrc } from "./paste";
+import {
+  normalizePastedText,
+  htmlToMarkdown,
+  isSafeHref,
+  isSafeSrc,
+} from "./paste";
 
 describe("粘贴清洗：换行归一", () => {
   it("CRLF 归一成 LF", () => {
@@ -63,7 +68,9 @@ describe("粘贴清洗：保留作者本意", () => {
 
 describe("HTML 转 Markdown", () => {
   it("粗体与斜体", () => {
-    expect(htmlToMarkdown("<p>这是 <strong>重点</strong></p>")).toBe("这是 **重点**");
+    expect(htmlToMarkdown("<p>这是 <strong>重点</strong></p>")).toBe(
+      "这是 **重点**",
+    );
     expect(htmlToMarkdown("<p>这是 <em>强调</em></p>")).toBe("这是 *强调*");
   });
 
@@ -77,7 +84,9 @@ describe("HTML 转 Markdown", () => {
   });
 
   it("列表项转换", () => {
-    expect(htmlToMarkdown("<ul><li>甲</li><li>乙</li></ul>")).toBe("- 甲\n- 乙");
+    expect(htmlToMarkdown("<ul><li>甲</li><li>乙</li></ul>")).toBe(
+      "- 甲\n- 乙",
+    );
   });
 
   it("行内代码", () => {
@@ -85,7 +94,9 @@ describe("HTML 转 Markdown", () => {
   });
 
   it("链接转换", () => {
-    expect(htmlToMarkdown('<a href="https://a.b">文档</a>')).toBe("[文档](https://a.b)");
+    expect(htmlToMarkdown('<a href="https://a.b">文档</a>')).toBe(
+      "[文档](https://a.b)",
+    );
   });
 
   it("行内样式被剥掉但文字保留", () => {
@@ -94,12 +105,16 @@ describe("HTML 转 Markdown", () => {
   });
 
   it("script 与 style 整块丢弃", () => {
-    expect(htmlToMarkdown("<style>p{color:red}</style><p>正文</p>")).toBe("正文");
+    expect(htmlToMarkdown("<style>p{color:red}</style><p>正文</p>")).toBe(
+      "正文",
+    );
     expect(htmlToMarkdown("<script>alert(1)</script><p>正文</p>")).toBe("正文");
   });
 
   it("HTML 注释丢弃", () => {
-    expect(htmlToMarkdown("<!--StartFragment--><p>正文</p><!--EndFragment-->")).toBe("正文");
+    expect(
+      htmlToMarkdown("<!--StartFragment--><p>正文</p><!--EndFragment-->"),
+    ).toBe("正文");
   });
 
   it("nbsp 转成普通空格", () => {
@@ -107,7 +122,9 @@ describe("HTML 转 Markdown", () => {
   });
 
   it("危险链接降级为纯文本", () => {
-    expect(htmlToMarkdown('<a href="javascript:alert(1)">点我</a>')).toBe("点我");
+    expect(htmlToMarkdown('<a href="javascript:alert(1)">点我</a>')).toBe(
+      "点我",
+    );
   });
 
   it("危险图片降级为占位文字", () => {
@@ -121,7 +138,8 @@ describe("HTML 转 Markdown", () => {
   });
 
   it("Word 特有的 mso 样式被剥掉", () => {
-    const html = '<p style="mso-margin-top-alt:auto"><span style="mso-bidi-font-size:10.5pt">正文</span></p>';
+    const html =
+      '<p style="mso-margin-top-alt:auto"><span style="mso-bidi-font-size:10.5pt">正文</span></p>';
     expect(htmlToMarkdown(html)).toBe("正文");
   });
 });

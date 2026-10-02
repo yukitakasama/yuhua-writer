@@ -77,11 +77,17 @@ describe("normalizeAppearance", () => {
   });
 
   it("超出的字号被夹到上限", () => {
-    expect(normalizeAppearance({ typography: { body: { size: 999 } } }).typography.body.size).toBe(BODY_SIZE_MAX);
+    expect(
+      normalizeAppearance({ typography: { body: { size: 999 } } }).typography
+        .body.size,
+    ).toBe(BODY_SIZE_MAX);
   });
 
   it("过小的字号被夹到下限", () => {
-    expect(normalizeAppearance({ typography: { body: { size: 1 } } }).typography.body.size).toBe(BODY_SIZE_MIN);
+    expect(
+      normalizeAppearance({ typography: { body: { size: 1 } } }).typography.body
+        .size,
+    ).toBe(BODY_SIZE_MIN);
   });
 
   it("标题与界面作用域用各自的区间，不共用正文的上下限", () => {
@@ -93,43 +99,67 @@ describe("normalizeAppearance", () => {
   });
 
   it("行距被夹到区间内", () => {
-    expect(normalizeAppearance({ typography: { body: { lineHeight: 99 } } }).typography.body.lineHeight).toBe(LINE_HEIGHT_MAX);
-    expect(normalizeAppearance({ typography: { body: { lineHeight: 0.1 } } }).typography.body.lineHeight).toBe(LINE_HEIGHT_MIN);
+    expect(
+      normalizeAppearance({ typography: { body: { lineHeight: 99 } } })
+        .typography.body.lineHeight,
+    ).toBe(LINE_HEIGHT_MAX);
+    expect(
+      normalizeAppearance({ typography: { body: { lineHeight: 0.1 } } })
+        .typography.body.lineHeight,
+    ).toBe(LINE_HEIGHT_MIN);
   });
 
   it("正文宽度被夹到区间内", () => {
-    expect(normalizeAppearance({ typography: { measure: 99999 } }).typography.measure).toBe(MEASURE_MAX);
-    expect(normalizeAppearance({ typography: { measure: 10 } }).typography.measure).toBe(MEASURE_MIN);
+    expect(
+      normalizeAppearance({ typography: { measure: 99999 } }).typography
+        .measure,
+    ).toBe(MEASURE_MAX);
+    expect(
+      normalizeAppearance({ typography: { measure: 10 } }).typography.measure,
+    ).toBe(MEASURE_MIN);
   });
 
   it("段距被夹到区间内", () => {
-    expect(normalizeAppearance({ typography: { paragraphGap: 99 } }).typography.paragraphGap).toBe(PARAGRAPH_GAP_MAX);
-    expect(normalizeAppearance({ typography: { paragraphGap: -5 } }).typography.paragraphGap).toBe(0);
+    expect(
+      normalizeAppearance({ typography: { paragraphGap: 99 } }).typography
+        .paragraphGap,
+    ).toBe(PARAGRAPH_GAP_MAX);
+    expect(
+      normalizeAppearance({ typography: { paragraphGap: -5 } }).typography
+        .paragraphGap,
+    ).toBe(0);
   });
 
   it("NaN / Infinity 回退到默认值而不是产生 NaN 字号", () => {
-    expect(normalizeAppearance({ typography: { body: { size: Number.NaN } } }).typography.body.size).toBe(
-      DEFAULT_APPEARANCE.typography.body.size,
-    );
-    expect(normalizeAppearance({ typography: { measure: Number.POSITIVE_INFINITY } }).typography.measure).toBe(
-      DEFAULT_APPEARANCE.typography.measure,
-    );
+    expect(
+      normalizeAppearance({ typography: { body: { size: Number.NaN } } })
+        .typography.body.size,
+    ).toBe(DEFAULT_APPEARANCE.typography.body.size);
+    expect(
+      normalizeAppearance({ typography: { measure: Number.POSITIVE_INFINITY } })
+        .typography.measure,
+    ).toBe(DEFAULT_APPEARANCE.typography.measure);
   });
 
   it("字符串数值被忽略（localStorage 可能被手改）", () => {
-    expect(normalizeAppearance({ typography: { body: { size: "很大" as never } } }).typography.body.size).toBe(
-      DEFAULT_APPEARANCE.typography.body.size,
-    );
+    expect(
+      normalizeAppearance({ typography: { body: { size: "很大" as never } } })
+        .typography.body.size,
+    ).toBe(DEFAULT_APPEARANCE.typography.body.size);
   });
 
   it("空字符串字体族被忽略", () => {
-    expect(normalizeAppearance({ typography: { body: { family: "" } } }).typography.body.family).toBe(
-      DEFAULT_APPEARANCE.typography.body.family,
-    );
+    expect(
+      normalizeAppearance({ typography: { body: { family: "" } } }).typography
+        .body.family,
+    ).toBe(DEFAULT_APPEARANCE.typography.body.family);
   });
 
   it("字号取整到一位小数（避免浮点尾巴写进 JSON）", () => {
-    expect(normalizeAppearance({ typography: { body: { size: 17.28 } } }).typography.body.size).toBe(17.3);
+    expect(
+      normalizeAppearance({ typography: { body: { size: 17.28 } } }).typography
+        .body.size,
+    ).toBe(17.3);
   });
 });
 
@@ -141,20 +171,28 @@ describe("normalizeWorkspaceAppearance", () => {
   });
 
   it("只保留实际给出的字段", () => {
-    const result = normalizeWorkspaceAppearance({ typography: { body: { family: "yuhua-kai" } } });
+    const result = normalizeWorkspaceAppearance({
+      typography: { body: { family: "yuhua-kai" } },
+    });
     expect(result.typography?.body).toEqual({ family: "yuhua-kai" });
     // 没有给出的字段不应出现：出现即意味着「已覆盖」，会错误地打断继承
-    expect(result.typography?.body && "size" in result.typography.body).toBe(false);
+    expect(result.typography?.body && "size" in result.typography.body).toBe(
+      false,
+    );
   });
 
   it("越界值被夹紧而不是丢弃", () => {
-    const result = normalizeWorkspaceAppearance({ typography: { body: { size: 999 } } });
+    const result = normalizeWorkspaceAppearance({
+      typography: { body: { size: 999 } },
+    });
     expect(result.typography?.body?.size).toBe(BODY_SIZE_MAX);
   });
 
   it("主题覆盖被保留", () => {
     expect(normalizeWorkspaceAppearance({ theme: "dark" }).theme).toBe("dark");
-    expect(normalizeWorkspaceAppearance({ theme: "乱写" as never }).theme).toBeUndefined();
+    expect(
+      normalizeWorkspaceAppearance({ theme: "乱写" as never }).theme,
+    ).toBeUndefined();
   });
 });
 
@@ -179,12 +217,16 @@ describe("全局设置写入", () => {
 
   it("设置行距时自动夹紧", () => {
     setScopeTypography("heading", { lineHeight: 99 });
-    expect(appearanceSettings.typography.heading.lineHeight).toBe(LINE_HEIGHT_MAX);
+    expect(appearanceSettings.typography.heading.lineHeight).toBe(
+      LINE_HEIGHT_MAX,
+    );
   });
 
   it("只写给出的字段，其余保持不变", () => {
     setScopeTypography("body", { size: 20 });
-    expect(appearanceSettings.typography.body.family).toBe(DEFAULT_APPEARANCE.typography.body.family);
+    expect(appearanceSettings.typography.body.family).toBe(
+      DEFAULT_APPEARANCE.typography.body.family,
+    );
   });
 
   it("设置段距与正文宽度", () => {
@@ -206,7 +248,9 @@ describe("全局设置写入", () => {
     setMeasure(1000);
     resetAppearance();
     expect(appearanceSettings.theme).toBe(DEFAULT_APPEARANCE.theme);
-    expect(appearanceSettings.typography.measure).toBe(DEFAULT_APPEARANCE.typography.measure);
+    expect(appearanceSettings.typography.measure).toBe(
+      DEFAULT_APPEARANCE.typography.measure,
+    );
   });
 
   it("localStorage 里是坏 JSON 时回退默认而不抛异常", () => {
@@ -302,7 +346,9 @@ describe("全局级 / 工作区级合并（T9.4）", () => {
     setAppearanceWorkspace("D:/书/甲");
     setWorkspaceScope("body", { size: 22 });
     setAppearanceWorkspace("");
-    expect(effectiveTypography().body.size).toBe(DEFAULT_APPEARANCE.typography.body.size);
+    expect(effectiveTypography().body.size).toBe(
+      DEFAULT_APPEARANCE.typography.body.size,
+    );
   });
 
   it("段距与宽度也支持工作区覆盖", () => {
@@ -332,14 +378,18 @@ describe("全局级 / 工作区级合并（T9.4）", () => {
     setAppearanceWorkspace("D:/书/甲");
     setWorkspaceScope("body", { size: 22 });
     clearWorkspaceAppearance("D:/书/甲");
-    expect(effectiveTypography().body.size).toBe(DEFAULT_APPEARANCE.typography.body.size);
+    expect(effectiveTypography().body.size).toBe(
+      DEFAULT_APPEARANCE.typography.body.size,
+    );
     expect(loadWorkspaceAppearance("D:/书/甲")).toEqual({});
   });
 
   it("工作区覆盖被持久化到 localStorage", () => {
     setAppearanceWorkspace("D:/书/甲");
     setWorkspaceScope("body", { family: "yuhua-kai" });
-    expect(loadWorkspaceAppearance("D:/书/甲").typography?.body?.family).toBe("yuhua-kai");
+    expect(loadWorkspaceAppearance("D:/书/甲").typography?.body?.family).toBe(
+      "yuhua-kai",
+    );
   });
 
   it("工作区设置里的脏数据被安全归一", () => {

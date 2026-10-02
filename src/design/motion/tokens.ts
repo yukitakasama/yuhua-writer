@@ -44,7 +44,10 @@ export const EASING_POINTS = {
   standard: [0.2, 0, 0, 1],
   decelerate: [0, 0, 0, 1],
   accelerate: [0.3, 0, 1, 1],
-} as const satisfies Record<EasingToken, readonly [number, number, number, number]>;
+} as const satisfies Record<
+  EasingToken,
+  readonly [number, number, number, number]
+>;
 
 /** 弹簧参数（计划书 5.3 的 --spring-soft / --spring-snappy）。 */
 export interface SpringConfig {
@@ -57,10 +60,18 @@ export interface SpringConfig {
 }
 
 /** 软弹簧：面板、抽屉、弹层入场，回弹克制。 */
-export const SPRING_SOFT: SpringConfig = { stiffness: 300, damping: 30, mass: 1 };
+export const SPRING_SOFT: SpringConfig = {
+  stiffness: 300,
+  damping: 30,
+  mass: 1,
+};
 
 /** 脆弹簧：拖拽落位、分隔条吸附，需要「咔」地一下到位。 */
-export const SPRING_SNAPPY: SpringConfig = { stiffness: 500, damping: 35, mass: 1 };
+export const SPRING_SNAPPY: SpringConfig = {
+  stiffness: 500,
+  damping: 35,
+  mass: 1,
+};
 
 /**
  * 同屏并发动效元素上限（计划书 5.4）。

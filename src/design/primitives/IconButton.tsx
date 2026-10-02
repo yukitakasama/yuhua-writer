@@ -13,8 +13,10 @@ import { cx, usePrimitivesStyle } from "./styles";
 export type IconButtonSize = "sm" | "md" | "lg";
 
 /** {@link IconButton} 的 props。 */
-export interface IconButtonProps
-  extends Omit<JSX.ButtonHTMLAttributes<HTMLButtonElement>, "onClick" | "type" | "class" | "children"> {
+export interface IconButtonProps extends Omit<
+  JSX.ButtonHTMLAttributes<HTMLButtonElement>,
+  "onClick" | "type" | "class" | "children"
+> {
   /**
    * 无障碍名称。必填。
    * 读屏只会念出这里的内容，所以要写完整的动作短语
@@ -64,7 +66,13 @@ export const IconButton: Component<IconButtonProps> = (props) => {
       {...rest}
       type={local.type ?? "button"}
       disabled={local.disabled === true}
-      aria-pressed={local.pressed === undefined ? undefined : local.pressed ? "true" : "false"}
+      aria-pressed={
+        local.pressed === undefined
+          ? undefined
+          : local.pressed
+            ? "true"
+            : "false"
+      }
       data-variant={local.variant ?? "ghost"}
       class={cx(
         "yh-icon-btn",

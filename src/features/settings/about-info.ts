@@ -75,10 +75,33 @@ export interface AboutInfo {
  * `about.test.ts` 会断言两者不漂移。
  */
 const LICENSES: LicenseEntry[] = [
-  { asset: "羽化写作代码", license: "MIT", note: "本项目自身代码", file: "LICENSE" },
-  { asset: "思源宋体 SC（Source Han Serif SC）", license: "SIL OFL 1.1", note: "子集化后更名为 Yuhua Serif SC", file: "OFL-1.1.txt" },
-  { asset: "霞鹜文楷（LXGW WenKai）", license: "SIL OFL 1.1", note: "子集化后更名为 Yuhua Kai SC", file: "OFL-1.1.txt" },
+  {
+    asset: "羽化写作代码",
+    license: "MIT",
+    note: "本项目自身代码",
+    file: "LICENSE",
+  },
+  {
+    asset: "思源宋体 SC（Source Han Serif SC）",
+    license: "SIL OFL 1.1",
+    note: "子集化后更名为 Yuhua Serif SC",
+    file: "OFL-1.1.txt",
+  },
+  {
+    asset: "霞鹜文楷（LXGW WenKai）",
+    license: "SIL OFL 1.1",
+    note: "子集化后更名为 Yuhua Kai SC",
+    file: "OFL-1.1.txt",
+  },
 ];
+
+/** `fonts.lock.json` 中 `plannedFonts` 的一条原始条目。 */
+interface PlannedFontEntry {
+  family: string;
+  source: string;
+  license: string;
+  weights: string[];
+}
 
 /**
  * 读取关于页数据。
@@ -87,10 +110,15 @@ const LICENSES: LicenseEntry[] = [
  * 一旦它变成空数组（字体还没配置），这里会退回到一份**与目录一致的默认署名**，
  * 而不是展示一个空列表 —— 「正在展示零个字体」比「展示计划中的字体」更容易误导用户。
  *
+ * 注意空数组会被 TypeScript 推断为 `never[]`，直接 `.map()` 会让回调参数变成
+ * `never` 并报TS2339，因此这里必须显式标注元素类型。
+ *
  * @returns 关于页数据
  */
 export function loadAboutInfo(): AboutInfo {
-  const planned = Array.isArray(fontsLock.plannedFonts) ? fontsLock.plannedFonts : [];
+  const planned: PlannedFontEntry[] = Array.isArray(fontsLock.plannedFonts)
+    ? (fontsLock.plannedFonts as PlannedFontEntry[])
+    : [];
   const fonts: FontAttribution[] = planned.map((entry) => ({
     family: entry.family,
     source: entry.source,
@@ -111,8 +139,18 @@ export function loadAboutInfo(): AboutInfo {
 
 /** fonts.lock.json 尚未填入真实条目时的署名兜底（与字体目录保持一致）。 */
 const FALLBACK_FONTS: FontAttribution[] = [
-  { family: "Yuhua Serif SC", source: "Source Han Serif SC (思源宋体)", license: "SIL OFL 1.1", weights: ["regular", "bold"] },
-  { family: "Yuhua Kai SC", source: "LXGW WenKai (霞鹜文楷)", license: "SIL OFL 1.1", weights: ["regular", "bold"] },
+  {
+    family: "Yuhua Serif SC",
+    source: "Source Han Serif SC (思源宋体)",
+    license: "SIL OFL 1.1",
+    weights: ["regular", "bold"],
+  },
+  {
+    family: "Yuhua Kai SC",
+    source: "LXGW WenKai (霞鹜文楷)",
+    license: "SIL OFL 1.1",
+    weights: ["regular", "bold"],
+  },
 ];
 
 /** 构建通道：根据版本号后缀推断。alpha / beta / rc 之外视为正式版。 */

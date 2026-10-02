@@ -29,13 +29,29 @@
  * 「你还没开始写」。
  */
 
-import { For, Match, Show, Switch, createMemo, createSignal, onMount, type JSX } from "solid-js";
+import {
+  For,
+  Match,
+  Show,
+  Switch,
+  createMemo,
+  createSignal,
+  onMount,
+  type JSX,
+} from "solid-js";
 
 import { t } from "@/strings";
 import { Button } from "@/app/ui/Button";
 import { EmptyState } from "@/app/ui/EmptyState";
 import { IllustrationEmptyEditor } from "@/app/ui/illustrations";
-import { CalendarIcon, FlameIcon, GoalIcon, InfoIcon, StatsIcon, TargetIcon } from "@/icons";
+import {
+  CalendarIcon,
+  FlameIcon,
+  GoalIcon,
+  InfoIcon,
+  StatsIcon,
+  TargetIcon,
+} from "@/icons";
 import { chaptersIn, volumes, workspaceState } from "@/app/workspace-store";
 import { BreakdownView } from "./BreakdownView";
 import { CalendarView } from "./CalendarView";
@@ -111,7 +127,9 @@ export function StatsView(props: StatsViewProps): JSX.Element {
   });
 
   /** 是否已经写过字。全空时整个统计页退化成空状态。 */
-  const hasData = createMemo(() => Object.keys(days()).length > 0 || statsState.summary.totalWords > 0);
+  const hasData = createMemo(
+    () => Object.keys(days()).length > 0 || statsState.summary.totalWords > 0,
+  );
 
   /** 分章分卷的输入：直接来自工作区文档，不需要后端统计。 */
   const breakdownInput = createMemo<BreakdownInput[]>(() => {
@@ -156,7 +174,11 @@ export function StatsView(props: StatsViewProps): JSX.Element {
       <div class="stats__body">
         {/* 侧边导航。用 tablist 语义：它切换的正是右侧的 panel */}
         <nav class="stats__nav" aria-label={t("stats.title")}>
-          <ul class="stats__nav-list" role="tablist" aria-orientation="vertical">
+          <ul
+            class="stats__nav-list"
+            role="tablist"
+            aria-orientation="vertical"
+          >
             <For each={STATS_SECTIONS}>
               {(section) => {
                 const meta = SECTION_META[section];
@@ -167,8 +189,12 @@ export function StatsView(props: StatsViewProps): JSX.Element {
                       type="button"
                       role="tab"
                       class="stats__nav-item"
-                      classList={{ "is-active": statsState.section === section }}
-                      aria-selected={statsState.section === section ? "true" : "false"}
+                      classList={{
+                        "is-active": statsState.section === section,
+                      }}
+                      aria-selected={
+                        statsState.section === section ? "true" : "false"
+                      }
                       aria-controls="stats-panel"
                       onClick={() => setSection(section)}
                     >
@@ -200,7 +226,10 @@ export function StatsView(props: StatsViewProps): JSX.Element {
           >
             <Switch>
               <Match when={statsState.section === "overview"}>
-                <OverviewView summary={statsState.summary} dailyGoal={statsState.goal.daily} />
+                <OverviewView
+                  summary={statsState.summary}
+                  dailyGoal={statsState.goal.daily}
+                />
               </Match>
 
               <Match when={statsState.section === "calendar"}>
@@ -227,7 +256,11 @@ export function StatsView(props: StatsViewProps): JSX.Element {
               </Match>
 
               <Match when={statsState.section === "goal"}>
-                <GoalView goal={statsState.goal} summary={statsState.summary} onSave={saveGoal} />
+                <GoalView
+                  goal={statsState.goal}
+                  summary={statsState.summary}
+                  onSave={saveGoal}
+                />
               </Match>
 
               <Match when={statsState.section === "breakdown"}>

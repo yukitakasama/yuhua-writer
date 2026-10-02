@@ -86,12 +86,17 @@ export function AppearancePanel(): JSX.Element {
     if (!forward && !backward) return;
     event.preventDefault();
     const delta = forward ? 1 : -1;
-    const next = THEME_CHOICES[(index + delta + THEME_CHOICES.length) % THEME_CHOICES.length];
+    const next =
+      THEME_CHOICES[
+        (index + delta + THEME_CHOICES.length) % THEME_CHOICES.length
+      ];
     if (next) {
       choose(next);
       // 焦点跟着选中项走，读屏才能把新的选中态念出来
       queueMicrotask(() => {
-        document.querySelector<HTMLElement>('[data-theme-choice="' + next + '"]')?.focus();
+        document
+          .querySelector<HTMLElement>('[data-theme-choice="' + next + '"]')
+          ?.focus();
       });
     }
   };

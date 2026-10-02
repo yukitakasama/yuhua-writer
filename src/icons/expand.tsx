@@ -17,8 +17,8 @@ export function ExpandIcon(props: SvgIconProps) {
   return (
     <svg {...iconProps(props)}>
       <path d="M12 3.5v9" />
-    <path d="M8.5 9l3.5 3.5L15.5 9" />
-    <path d="M4.5 20.5h15" />
+      <path d="M8.5 9l3.5 3.5L15.5 9" />
+      <path d="M4.5 20.5h15" />
     </svg>
   );
 }

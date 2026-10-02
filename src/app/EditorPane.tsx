@@ -27,18 +27,42 @@
  * 这是整篇文档里最容易丢字的地方，因此做成**切章流程的第一步**。
  */
 
-import { Show, createEffect, createMemo, createSignal, onCleanup, onMount, type JSX } from "solid-js";
+import {
+  Show,
+  createEffect,
+  createMemo,
+  createSignal,
+  onCleanup,
+  onMount,
+  type JSX,
+} from "solid-js";
 
 import { t } from "@/strings";
 import { EmptyState } from "@/app/ui/EmptyState";
 import { IllustrationEmptyEditor } from "@/app/ui/illustrations";
 import { Button } from "@/app/ui/Button";
 import { AutosaveScheduler } from "@/features/editor/autosave";
-import { captureCursor, recallCursor, rememberCursor, resolveCursor, isCursorResolvable, type CursorStore } from "@/features/editor/cursor-memory";
-import { MarkdownEditor, type EditorHandle } from "@/features/editor/MarkdownEditor";
+import {
+  captureCursor,
+  recallCursor,
+  rememberCursor,
+  resolveCursor,
+  isCursorResolvable,
+  type CursorStore,
+} from "@/features/editor/cursor-memory";
+import {
+  MarkdownEditor,
+  type EditorHandle,
+} from "@/features/editor/MarkdownEditor";
 import { focusModeClass } from "@/features/editor/focus";
 import { consumeJump, pendingJump } from "@/features/search/search-store";
-import { selectedChapter, editingChapter, loadChapterBody, createFirstChapter, saveChapterBody } from "./workspace-store";
+import {
+  selectedChapter,
+  editingChapter,
+  loadChapterBody,
+  createFirstChapter,
+  saveChapterBody,
+} from "./workspace-store";
 
 export type EditorSaveState = "idle" | "saving" | "dirty" | "failed";
 
@@ -131,7 +155,11 @@ export function EditorPane(props: EditorPaneProps = {}): JSX.Element {
     const view = handle.view;
     const sel = view.state.selection.main;
     const line = view.state.doc.lineAt(sel.head).number;
-    rememberCursor(cursorStore, mountedChapterId, captureCursor(text, sel.anchor, sel.head, line));
+    rememberCursor(
+      cursorStore,
+      mountedChapterId,
+      captureCursor(text, sel.anchor, sel.head, line),
+    );
   };
 
   /**
@@ -166,7 +194,8 @@ export function EditorPane(props: EditorPaneProps = {}): JSX.Element {
       return;
     }
     // 正文还没读回来（或在读别的章）时什么都别做
-    if (editing === null || editing.id !== current.id || editing.loading) return;
+    if (editing === null || editing.id !== current.id || editing.loading)
+      return;
 
     const next = editing.body;
 
@@ -206,7 +235,8 @@ export function EditorPane(props: EditorPaneProps = {}): JSX.Element {
     const current = chapter();
     if (current === null || current.id !== target.chapterId) return;
     const editing = editingChapter();
-    if (editing === null || editing.id !== target.chapterId || editing.loading) return;
+    if (editing === null || editing.id !== target.chapterId || editing.loading)
+      return;
 
     // 锚点校正：偏移是「片段内的下标」，需要在正文里重新定位
     const text = handle.getValue();
@@ -324,7 +354,10 @@ export function EditorPane(props: EditorPaneProps = {}): JSX.Element {
   });
 
   return (
-    <main class={["editor", focusModeClass()].filter(Boolean).join(" ")} aria-label={t("a11y.mainRegion")}>
+    <main
+      class={["editor", focusModeClass()].filter(Boolean).join(" ")}
+      aria-label={t("a11y.mainRegion")}
+    >
       <Show
         when={chapter()}
         fallback={
@@ -333,7 +366,10 @@ export function EditorPane(props: EditorPaneProps = {}): JSX.Element {
             title={t("editor.noChapter")}
             body={t("editor.placeholderBody")}
             action={
-              <Button variant="outline" onClick={() => void createFirstChapter()}>
+              <Button
+                variant="outline"
+                onClick={() => void createFirstChapter()}
+              >
                 {t("editor.selectHint")}
               </Button>
             }

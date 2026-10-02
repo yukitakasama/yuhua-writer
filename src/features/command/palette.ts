@@ -80,7 +80,10 @@ export function fuzzyMatch(text: string, query: string): Match | null {
  * 空关键词时**原样返回**（保持命令的分组顺序）——
  * 刚打开面板就按分值重排会让列表看起来在乱跳。
  */
-export function rankCommands<T extends { label: string }>(items: readonly T[], query: string): Array<{ item: T; match: Match }> {
+export function rankCommands<T extends { label: string }>(
+  items: readonly T[],
+  query: string,
+): Array<{ item: T; match: Match }> {
   if (query.trim().length === 0) {
     return items.map((item) => ({ item, match: { score: 0, positions: [] } }));
   }
@@ -90,6 +93,9 @@ export function rankCommands<T extends { label: string }>(items: readonly T[], q
     if (match) scored.push({ item, match });
   }
   // 同分时按标签字典序，保证顺序稳定（否则每次渲染结果可能不一样）
-  scored.sort((a, b) => b.match.score - a.match.score || a.item.label.localeCompare(b.item.label));
+  scored.sort(
+    (a, b) =>
+      b.match.score - a.match.score || a.item.label.localeCompare(b.item.label),
+  );
   return scored;
 }

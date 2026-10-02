@@ -37,7 +37,12 @@ function mockTime(dayOffset: number, hour = 9, minute = 0): string {
 /** 一个卷的原始定义（章节用标题数组描述，正文由标题生成）。 */
 interface SeedVolume {
   title: string;
-  chapters: Array<{ title: string; status: ChapterStatus; paragraphs: number; summary?: string }>;
+  chapters: Array<{
+    title: string;
+    status: ChapterStatus;
+    paragraphs: number;
+    summary?: string;
+  }>;
 }
 
 /** 示例书的骨架。 */
@@ -45,9 +50,19 @@ export const SEED_VOLUMES: SeedVolume[] = [
   {
     title: "第一卷 落羽",
     chapters: [
-      { title: "第一章 落羽", status: "done", paragraphs: 8, summary: "主角在雨夜醒来，发现自己失去了三天的记忆。" },
+      {
+        title: "第一章 落羽",
+        status: "done",
+        paragraphs: 8,
+        summary: "主角在雨夜醒来，发现自己失去了三天的记忆。",
+      },
       { title: "第二章 山雨", status: "done", paragraphs: 6 },
-      { title: "第三章 入城", status: "revising", paragraphs: 11, summary: "第一次进入州城，见到城门上的告示。" },
+      {
+        title: "第三章 入城",
+        status: "revising",
+        paragraphs: 11,
+        summary: "第一次进入州城，见到城门上的告示。",
+      },
     ],
   },
   {
@@ -89,7 +104,12 @@ function seedBody(paragraphs: number): string {
 }
 
 /** 构造示例工作区的初始数据。 */
-export function buildSeedData(): { book: Book; volumes: Volume[]; chapters: ChapterSummary[]; bodies: Map<string, string> } {
+export function buildSeedData(): {
+  book: Book;
+  volumes: Volume[];
+  chapters: ChapterSummary[];
+  bodies: Map<string, string>;
+} {
   const book: Book = {
     id: mockId("bk_", 1),
     title: "羽化录",

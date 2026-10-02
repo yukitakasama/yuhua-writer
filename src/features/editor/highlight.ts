@@ -18,9 +18,19 @@
  * 找不到结构。纯 token 着色做不到这一点。
  */
 
-import { HighlightStyle, syntaxHighlighting, type LanguageSupport } from "@codemirror/language";
+import {
+  HighlightStyle,
+  syntaxHighlighting,
+  type LanguageSupport,
+} from "@codemirror/language";
 import { markdown, markdownLanguage } from "@codemirror/lang-markdown";
-import { Decoration, EditorView, ViewPlugin, type DecorationSet, type ViewUpdate } from "@codemirror/view";
+import {
+  Decoration,
+  EditorView,
+  ViewPlugin,
+  type DecorationSet,
+  type ViewUpdate,
+} from "@codemirror/view";
 import { RangeSetBuilder, type Extension } from "@codemirror/state";
 import { tags as t } from "@lezer/highlight";
 
@@ -134,5 +144,9 @@ export function markdownLanguageSupport(): LanguageSupport {
 
 /** 语法高亮 + 行级装饰的完整扩展。 */
 export function markdownHighlighting(): Extension[] {
-  return [markdownLanguageSupport(), syntaxHighlighting(yuhuaHighlightStyle), lineDecorationPlugin];
+  return [
+    markdownLanguageSupport(),
+    syntaxHighlighting(yuhuaHighlightStyle),
+    lineDecorationPlugin,
+  ];
 }

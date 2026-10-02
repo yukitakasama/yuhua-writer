@@ -25,10 +25,21 @@ export {
 } from "./focusTrap";
 export type { FocusTrapOptions, FocusTrapCleanup } from "./focusTrap";
 
-export { axisDelta, isEdgeKey, nextIndexFor, handleListNavigation, applyRovingTabindex } from "./keyboardNav";
+export {
+  axisDelta,
+  isEdgeKey,
+  nextIndexFor,
+  handleListNavigation,
+  applyRovingTabindex,
+} from "./keyboardNav";
 export type { NavigationAxis, ListNavigationOptions } from "./keyboardNav";
 
-export { PRIMITIVES_CSS, ensurePrimitivesStyle, usePrimitivesStyle, cx } from "./styles";
+export {
+  PRIMITIVES_CSS,
+  ensurePrimitivesStyle,
+  usePrimitivesStyle,
+  cx,
+} from "./styles";
 
 // ---- 基础原语（T1.4） ----
 export { Button } from "./Button";
@@ -78,10 +89,20 @@ export {
   toast,
   resetToastStore,
 } from "./Toast";
-export type { ToastProps, ToastRegionProps, ToastItem, ToastTone, ToastPlacement } from "./Toast";
+export type {
+  ToastProps,
+  ToastRegionProps,
+  ToastItem,
+  ToastTone,
+  ToastPlacement,
+} from "./Toast";
 
 export { Tabs } from "./Tabs";
 export type { TabsProps, TabItem } from "./Tabs";
 
 export { ScrollArea, scrollToBottom } from "./ScrollArea";
-export type { ScrollAreaProps, ScrollInfo, ScrollOrientation } from "./ScrollArea";
+export type {
+  ScrollAreaProps,
+  ScrollInfo,
+  ScrollOrientation,
+} from "./ScrollArea";

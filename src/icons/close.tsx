@@ -17,7 +17,7 @@ export function CloseIcon(props: SvgIconProps) {
   return (
     <svg {...iconProps(props)}>
       <path d="M6.2 6.2l11.6 11.6" />
-    <path d="M17.8 6.2L6.2 17.8" />
+      <path d="M17.8 6.2L6.2 17.8" />
     </svg>
   );
 }

@@ -72,7 +72,9 @@ describe("fuzzyMatch", () => {
   });
 
   it("名字相同的两条命令得到相同分数（排序可复现）", () => {
-    expect(fuzzyMatch("统计", "统计")!.score).toBe(fuzzyMatch("统计", "统计")!.score);
+    expect(fuzzyMatch("统计", "统计")!.score).toBe(
+      fuzzyMatch("统计", "统计")!.score,
+    );
   });
 });
 

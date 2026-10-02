@@ -47,7 +47,12 @@ import {
 function days(entries: Array<[string, number]>): DayMap {
   const map: DayMap = {};
   for (const [date, words] of entries) {
-    map[date] = { date, words, minutes: Math.max(1, Math.round(words / 30)), chapters: words > 0 ? 1 : 0 };
+    map[date] = {
+      date,
+      words,
+      minutes: Math.max(1, Math.round(words / 30)),
+      chapters: words > 0 ? 1 : 0,
+    };
   }
   return map;
 }
@@ -111,11 +116,20 @@ describe("日期运算", () => {
   });
 
   it("shiftMonth 在年边界上正确进位", () => {
-    expect(shiftMonth({ year: 2026, month: 12 }, 1)).toEqual({ year: 2027, month: 1 });
-    expect(shiftMonth({ year: 2026, month: 1 }, -1)).toEqual({ year: 2025, month: 12 });
+    expect(shiftMonth({ year: 2026, month: 12 }, 1)).toEqual({
+      year: 2027,
+      month: 1,
+    });
+    expect(shiftMonth({ year: 2026, month: 1 }, -1)).toEqual({
+      year: 2025,
+      month: 12,
+    });
     // 3 月 31 日加一个月不该变成 4 月 31 日（Date 会滚动到 5 月 1 日），
     // 因此实现里用的是「当月 1 号」做算术
-    expect(shiftMonth({ year: 2026, month: 1 }, 1)).toEqual({ year: 2026, month: 2 });
+    expect(shiftMonth({ year: 2026, month: 1 }, 1)).toEqual({
+      year: 2026,
+      month: 2,
+    });
   });
 });
 
@@ -140,7 +154,9 @@ describe("色阶分档", () => {
   });
 
   it("日常量级落在中间档，爆发日落在最高档", () => {
-    const thresholds = buildThresholds([200, 300, 400, 500, 600, 700, 800, 1000, 10_000]);
+    const thresholds = buildThresholds([
+      200, 300, 400, 500, 600, 700, 800, 1000, 10_000,
+    ]);
     const daily = levelOf(400, thresholds);
     expect(daily).toBeGreaterThanOrEqual(1);
     expect(levelOf(10_000, thresholds)).toBeGreaterThan(daily);
@@ -260,8 +276,12 @@ describe("汇总", () => {
   });
 
   it("窗口长度为 0 或负数时返回 0", () => {
-    expect(averageOverWindow(days([["2026-01-15", 700]]), "2026-01-15", 0)).toBe(0);
-    expect(averageOverWindow(days([["2026-01-15", 700]]), "2026-01-15", -3)).toBe(0);
+    expect(
+      averageOverWindow(days([["2026-01-15", 700]]), "2026-01-15", 0),
+    ).toBe(0);
+    expect(
+      averageOverWindow(days([["2026-01-15", 700]]), "2026-01-15", -3),
+    ).toBe(0);
   });
 
   it("最高单日并列时取更早的一天（结果稳定）", () => {
@@ -331,7 +351,12 @@ describe("预计完稿日", () => {
 
 describe("网格摆放", () => {
   it("月历固定 42 格、7 列 6 行", () => {
-    const cells = monthGrid({}, { year: 2026, month: 1 }, buildThresholds([]), false);
+    const cells = monthGrid(
+      {},
+      { year: 2026, month: 1 },
+      buildThresholds([]),
+      false,
+    );
     expect(cells).toHaveLength(42);
     expect(Math.max(...cells.map((c) => c.column))).toBe(6);
     expect(Math.max(...cells.map((c) => c.row))).toBe(5);
@@ -339,20 +364,40 @@ describe("网格摆放", () => {
 
   it("月历首格是本月 1 号所在周的周一", () => {
     // 2026-01-01 是周四，因此首格是 2025-12-29（周一）
-    const cells = monthGrid({}, { year: 2026, month: 1 }, buildThresholds([]), false);
+    const cells = monthGrid(
+      {},
+      { year: 2026, month: 1 },
+      buildThresholds([]),
+      false,
+    );
     expect(cells[0]!.date).toBe("2025-12-29");
     expect(weekdayIndex(cells[0]!.date)).toBe(0);
   });
 
   it("月历恰好标出本月的天数", () => {
-    const jan = monthGrid({}, { year: 2026, month: 1 }, buildThresholds([]), false);
+    const jan = monthGrid(
+      {},
+      { year: 2026, month: 1 },
+      buildThresholds([]),
+      false,
+    );
     expect(jan.filter((c) => c.inRange)).toHaveLength(31);
-    const feb = monthGrid({}, { year: 2024, month: 2 }, buildThresholds([]), false);
+    const feb = monthGrid(
+      {},
+      { year: 2024, month: 2 },
+      buildThresholds([]),
+      false,
+    );
     expect(feb.filter((c) => c.inRange)).toHaveLength(29);
   });
 
   it("月历相邻格严格相差一天", () => {
-    const cells = monthGrid({}, { year: 2026, month: 3 }, buildThresholds([]), false);
+    const cells = monthGrid(
+      {},
+      { year: 2026, month: 3 },
+      buildThresholds([]),
+      false,
+    );
     for (let i = 1; i < cells.length; i += 1) {
       expect(shiftDay(cells[i - 1]!.date, 1)).toBe(cells[i]!.date);
     }
@@ -374,7 +419,12 @@ describe("网格摆放", () => {
 
   it("月历的补位格带真实字数但不计入本月", () => {
     const map = days([["2025-12-29", 999]]);
-    const cells = monthGrid(map, { year: 2026, month: 1 }, buildThresholds([999]), true);
+    const cells = monthGrid(
+      map,
+      { year: 2026, month: 1 },
+      buildThresholds([999]),
+      true,
+    );
     const padding = cells.find((c) => c.date === "2025-12-29");
     expect(padding?.words).toBe(999);
     expect(padding?.inRange).toBe(false);
@@ -389,8 +439,12 @@ describe("网格摆放", () => {
   });
 
   it("热力图覆盖整年 365 或 366 天", () => {
-    expect(yearGrid({}, 2026, buildThresholds([]), false).filter((c) => c.inRange)).toHaveLength(365);
-    expect(yearGrid({}, 2024, buildThresholds([]), false).filter((c) => c.inRange)).toHaveLength(366);
+    expect(
+      yearGrid({}, 2026, buildThresholds([]), false).filter((c) => c.inRange),
+    ).toHaveLength(365);
+    expect(
+      yearGrid({}, 2024, buildThresholds([]), false).filter((c) => c.inRange),
+    ).toHaveLength(366);
   });
 
   it("热力图首列是 1 月 1 日所在周的周一", () => {
@@ -405,7 +459,9 @@ describe("网格摆放", () => {
     for (let week = 0; week < 53; week += 1) {
       const slice = cells.slice(week * 7, week * 7 + 7);
       expect(slice.map((c) => c.row)).toEqual([0, 1, 2, 3, 4, 5, 6]);
-      expect(slice.map((c) => weekdayIndex(c.date))).toEqual([0, 1, 2, 3, 4, 5, 6]);
+      expect(slice.map((c) => weekdayIndex(c.date))).toEqual([
+        0, 1, 2, 3, 4, 5, 6,
+      ]);
     }
   });
 
@@ -419,7 +475,12 @@ describe("网格摆放", () => {
   });
 
   it("summarizeCells 只统计 inRange 的格子", () => {
-    const cells = yearGrid(days([["2026-03-01", 5000]]), 2026, buildThresholds([5000]), true);
+    const cells = yearGrid(
+      days([["2026-03-01", 5000]]),
+      2026,
+      buildThresholds([5000]),
+      true,
+    );
     const summary = summarizeCells(cells);
     expect(summary.totalWords).toBe(5000);
     expect(summary.activeDays).toBe(1);
@@ -530,7 +591,9 @@ describe("分章分卷（T8.12）", () => {
 
   it("空输入不会除零", () => {
     expect(breakdownRows([])).toEqual([]);
-    const zero = breakdownRows([{ volumeId: "v", volumeTitle: "空卷", volumeWords: 0, chapters: [] }]);
+    const zero = breakdownRows([
+      { volumeId: "v", volumeTitle: "空卷", volumeWords: 0, chapters: [] },
+    ]);
     expect(zero[0]!.share).toBe(0);
   });
 

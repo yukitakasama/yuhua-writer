@@ -16,11 +16,17 @@ import { EditorState } from "@codemirror/state";
 import { EditorView } from "@codemirror/view";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
-import { createEditorExtensions, fontCompartmentExtension } from "./MarkdownEditor";
+import {
+  createEditorExtensions,
+  fontCompartmentExtension,
+} from "./MarkdownEditor";
 import { normalizePastedText } from "./paste";
 
 /** 建一个挂在 jsdom 里的编辑器。 */
-function mountEditor(doc: string, hooks: { onUserEdit?: () => void; onDocChange?: (v: string) => void } = {}): EditorView {
+function mountEditor(
+  doc: string,
+  hooks: { onUserEdit?: () => void; onDocChange?: (v: string) => void } = {},
+): EditorView {
   const parent = document.createElement("div");
   document.body.appendChild(parent);
   const state = EditorState.create({
@@ -118,7 +124,9 @@ describe("编辑器装配：改动回调", () => {
   it("程序替换文档不触发 onUserEdit（否则打开章节就会自动保存）", () => {
     const onUserEdit = vi.fn();
     const view = track(mountEditor("初始", { onUserEdit }));
-    view.dispatch({ changes: { from: 0, to: view.state.doc.length, insert: "换了一整篇" } });
+    view.dispatch({
+      changes: { from: 0, to: view.state.doc.length, insert: "换了一整篇" },
+    });
     expect(onUserEdit).not.toHaveBeenCalled();
   });
 
@@ -171,13 +179,17 @@ describe("编辑器装配：字体 Compartment", () => {
 describe("编辑器装配：文档整体替换", () => {
   it("setValue 语义：整体替换后内容正确", () => {
     const view = track(mountEditor("旧内容"));
-    view.dispatch({ changes: { from: 0, to: view.state.doc.length, insert: "新内容" } });
+    view.dispatch({
+      changes: { from: 0, to: view.state.doc.length, insert: "新内容" },
+    });
     expect(view.state.doc.toString()).toBe("新内容");
   });
 
   it("替换成空文档", () => {
     const view = track(mountEditor("有内容"));
-    view.dispatch({ changes: { from: 0, to: view.state.doc.length, insert: "" } });
+    view.dispatch({
+      changes: { from: 0, to: view.state.doc.length, insert: "" },
+    });
     expect(view.state.doc.length).toBe(0);
   });
 });

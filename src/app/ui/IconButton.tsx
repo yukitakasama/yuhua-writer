@@ -21,14 +21,34 @@ export interface IconButtonProps extends JSX.ButtonHTMLAttributes<HTMLButtonElem
 
 /** 一个只含图形的按钮。 */
 export function IconButton(props: IconButtonProps): JSX.Element {
-  const [local, rest] = splitProps(props, ["label", "size", "active", "danger", "class", "children", "type"]);
+  const [local, rest] = splitProps(props, [
+    "label",
+    "size",
+    "active",
+    "danger",
+    "class",
+    "children",
+    "type",
+  ]);
   const classes = () =>
-    ["icon-btn", local.size === "sm" ? "icon-btn--sm" : "", local.active ? "is-active" : "", local.danger ? "is-danger" : "", local.class ?? ""]
+    [
+      "icon-btn",
+      local.size === "sm" ? "icon-btn--sm" : "",
+      local.active ? "is-active" : "",
+      local.danger ? "is-danger" : "",
+      local.class ?? "",
+    ]
       .filter(Boolean)
       .join(" ");
 
   return (
-    <button type={local.type ?? "button"} class={classes()} aria-label={local.label} title={local.label} {...rest}>
+    <button
+      type={local.type ?? "button"}
+      class={classes()}
+      aria-label={local.label}
+      title={local.label}
+      {...rest}
+    >
       {local.children}
     </button>
   );

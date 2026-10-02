@@ -570,7 +570,8 @@ export type ExportScope =
   | { type: "whole" };
 
 /** 导出格式。 */
-export type ExportFormat = "txt" | "markdown" | "html" | "docx" | "pdf" | "epub";
+export type ExportFormat =
+  "txt" | "markdown" | "html" | "docx" | "pdf" | "epub";
 
 /** 导出格式信息。 */
 export interface ExportFormatInfo {
@@ -607,10 +608,8 @@ export function exportDocument(
   scope: ExportScope,
   outputPath: string,
 ): Promise<ExportResult> {
-  return call(
-    "export_document",
-    { format, scope, outputPath },
-    (b) => b.exportDocument(format, scope, outputPath),
+  return call("export_document", { format, scope, outputPath }, (b) =>
+    b.exportDocument(format, scope, outputPath),
   );
 }
 

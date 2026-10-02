@@ -24,7 +24,13 @@ import {
   toggleRight,
   layout,
 } from "./layout-store";
-import { isFiniteNumber, isPlainObject, readJson, removeKey, writeJson } from "./persistent";
+import {
+  isFiniteNumber,
+  isPlainObject,
+  readJson,
+  removeKey,
+  writeJson,
+} from "./persistent";
 
 beforeEach(() => {
   window.localStorage.clear();
@@ -39,7 +45,13 @@ describe("normalizeLayout", () => {
   });
 
   it("正常值被保留", () => {
-    const result = normalizeLayout({ leftWidth: 320, rightWidth: 260, leftCollapsed: true, rightCollapsed: false, view: "workspace" });
+    const result = normalizeLayout({
+      leftWidth: 320,
+      rightWidth: 260,
+      leftCollapsed: true,
+      rightCollapsed: false,
+      view: "workspace",
+    });
     expect(result.leftWidth).toBe(320);
     expect(result.rightWidth).toBe(260);
     expect(result.leftCollapsed).toBe(true);
@@ -63,13 +75,19 @@ describe("normalizeLayout", () => {
   });
 
   it("NaN / Infinity 回退到默认值而不是产生 NaN 宽度", () => {
-    expect(normalizeLayout({ leftWidth: Number.NaN }).leftWidth).toBe(DEFAULT_LAYOUT.leftWidth);
-    expect(normalizeLayout({ leftWidth: Number.POSITIVE_INFINITY }).leftWidth).toBe(DEFAULT_LAYOUT.leftWidth);
+    expect(normalizeLayout({ leftWidth: Number.NaN }).leftWidth).toBe(
+      DEFAULT_LAYOUT.leftWidth,
+    );
+    expect(
+      normalizeLayout({ leftWidth: Number.POSITIVE_INFINITY }).leftWidth,
+    ).toBe(DEFAULT_LAYOUT.leftWidth);
   });
 
   it("字符串宽度被忽略（localStorage 里的值可能被手改）", () => {
     // 用 as never 绕过类型检查：这里刻意测试运行时对脏数据的容错
-    expect(normalizeLayout({ leftWidth: "很宽" as never }).leftWidth).toBe(DEFAULT_LAYOUT.leftWidth);
+    expect(normalizeLayout({ leftWidth: "很宽" as never }).leftWidth).toBe(
+      DEFAULT_LAYOUT.leftWidth,
+    );
   });
 
   it("非法 view 值回退到 library", () => {
@@ -77,7 +95,9 @@ describe("normalizeLayout", () => {
   });
 
   it("非布尔值的折叠标记被忽略", () => {
-    expect(normalizeLayout({ leftCollapsed: "yes" as never }).leftCollapsed).toBe(DEFAULT_LAYOUT.leftCollapsed);
+    expect(
+      normalizeLayout({ leftCollapsed: "yes" as never }).leftCollapsed,
+    ).toBe(DEFAULT_LAYOUT.leftCollapsed);
   });
 
   it("宽度被取整（避免出现半像素导致模糊）", () => {

@@ -5,10 +5,20 @@
  * 这样将来把设置面板拆成独立窗口（Tauri 的多窗口）时，App 侧零改动。
  */
 
-export { SettingsPanel, SETTINGS_TABS, SETTINGS_TAB_COUNT } from "./SettingsPanel";
+export {
+  SettingsPanel,
+  SETTINGS_TABS,
+  SETTINGS_TAB_COUNT,
+} from "./SettingsPanel";
 export type { SettingsPanelProps } from "./SettingsPanel";
 
-export { FirstRunWizard, hasCompletedOnboarding, markOnboardingDone, resetOnboarding, ONBOARDING_KEY } from "./FirstRunWizard";
+export {
+  FirstRunWizard,
+  hasCompletedOnboarding,
+  markOnboardingDone,
+  resetOnboarding,
+  ONBOARDING_KEY,
+} from "./FirstRunWizard";
 export type { FirstRunWizardProps, WizardStep } from "./FirstRunWizard";
 
 export { AboutPanel } from "./AboutPanel";

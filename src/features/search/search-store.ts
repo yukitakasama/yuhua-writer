@@ -46,7 +46,11 @@ let counter = 0;
  */
 export function requestJump(chapterId: string, offset: number): void {
   counter += 1;
-  setPending({ chapterId, offset: Math.max(0, Math.floor(offset)), token: counter });
+  setPending({
+    chapterId,
+    offset: Math.max(0, Math.floor(offset)),
+    token: counter,
+  });
 }
 
 /**

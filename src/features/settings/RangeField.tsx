@@ -56,10 +56,14 @@ export function RangeField(props: RangeFieldProps): JSX.Element {
   const hintId = id + "-hint";
 
   /** 读屏念的完整值，例如「17 像素」。 */
-  const valueText = (): string => (props.unit ? `${props.value} ${props.unit}` : String(props.value));
+  const valueText = (): string =>
+    props.unit ? `${props.value} ${props.unit}` : String(props.value);
 
   return (
-    <div class="range-field" data-overridden={props.overridden ? "true" : undefined}>
+    <div
+      class="range-field"
+      data-overridden={props.overridden ? "true" : undefined}
+    >
       <div class="range-field__head">
         <label class="range-field__label" for={id}>
           {props.label}
@@ -93,7 +97,11 @@ export function RangeField(props: RangeFieldProps): JSX.Element {
       )}
 
       {props.canOverride && props.overridden && (
-        <button type="button" class="settings-link" onClick={() => props.onInherit?.()}>
+        <button
+          type="button"
+          class="settings-link"
+          onClick={() => props.onInherit?.()}
+        >
           {t("settings.level.inherit")}
         </button>
       )}

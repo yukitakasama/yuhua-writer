@@ -46,7 +46,12 @@ export function parseDayKey(key: string): number {
   const year = Number(y);
   const month = Number(m);
   const day = Number(d);
-  if (!Number.isFinite(year) || !Number.isFinite(month) || !Number.isFinite(day)) return Number.NaN;
+  if (
+    !Number.isFinite(year) ||
+    !Number.isFinite(month) ||
+    !Number.isFinite(day)
+  )
+    return Number.NaN;
   return new Date(year, month - 1, day).getTime();
 }
 
@@ -72,7 +77,12 @@ export function monthOf(key: string): MonthKey {
   const parts = key.split("-");
   const year = Number(parts[0]);
   const month = Number(parts[1]);
-  if (!Number.isFinite(year) || !Number.isFinite(month) || month < 1 || month > 12) {
+  if (
+    !Number.isFinite(year) ||
+    !Number.isFinite(month) ||
+    month < 1 ||
+    month > 12
+  ) {
     const now = new Date();
     return { year: now.getFullYear(), month: now.getMonth() + 1 };
   }
@@ -169,7 +179,11 @@ export function buildThresholds(samples: readonly number[]): number[] {
 }
 
 /** 把字数映射到 0..4 档。 */
-export function levelOf(words: number, thresholds: readonly number[], hasSamples = true): number {
+export function levelOf(
+  words: number,
+  thresholds: readonly number[],
+  hasSamples = true,
+): number {
   if (!hasSamples || !Number.isFinite(words) || words <= 0) return 0;
   let level = 0;
   for (let i = 0; i < thresholds.length; i += 1) {
@@ -187,7 +201,9 @@ export interface LegendEntry {
 }
 
 /** 由阈值生成图例。 */
-export function legendFromThresholds(thresholds: readonly number[]): LegendEntry[] {
+export function legendFromThresholds(
+  thresholds: readonly number[],
+): LegendEntry[] {
   return thresholds.map((from, level) => ({ level, from }));
 }
 
@@ -238,7 +254,11 @@ export function weekStart(key: string): string {
  * 2. **今天还没写不算断**：从昨天开始往前数
  * 3. 今天与昨天都不达标即停止
  */
-export function countStreak(days: DayMap, today: string, threshold: number): number {
+export function countStreak(
+  days: DayMap,
+  today: string,
+  threshold: number,
+): number {
   const reached = (key: string): boolean => wordsOn(days, key) >= threshold;
   let cursor = reached(today) ? today : shiftDay(today, -1);
   let streak = 0;
@@ -252,7 +272,11 @@ export function countStreak(days: DayMap, today: string, threshold: number): num
 }
 
 /** 近 N 个自然日的平均日更。分母恒为 N（自然日），不是「有写字的天数」。 */
-export function averageOverWindow(days: DayMap, end: string, length: number): number {
+export function averageOverWindow(
+  days: DayMap,
+  end: string,
+  length: number,
+): number {
   if (length <= 0) return 0;
   let sum = 0;
   for (let i = length - 1; i >= 0; i -= 1) {
@@ -273,7 +297,8 @@ export function estimateCompletion(
   averagePerDay7: number,
   today: string,
 ): { date: string | null; remainingDays: number | null } {
-  if (totalTarget === null || totalTarget <= 0) return { date: null, remainingDays: null };
+  if (totalTarget === null || totalTarget <= 0)
+    return { date: null, remainingDays: null };
   const remaining = Math.max(0, totalTarget - totalWords);
   if (remaining === 0) return { date: null, remainingDays: 0 };
   if (averagePerDay7 <= 0) return { date: null, remainingDays: null };
@@ -300,7 +325,10 @@ export interface SummarizeOptions {
  * 只有当后端还没有该命令时才走这里。两条路径的字段名完全一致，
  * 因此界面代码不需要知道自己在用哪一条。
  */
-export function summarize(days: DayMap, options: SummarizeOptions): StatsSummary {
+export function summarize(
+  days: DayMap,
+  options: SummarizeOptions,
+): StatsSummary {
   const { today, streakThreshold } = options;
   const totalTarget = options.totalTarget ?? null;
   const month = monthOf(today);
@@ -327,12 +355,18 @@ export function summarize(days: DayMap, options: SummarizeOptions): StatsSummary
       bestDayDate = key;
     }
     const keyMonth = monthOf(key);
-    if (keyMonth.year === month.year && keyMonth.month === month.month) thisMonth += entry.words;
+    if (keyMonth.year === month.year && keyMonth.month === month.month)
+      thisMonth += entry.words;
     if (key >= week && key < weekEnd) thisWeek += entry.words;
   }
 
   const averagePerDay7 = averageOverWindow(days, today, 7);
-  const estimate = estimateCompletion(totalWords, totalTarget, averagePerDay7, today);
+  const estimate = estimateCompletion(
+    totalWords,
+    totalTarget,
+    averagePerDay7,
+    today,
+  );
 
   return {
     totalWords,
@@ -377,7 +411,12 @@ export interface GridCell {
  * 固定 6 行而不是按月份裁到 5 行：切月时高度不跳动（计划书 5.5）。
  * 首格是本月 1 号所在周的周一，因此会带上上月末的几天。
  */
-export function monthGrid(days: DayMap, key: MonthKey, thresholds: readonly number[], hasSamples: boolean): GridCell[] {
+export function monthGrid(
+  days: DayMap,
+  key: MonthKey,
+  thresholds: readonly number[],
+  hasSamples: boolean,
+): GridCell[] {
   const first = dayKey(new Date(key.year, key.month - 1, 1));
   const daysInThis = daysInMonth(key.year, key.month);
   const gridStart = weekStart(first);
@@ -390,7 +429,11 @@ export function monthGrid(days: DayMap, key: MonthKey, thresholds: readonly numb
       date,
       words,
       level: levelOf(words, thresholds, hasSamples),
-      inRange: date >= first && dayOfMonth <= daysInThis && monthOf(date).month === key.month && monthOf(date).year === key.year,
+      inRange:
+        date >= first &&
+        dayOfMonth <= daysInThis &&
+        monthOf(date).month === key.month &&
+        monthOf(date).year === key.year,
       column: i % 7,
       row: Math.floor(i / 7),
     });
@@ -405,7 +448,12 @@ export function monthGrid(days: DayMap, key: MonthKey, thresholds: readonly numb
  * 用 inRange 标出来由渲染层淡化。**一年 365（或 366）格全部在同一个
  * SVG 里**，逐格不做动画（计划书 T8.9）。
  */
-export function yearGrid(days: DayMap, year: number, thresholds: readonly number[], hasSamples: boolean): GridCell[] {
+export function yearGrid(
+  days: DayMap,
+  year: number,
+  thresholds: readonly number[],
+  hasSamples: boolean,
+): GridCell[] {
   const jan1 = dayKey(new Date(year, 0, 1));
   const gridStart = weekStart(jan1);
   const cells: GridCell[] = [];
@@ -463,13 +511,19 @@ export interface GoalConfig {
 }
 
 /** 默认目标：每天 2000 字，阈值取与 Rust 侧一致的 100。 */
-export const DEFAULT_GOAL: GoalConfig = { daily: 2000, weekly: 12_000, streakThreshold: 100 };
+export const DEFAULT_GOAL: GoalConfig = {
+  daily: 2000,
+  weekly: 12_000,
+  streakThreshold: 100,
+};
 
 /** 目标字数的合法上限。再高就不是「目标」而是「许愿」了。 */
 export const GOAL_MAX = 1_000_000;
 
 /** 校验一个目标值。返回 null 表示合法，否则返回错误码。 */
-export function validateGoal(raw: string): "empty" | "notANumber" | "outOfRange" | null {
+export function validateGoal(
+  raw: string,
+): "empty" | "notANumber" | "outOfRange" | null {
   const trimmed = raw.trim();
   if (trimmed.length === 0) return "empty";
   // 只接受十进制整数：允许 "1e3" 或 "0x10" 会让用户以为软件在装聪明
@@ -524,7 +578,10 @@ export interface BreakdownInput {
  * 共用同一根横轴的刻度，条形长度才可以直接比较 ——
  * 若分章用本卷做分母，一个 50 字的小章会画出和整卷一样长的条。
  */
-export function breakdownRows(volumes: readonly BreakdownInput[], limit = 200): BreakdownRow[] {
+export function breakdownRows(
+  volumes: readonly BreakdownInput[],
+  limit = 200,
+): BreakdownRow[] {
   const total = volumes.reduce((sum, v) => sum + v.volumeWords, 0);
   const safeTotal = total > 0 ? total : 1;
   const rows: BreakdownRow[] = [];
@@ -564,7 +621,9 @@ export interface RingGeometry {
 export function progressRing(radius: number, progress: number): RingGeometry {
   const r = Math.max(Number.isFinite(radius) ? radius : 0, 0);
   const circumference = 2 * Math.PI * r;
-  const clamped = Number.isFinite(progress) ? Math.min(Math.max(progress, 0), 1) : 0;
+  const clamped = Number.isFinite(progress)
+    ? Math.min(Math.max(progress, 0), 1)
+    : 0;
   const dash = circumference * clamped;
   return { dashArray: `${dash} ${circumference - dash}`, circumference };
 }

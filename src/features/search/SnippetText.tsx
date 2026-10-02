@@ -23,7 +23,8 @@ export interface SnippetTextProps {
 
 /** 渲染一段带高亮的匹配片段。 */
 export function SnippetText(props: SnippetTextProps): JSX.Element {
-  const segments = (): Segment[] => splitHighlight(props.snippet.text, props.snippet.ranges);
+  const segments = (): Segment[] =>
+    splitHighlight(props.snippet.text, props.snippet.ranges);
 
   return (
     <span class="hit__snippet">

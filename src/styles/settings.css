@@ -98,7 +98,9 @@
   font: inherit;
   font-size: var(--fs-sm);
   /* 只过渡颜色与描边，不动画尺寸 —— 选中不该让按钮「长大」 */
-  transition: border-color var(--d-fast) var(--e-standard), background-color var(--d-fast) var(--e-standard);
+  transition:
+    border-color var(--d-fast) var(--e-standard),
+    background-color var(--d-fast) var(--e-standard);
 }
 
 .theme-choice__item:hover {
@@ -160,7 +162,9 @@
   font: inherit;
   font-size: var(--fs-sm);
   cursor: pointer;
-  transition: background-color var(--d-fast) var(--e-standard), color var(--d-fast) var(--e-standard);
+  transition:
+    background-color var(--d-fast) var(--e-standard),
+    color var(--d-fast) var(--e-standard);
 }
 
 .level-toggle__item[aria-checked="true"] {
@@ -377,7 +381,9 @@
   font: inherit;
   font-size: var(--fs-xs);
   cursor: pointer;
-  transition: border-color var(--d-fast) var(--e-standard), color var(--d-fast) var(--e-standard);
+  transition:
+    border-color var(--d-fast) var(--e-standard),
+    color var(--d-fast) var(--e-standard);
 }
 
 .font-focus__item[aria-pressed="true"] {
@@ -665,7 +671,9 @@
   font-size: var(--fs-sm);
   cursor: pointer;
   text-align: left;
-  transition: border-color var(--d-fast) var(--e-standard), background-color var(--d-fast) var(--e-standard);
+  transition:
+    border-color var(--d-fast) var(--e-standard),
+    background-color var(--d-fast) var(--e-standard);
 }
 
 .wizard__choice[aria-checked="true"] {

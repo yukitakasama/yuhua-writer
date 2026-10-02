@@ -39,7 +39,14 @@ export interface ButtonProps extends JSX.ButtonHTMLAttributes<HTMLButtonElement>
 
 /** 一个可点击按钮。 */
 export function Button(props: ButtonProps): JSX.Element {
-  const [local, rest] = splitProps(props, ["variant", "size", "block", "class", "children", "type"]);
+  const [local, rest] = splitProps(props, [
+    "variant",
+    "size",
+    "block",
+    "class",
+    "children",
+    "type",
+  ]);
   const classes = () =>
     [
       "btn",

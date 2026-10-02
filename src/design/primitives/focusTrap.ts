@@ -48,7 +48,9 @@ export const FOCUSABLE_SELECTOR = [
  * 这里退而求其次只看属性与显式样式，真实浏览器里的隐藏元素绝大多数也带
  * \`hidden\` / \`display:none\` / \`visibility:hidden\`，判定结果一致。
  */
-export function isFocusable(element: Element | null | undefined): element is HTMLElement {
+export function isFocusable(
+  element: Element | null | undefined,
+): element is HTMLElement {
   if (!element || !(element instanceof HTMLElement)) return false;
 
   // disabled 与 inert 是硬性屏蔽，优先判断。
@@ -74,7 +76,11 @@ export function isFocusable(element: Element | null | undefined): element is HTM
 function isNaturallyFocusable(element: HTMLElement): boolean {
   if (NATURALLY_FOCUSABLE.has(element.tagName)) {
     // type="hidden" 的 input 不会被渲染，自然也不可聚焦。
-    if (element.tagName === "INPUT" && element.getAttribute("type") === "hidden") return false;
+    if (
+      element.tagName === "INPUT" &&
+      element.getAttribute("type") === "hidden"
+    )
+      return false;
     return true;
   }
   // contenteditable 是「可编辑区域」，对键盘用户等价于一个输入控件。
@@ -90,7 +96,9 @@ function isNaturallyFocusable(element: HTMLElement): boolean {
  * 设成 -1，它们仍然要能接收焦点。把两者混为一谈会让键盘导航整段失效，
  * 所以这里显式分成两个函数，调用方按意图选择。
  */
-export function isProgrammaticallyFocusable(element: Element | null | undefined): element is HTMLElement {
+export function isProgrammaticallyFocusable(
+  element: Element | null | undefined,
+): element is HTMLElement {
   if (!element || !(element instanceof HTMLElement)) return false;
   if ((element as HTMLInputElement).disabled) return false;
   if (element.closest("[inert]")) return false;
@@ -107,7 +115,9 @@ export function isProgrammaticallyFocusable(element: Element | null | undefined)
 
 /** 取容器内按 DOM 顺序排列的所有可 Tab 聚焦元素。 */
 export function getFocusableElements(container: HTMLElement): HTMLElement[] {
-  const candidates = Array.from(container.querySelectorAll<HTMLElement>(FOCUSABLE_SELECTOR));
+  const candidates = Array.from(
+    container.querySelectorAll<HTMLElement>(FOCUSABLE_SELECTOR),
+  );
   return candidates.filter((element) => isFocusable(element));
 }
 
@@ -119,7 +129,9 @@ export function getFocusableElements(container: HTMLElement): HTMLElement[] {
  * 但导航时必须把它们全部视作候选。
  */
 export function focusableCandidates(container: HTMLElement): HTMLElement[] {
-  const candidates = Array.from(container.querySelectorAll<HTMLElement>(FOCUSABLE_SELECTOR));
+  const candidates = Array.from(
+    container.querySelectorAll<HTMLElement>(FOCUSABLE_SELECTOR),
+  );
   return candidates.filter((element) => isProgrammaticallyFocusable(element));
 }
 
@@ -156,9 +168,20 @@ function isInside(container: HTMLElement, node: EventTarget | null): boolean {
  *
  * @returns 解除陷阱的函数；调用后监听全部移除、焦点归还。
  */
-export function focusTrap(container: HTMLElement, options: FocusTrapOptions = {}): FocusTrapCleanup {
-  const { autoFocus = true, initialFocus, restoreFocus = true, focusContainer = true } = options;
-  const previouslyFocused = document.activeElement instanceof HTMLElement ? document.activeElement : null;
+export function focusTrap(
+  container: HTMLElement,
+  options: FocusTrapOptions = {},
+): FocusTrapCleanup {
+  const {
+    autoFocus = true,
+    initialFocus,
+    restoreFocus = true,
+    focusContainer = true,
+  } = options;
+  const previouslyFocused =
+    document.activeElement instanceof HTMLElement
+      ? document.activeElement
+      : null;
 
   /**
    * 防重入闸门。
@@ -249,7 +272,11 @@ export function focusTrap(container: HTMLElement, options: FocusTrapOptions = {}
   return () => {
     document.removeEventListener("keydown", onKeyDown, true);
     document.removeEventListener("focusin", onFocusIn, true);
-    if (restoreFocus && previouslyFocused && document.contains(previouslyFocused)) {
+    if (
+      restoreFocus &&
+      previouslyFocused &&
+      document.contains(previouslyFocused)
+    ) {
       previouslyFocused.focus();
     }
   };

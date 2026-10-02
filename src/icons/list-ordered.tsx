@@ -17,11 +17,11 @@ export function ListOrderedIcon(props: SvgIconProps) {
   return (
     <svg {...iconProps(props)}>
       <path d="M10 6.5h10" />
-    <path d="M10 12h10" />
-    <path d="M10 17.5h10" />
-    <path d="M4 5.5h1v3" />
-    <path d="M3.6 11.4h2.1L3.6 14h2.1" />
-    <path d="M3.6 16.6h2.1v2.4H3.6" />
+      <path d="M10 12h10" />
+      <path d="M10 17.5h10" />
+      <path d="M4 5.5h1v3" />
+      <path d="M3.6 11.4h2.1L3.6 14h2.1" />
+      <path d="M3.6 16.6h2.1v2.4H3.6" />
     </svg>
   );
 }

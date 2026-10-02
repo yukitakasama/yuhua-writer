@@ -28,7 +28,12 @@
 
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-import { __resetAppearance, DEFAULT_APPEARANCE, setMeasure, setScopeTypography } from "@/app/appearance-store";
+import {
+  __resetAppearance,
+  DEFAULT_APPEARANCE,
+  setMeasure,
+  setScopeTypography,
+} from "@/app/appearance-store";
 import { FontLoader, type FontFaceLike } from "@/design/fonts/loader";
 import { applyTypography, typographyVariables } from "@/design/fonts/apply";
 
@@ -82,7 +87,9 @@ describe("T1.12 · 字体切换只走 CSS 变量", () => {
     target.removeAttribute("style");
 
     applyTypography(DEFAULT_APPEARANCE.typography);
-    expect(target.style.getPropertyValue("--font-body")).toContain("Yuhua Serif SC");
+    expect(target.style.getPropertyValue("--font-body")).toContain(
+      "Yuhua Serif SC",
+    );
     // 关键断言：根元素本身没有内联 font-family —— 字体完全由变量下发
     expect(target.style.fontFamily).toBe("");
   });
@@ -129,9 +136,15 @@ describe("T1.12 · 自定义属性不参与过渡", () => {
     const here = dirname(fileURLToPath(import.meta.url));
     const root = resolve(here, "../../../");
 
-    for (const file of ["src/design/tokens.css", "src/styles/settings.css", "src/styles/app.css"]) {
+    for (const file of [
+      "src/design/tokens.css",
+      "src/styles/settings.css",
+      "src/styles/app.css",
+    ]) {
       const source = readFileSync(resolve(root, file), "utf8");
-      expect(source.includes("@property"), file + " 引入了 @property").toBe(false);
+      expect(source.includes("@property"), file + " 引入了 @property").toBe(
+        false,
+      );
     }
   });
 
@@ -141,7 +154,10 @@ describe("T1.12 · 自定义属性不参与过渡", () => {
     const { dirname, resolve } = await import("node:path");
     const here = dirname(fileURLToPath(import.meta.url));
 
-    const source = readFileSync(resolve(here, "../../styles/settings.css"), "utf8");
+    const source = readFileSync(
+      resolve(here, "../../styles/settings.css"),
+      "utf8",
+    );
     // 抽出所有 transition-property / transition 简写的声明块
     const transitions = source.match(/transition(-property)?\s*:[^;]+;/g) ?? [];
     for (const rule of transitions) {
@@ -194,7 +210,9 @@ describe("T1.12 · 先加载字形，后应用排版", () => {
     await task;
     const target = document.createElement("div");
     applyTypography(DEFAULT_APPEARANCE.typography, target);
-    expect(target.style.getPropertyValue("--font-body")).toContain("Yuhua Serif SC");
+    expect(target.style.getPropertyValue("--font-body")).toContain(
+      "Yuhua Serif SC",
+    );
   });
 });
 
@@ -203,7 +221,10 @@ describe("T1.12 · 高频连改不产生中间态残留", () => {
     const target = document.createElement("div");
     for (const size of [18, 19, 20, 21, 22]) {
       applyTypography(
-        { ...DEFAULT_APPEARANCE.typography, body: { ...DEFAULT_APPEARANCE.typography.body, size } },
+        {
+          ...DEFAULT_APPEARANCE.typography,
+          body: { ...DEFAULT_APPEARANCE.typography.body, size },
+        },
         target,
       );
     }
@@ -217,21 +238,32 @@ describe("T1.12 · 高频连改不产生中间态残留", () => {
     const target = document.createElement("div");
     for (let measure = 480; measure <= 1120; measure += 80) {
       applyTypography({ ...DEFAULT_APPEARANCE.typography, measure }, target);
-      expect(target.style.getPropertyValue("--measure-body")).toMatch(/^\d+px$/);
+      expect(target.style.getPropertyValue("--measure-body")).toMatch(
+        /^\d+px$/,
+      );
     }
   });
 
   it("切换字体族不会在根元素上留下上一次的变量", () => {
     const target = document.createElement("div");
     applyTypography(
-      { ...DEFAULT_APPEARANCE.typography, body: { ...DEFAULT_APPEARANCE.typography.body, family: "yuhua-kai" } },
+      {
+        ...DEFAULT_APPEARANCE.typography,
+        body: { ...DEFAULT_APPEARANCE.typography.body, family: "yuhua-kai" },
+      },
       target,
     );
-    expect(target.style.getPropertyValue("--font-body")).toContain("Yuhua Kai SC");
+    expect(target.style.getPropertyValue("--font-body")).toContain(
+      "Yuhua Kai SC",
+    );
     applyTypography(DEFAULT_APPEARANCE.typography, target);
-    expect(target.style.getPropertyValue("--font-body")).toContain("Yuhua Serif SC");
+    expect(target.style.getPropertyValue("--font-body")).toContain(
+      "Yuhua Serif SC",
+    );
     // 同一个变量被覆盖，不存在两条并存
-    expect(target.style.getPropertyValue("--font-body")).not.toContain("Yuhua Kai SC");
+    expect(target.style.getPropertyValue("--font-body")).not.toContain(
+      "Yuhua Kai SC",
+    );
   });
 });
 

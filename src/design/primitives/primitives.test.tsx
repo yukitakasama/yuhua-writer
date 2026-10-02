@@ -10,7 +10,16 @@
 
 import { cleanup, fireEvent, render, screen } from "@solidjs/testing-library";
 import { describe, expect, it, vi } from "vitest";
-import { Button, Checkbox, IconButton, Input, Select, Switch, Textarea, Tooltip } from "./index";
+import {
+  Button,
+  Checkbox,
+  IconButton,
+  Input,
+  Select,
+  Switch,
+  Textarea,
+  Tooltip,
+} from "./index";
 import { mockReducedMotion } from "./test-utils";
 
 describe("Button", () => {
@@ -85,12 +94,16 @@ describe("Button", () => {
 
   it("默认 type=button，避免在表单里被误当提交按钮", () => {
     const { container } = render(() => <Button>普通</Button>);
-    expect(container.querySelector("button")?.getAttribute("type")).toBe("button");
+    expect(container.querySelector("button")?.getAttribute("type")).toBe(
+      "button",
+    );
   });
 
   it("class 透传给调用方", () => {
     const { container } = render(() => <Button class="my-save">保存</Button>);
-    expect(container.querySelector("button")?.classList.contains("my-save")).toBe(true);
+    expect(
+      container.querySelector("button")?.classList.contains("my-save"),
+    ).toBe(true);
   });
 });
 
@@ -124,7 +137,9 @@ describe("IconButton", () => {
         <svg />
       </IconButton>
     ));
-    expect(container.querySelector("button")?.getAttribute("aria-pressed")).toBe("true");
+    expect(
+      container.querySelector("button")?.getAttribute("aria-pressed"),
+    ).toBe("true");
   });
 
   it("不传 pressed 时不渲染 aria-pressed", () => {
@@ -133,7 +148,9 @@ describe("IconButton", () => {
         <svg />
       </IconButton>
     ));
-    expect(container.querySelector("button")?.hasAttribute("aria-pressed")).toBe(false);
+    expect(
+      container.querySelector("button")?.hasAttribute("aria-pressed"),
+    ).toBe(false);
   });
 
   it("disabled 时不触发 onClick", () => {
@@ -179,7 +196,9 @@ describe("Input", () => {
     const input = screen.getByLabelText("书名");
     const describedBy = input.getAttribute("aria-describedby");
     expect(describedBy).not.toBeNull();
-    expect(document.getElementById(describedBy as string)?.textContent).toBe("最多 40 字");
+    expect(document.getElementById(describedBy as string)?.textContent).toBe(
+      "最多 40 字",
+    );
   });
 
   it("placeholder 支持中文", () => {
@@ -203,7 +222,9 @@ describe("Textarea", () => {
 
   it("错误态设置 aria-invalid", () => {
     render(() => <Textarea label="摘要" error="摘要过长" />);
-    expect(screen.getByLabelText("摘要").getAttribute("aria-invalid")).toBe("true");
+    expect(screen.getByLabelText("摘要").getAttribute("aria-invalid")).toBe(
+      "true",
+    );
     expect(screen.getByRole("alert").textContent).toBe("摘要过长");
   });
 });
@@ -223,20 +244,26 @@ describe("Select", () => {
   });
 
   it("未选中时渲染 placeholder 项", () => {
-    render(() => <Select label="卷" options={options} placeholder="请选择卷" />);
+    render(() => (
+      <Select label="卷" options={options} placeholder="请选择卷" />
+    ));
     const select = screen.getByLabelText("卷") as HTMLSelectElement;
     expect(select.value).toBe("");
     expect(select.querySelector("option")?.textContent).toBe("请选择卷");
   });
 
   it("已有值时不再渲染 placeholder 项", () => {
-    render(() => <Select label="卷" options={options} value="v1" placeholder="请选择卷" />);
+    render(() => (
+      <Select label="卷" options={options} value="v1" placeholder="请选择卷" />
+    ));
     expect(screen.queryByText("请选择卷")).toBeNull();
   });
 
   it("选择后回调收到中文标签对应的值", () => {
     const onChange = vi.fn();
-    render(() => <Select label="卷" options={options} value="v1" onChange={onChange} />);
+    render(() => (
+      <Select label="卷" options={options} value="v1" onChange={onChange} />
+    ));
     fireEvent.change(screen.getByLabelText("卷"), { target: { value: "v2" } });
     expect(onChange).toHaveBeenCalledWith("v2", expect.anything());
   });
@@ -244,12 +271,16 @@ describe("Select", () => {
   it("禁用选项带 disabled 属性", () => {
     render(() => <Select label="卷" options={options} value="v1" />);
     const select = screen.getByLabelText("卷") as HTMLSelectElement;
-    expect((select.querySelectorAll("option")[2] as HTMLOptionElement).disabled).toBe(true);
+    expect(
+      (select.querySelectorAll("option")[2] as HTMLOptionElement).disabled,
+    ).toBe(true);
   });
 
   it("错误态设置 aria-invalid 并展示错误文案", () => {
     render(() => <Select label="卷" options={options} error="请选择所属卷" />);
-    expect(screen.getByLabelText("卷").getAttribute("aria-invalid")).toBe("true");
+    expect(screen.getByLabelText("卷").getAttribute("aria-invalid")).toBe(
+      "true",
+    );
     expect(screen.getByRole("alert").textContent).toBe("请选择所属卷");
   });
 });
@@ -257,21 +288,33 @@ describe("Select", () => {
 describe("Checkbox", () => {
   it("点击切换并回调新状态", () => {
     const onChange = vi.fn();
-    render(() => <Checkbox checked={false} onChange={onChange}>全选</Checkbox>);
+    render(() => (
+      <Checkbox checked={false} onChange={onChange}>
+        全选
+      </Checkbox>
+    ));
     fireEvent.click(screen.getByRole("checkbox"));
     expect(onChange).toHaveBeenCalledWith(true, expect.anything());
   });
 
   it("选中时 data-checked 为 true", () => {
     const { container } = render(() => <Checkbox checked>已选</Checkbox>);
-    expect(container.querySelector(".yh-checkbox")?.getAttribute("data-checked")).toBe("true");
+    expect(
+      container.querySelector(".yh-checkbox")?.getAttribute("data-checked"),
+    ).toBe("true");
   });
 
   it("indeterminate 会写到 DOM 属性上（Solid JSX 不支持该属性）", () => {
-    const { container } = render(() => <Checkbox indeterminate>部分选中</Checkbox>);
+    const { container } = render(() => (
+      <Checkbox indeterminate>部分选中</Checkbox>
+    ));
     const input = container.querySelector("input") as HTMLInputElement;
     expect(input.indeterminate).toBe(true);
-    expect(container.querySelector(".yh-checkbox")?.getAttribute("data-indeterminate")).toBe("true");
+    expect(
+      container
+        .querySelector(".yh-checkbox")
+        ?.getAttribute("data-indeterminate"),
+    ).toBe("true");
   });
 
   it("disabled 时不触发回调", () => {
@@ -289,8 +332,14 @@ describe("Checkbox", () => {
 
   it("invalid 时标记 aria-invalid 并加错误类", () => {
     const { container } = render(() => <Checkbox invalid>同意许可</Checkbox>);
-    expect(screen.getByRole("checkbox").getAttribute("aria-invalid")).toBe("true");
-    expect(container.querySelector(".yh-checkbox")?.classList.contains("yh-checkbox--invalid")).toBe(true);
+    expect(screen.getByRole("checkbox").getAttribute("aria-invalid")).toBe(
+      "true",
+    );
+    expect(
+      container
+        .querySelector(".yh-checkbox")
+        ?.classList.contains("yh-checkbox--invalid"),
+    ).toBe(true);
   });
 });
 
@@ -304,7 +353,11 @@ describe("Switch", () => {
 
   it("点击回调取反后的值", () => {
     const onChange = vi.fn();
-    render(() => <Switch checked={false} onChange={onChange}>自动保存</Switch>);
+    render(() => (
+      <Switch checked={false} onChange={onChange}>
+        自动保存
+      </Switch>
+    ));
     fireEvent.click(screen.getByRole("switch"));
     expect(onChange).toHaveBeenCalledWith(true, expect.anything());
   });
@@ -388,7 +441,9 @@ describe("Tooltip", () => {
         <Button>按钮</Button>
       </Tooltip>
     ));
-    fireEvent.pointerEnter(document.querySelector(".yh-tooltip-anchor") as HTMLElement);
+    fireEvent.pointerEnter(
+      document.querySelector(".yh-tooltip-anchor") as HTMLElement,
+    );
     await vi.advanceTimersByTimeAsync(10);
     expect(screen.queryByRole("tooltip")).toBeNull();
     vi.useRealTimers();
@@ -402,12 +457,16 @@ describe("Tooltip", () => {
         <Button>按钮</Button>
       </Tooltip>
     ));
-    fireEvent.pointerEnter(document.querySelector(".yh-tooltip-anchor") as HTMLElement);
+    fireEvent.pointerEnter(
+      document.querySelector(".yh-tooltip-anchor") as HTMLElement,
+    );
     await vi.advanceTimersByTimeAsync(1);
 
     const tooltip = screen.getByRole("tooltip") as HTMLElement;
     expect(tooltip.style.transform).toBe("none");
-    expect(Number.parseInt(tooltip.style.transitionDuration, 10)).toBeLessThanOrEqual(100);
+    expect(
+      Number.parseInt(tooltip.style.transitionDuration, 10),
+    ).toBeLessThanOrEqual(100);
     vi.useRealTimers();
   });
 });

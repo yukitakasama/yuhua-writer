@@ -19,22 +19,54 @@ import { findHitOffset, mergeRanges, splitHighlight } from "./highlight";
 
 describe("区间归一", () => {
   it("空区间被丢弃", () => {
-    expect(mergeRanges([[3, 3], [5, 2]], 10)).toEqual([]);
+    expect(
+      mergeRanges(
+        [
+          [3, 3],
+          [5, 2],
+        ],
+        10,
+      ),
+    ).toEqual([]);
   });
 
   it("乱序区间会被排序", () => {
-    expect(mergeRanges([[5, 7], [1, 3]], 10)).toEqual([
+    expect(
+      mergeRanges(
+        [
+          [5, 7],
+          [1, 3],
+        ],
+        10,
+      ),
+    ).toEqual([
       [1, 3],
       [5, 7],
     ]);
   });
 
   it("重叠区间合并成一个", () => {
-    expect(mergeRanges([[1, 5], [3, 8]], 10)).toEqual([[1, 8]]);
+    expect(
+      mergeRanges(
+        [
+          [1, 5],
+          [3, 8],
+        ],
+        10,
+      ),
+    ).toEqual([[1, 8]]);
   });
 
   it("相邻区间也合并（否则高亮会中间开裂）", () => {
-    expect(mergeRanges([[0, 2], [2, 4]], 10)).toEqual([[0, 4]]);
+    expect(
+      mergeRanges(
+        [
+          [0, 2],
+          [2, 4],
+        ],
+        10,
+      ),
+    ).toEqual([[0, 4]]);
   });
 
   it("超出文本长度的区间被夹紧", () => {
@@ -43,7 +75,15 @@ describe("区间归一", () => {
   });
 
   it("结果按起点升序且互不重叠", () => {
-    const merged = mergeRanges([[0, 3], [1, 2], [5, 6], [4, 7]], 10);
+    const merged = mergeRanges(
+      [
+        [0, 3],
+        [1, 2],
+        [5, 6],
+        [4, 7],
+      ],
+      10,
+    );
     for (let i = 1; i < merged.length; i += 1) {
       expect(merged[i]![0]).toBeGreaterThanOrEqual(merged[i - 1]![1]);
     }
@@ -52,7 +92,9 @@ describe("区间归一", () => {
 
 describe("高亮切分", () => {
   it("没有区间时返回单个非命中段", () => {
-    expect(splitHighlight("一段文字", [])).toEqual([{ text: "一段文字", hit: false }]);
+    expect(splitHighlight("一段文字", [])).toEqual([
+      { text: "一段文字", hit: false },
+    ]);
   });
 
   it("命中区间切成三段", () => {
@@ -75,12 +117,18 @@ describe("高亮切分", () => {
   });
 
   it("多个命中各自成段", () => {
-    const segments = splitHighlight("雨夜雨", [[0, 1], [2, 3]]);
+    const segments = splitHighlight("雨夜雨", [
+      [0, 1],
+      [2, 3],
+    ]);
     expect(segments.filter((s) => s.hit)).toHaveLength(2);
   });
 
   it("重叠区间不会切出重复文本", () => {
-    const segments = splitHighlight("哈哈哈", [[0, 2], [1, 3]]);
+    const segments = splitHighlight("哈哈哈", [
+      [0, 2],
+      [1, 3],
+    ]);
     // 拼回去必须与原文完全一致：这是"没有丢字也没有重复"的唯一硬标准
     expect(segments.map((s) => s.text).join("")).toBe("哈哈哈");
   });
@@ -90,10 +138,17 @@ describe("高亮切分", () => {
     for (const ranges of [
       [] as Array<[number, number]>,
       [[0, 2]] as Array<[number, number]>,
-      [[2, 6], [8, 10]] as Array<[number, number]>,
+      [
+        [2, 6],
+        [8, 10],
+      ] as Array<[number, number]>,
       [[0, text.length]] as Array<[number, number]>,
     ]) {
-      expect(splitHighlight(text, ranges).map((s) => s.text).join("")).toBe(text);
+      expect(
+        splitHighlight(text, ranges)
+          .map((s) => s.text)
+          .join(""),
+      ).toBe(text);
     }
   });
 

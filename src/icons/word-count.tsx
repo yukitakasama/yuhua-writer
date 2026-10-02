@@ -17,12 +17,12 @@ export function WordCountIcon(props: SvgIconProps) {
   return (
     <svg {...iconProps(props)}>
       <path d="M4.5 5.5h5.8v13H4.5z" />
-    <path d="M13.7 5.5h5.8v13h-5.8z" />
-    <path d="M6.4 9h2" />
-    <path d="M6.4 12h2" />
-    <path d="M6.4 15h2" />
-    <path d="M15.6 9h2" />
-    <path d="M15.6 12h2" />
+      <path d="M13.7 5.5h5.8v13h-5.8z" />
+      <path d="M6.4 9h2" />
+      <path d="M6.4 12h2" />
+      <path d="M6.4 15h2" />
+      <path d="M15.6 9h2" />
+      <path d="M15.6 12h2" />
     </svg>
   );
 }

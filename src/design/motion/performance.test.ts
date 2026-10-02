@@ -1,4 +1,4 @@
-/**
+﻿/**
  * 动效性能验证测试（T1.10）。
  *
  * ## 测试范围
@@ -22,8 +22,21 @@
 
 import { beforeEach, describe, expect, it } from "vitest";
 
-import { benchmarkMotionPrimitives, findMaxConcurrency, FrameRateMonitor } from "./performance";
-import { fadeIn, fadeOut, scaleIn, slideIn, collapse, flip, pressFeedback, rollNumber } from "./primitives";
+import {
+  benchmarkMotionPrimitives,
+  findMaxConcurrency,
+  FrameRateMonitor,
+} from "./performance";
+import {
+  fadeIn,
+  fadeOut,
+  scaleIn,
+  slideIn,
+  collapse,
+  flip,
+  pressFeedback,
+  rollNumber,
+} from "./primitives";
 import { resetMotionCounters } from "./primitives";
 
 describe("FrameRateMonitor · 计量逻辑", () => {
@@ -87,8 +100,13 @@ describe.skip("动效原语帧率验证（需在真实浏览器中运行）", ()
     await fadeIn(el, { duration: 300 });
     const report = monitor.stop();
 
-    expect(report.avgFps, `平均 fps: ${report.avgFps}`).toBeGreaterThanOrEqual(58);
-    expect(report.droppedFrames, `掉帧: ${report.droppedFrames}`).toBeLessThanOrEqual(2);
+    expect(report.avgFps, `平均 fps: ${report.avgFps}`).toBeGreaterThanOrEqual(
+      58,
+    );
+    expect(
+      report.droppedFrames,
+      `掉帧: ${report.droppedFrames}`,
+    ).toBeLessThanOrEqual(2);
     expect(report.passed).toBe(true);
   });
 
@@ -231,8 +249,14 @@ describe.skip("并发上限验证（M2 指标，需在真实浏览器中运行�
     await Promise.all(tasks);
 
     const report = monitor.stop();
-    expect(report.avgFps, `30 并发平均 fps: ${report.avgFps}`).toBeGreaterThanOrEqual(58);
-    expect(report.droppedFrames, `30 并发掉帧: ${report.droppedFrames}`).toBeLessThanOrEqual(2);
+    expect(
+      report.avgFps,
+      `30 并发平均 fps: ${report.avgFps}`,
+    ).toBeGreaterThanOrEqual(58);
+    expect(
+      report.droppedFrames,
+      `30 并发掉帧: ${report.droppedFrames}`,
+    ).toBeLessThanOrEqual(2);
   });
 
   it("超过 30 个并发时降级为直接切换（不做动画）", async () => {
@@ -310,6 +334,7 @@ describe("findMaxConcurrency 并发上限查找", () => {
 
     // 在 jsdom 里这个测试意义不大（帧率恒为无穷），但至少能验证函数不崩溃
     const maxN = await findMaxConcurrency(createAnimation, 5);
+    expect(callCount).toBeGreaterThanOrEqual(maxN);
     expect(maxN).toBeGreaterThanOrEqual(1);
     expect(maxN).toBeLessThanOrEqual(5);
   });

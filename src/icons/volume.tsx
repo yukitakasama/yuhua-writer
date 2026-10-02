@@ -17,9 +17,9 @@ export function VolumeIcon(props: SvgIconProps) {
   return (
     <svg {...iconProps(props)}>
       <path d="M4.5 5.6a1.4 1.4 0 0 1 1.4-1.4h5.4a1.4 1.4 0 0 1 1.4 1.4v13.6H5.9a1.4 1.4 0 0 1-1.4-1.4z" />
-    <path d="M12.7 6.2a1.4 1.4 0 0 1 1.4-1.4h5.4v14.4h-5.4a1.4 1.4 0 0 1-1.4-1.4z" />
-    <path d="M8.3 8.2h4.4" />
-    <path d="M8.3 11.4h4.4" />
+      <path d="M12.7 6.2a1.4 1.4 0 0 1 1.4-1.4h5.4v14.4h-5.4a1.4 1.4 0 0 1-1.4-1.4z" />
+      <path d="M8.3 8.2h4.4" />
+      <path d="M8.3 11.4h4.4" />
     </svg>
   );
 }

@@ -97,7 +97,10 @@ export const ModalShell: Component<ModalShellProps> = (props) => {
     if (!props.open) return undefined;
     const panel = panelElement;
     if (!panel) return undefined;
-    return focusTrap(panel, { initialFocus: props.initialFocus, autoFocus: true });
+    return focusTrap(panel, {
+      initialFocus: props.initialFocus,
+      autoFocus: true,
+    });
   });
 
   const onKeyDown = (event: KeyboardEvent): void => {

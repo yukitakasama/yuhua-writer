@@ -16,7 +16,11 @@ import { iconProps, type SvgIconProps } from "./base";
 export function BoldIcon(props: SvgIconProps) {
   return (
     <svg {...iconProps(props)}>
-      <path fill="currentColor" stroke="none" d="M7.2 4.6h6.3c2.3 0 3.9 1.3 3.9 3.3 0 1.4-.8 2.4-2 2.9 1.5.5 2.5 1.6 2.5 3.2 0 2.2-1.7 3.6-4.2 3.6H7.2zm3.2 2.6v3h2.4c1 0 1.6-.6 1.6-1.5s-.6-1.5-1.6-1.5zm0 5.4v3.4h2.8c1.1 0 1.8-.7 1.8-1.7s-.7-1.7-1.8-1.7z" />
+      <path
+        fill="currentColor"
+        stroke="none"
+        d="M7.2 4.6h6.3c2.3 0 3.9 1.3 3.9 3.3 0 1.4-.8 2.4-2 2.9 1.5.5 2.5 1.6 2.5 3.2 0 2.2-1.7 3.6-4.2 3.6H7.2zm3.2 2.6v3h2.4c1 0 1.6-.6 1.6-1.5s-.6-1.5-1.6-1.5zm0 5.4v3.4h2.8c1.1 0 1.8-.7 1.8-1.7s-.7-1.7-1.8-1.7z"
+      />
     </svg>
   );
 }

@@ -23,7 +23,16 @@
  * 全流程不碰鼠标。
  */
 
-import { For, Show, createEffect, createMemo, createSignal, onCleanup, untrack, type JSX } from "solid-js";
+import {
+  For,
+  Show,
+  createEffect,
+  createMemo,
+  createSignal,
+  onCleanup,
+  untrack,
+  type JSX,
+} from "solid-js";
 
 import { t } from "@/strings";
 import * as ipc from "@/lib/ipc";
@@ -36,7 +45,6 @@ import { OutlineIcon, SearchIcon } from "@/icons";
 import { selectChapter, selectedChapterId } from "@/app/workspace-store";
 import { requestJump } from "./search-store";
 import { SnippetText } from "./SnippetText";
-
 
 /** 检索面板属性。 */
 export interface SearchPanelProps {
@@ -53,7 +61,9 @@ const DEBOUNCE_MS = 180;
 
 /** 检索与大纲面板。 */
 export function SearchPanel(props: SearchPanelProps): JSX.Element {
-  const [tab, setTab] = createSignal<"search" | "outline">(props.initialTab ?? "search");
+  const [tab, setTab] = createSignal<"search" | "outline">(
+    props.initialTab ?? "search",
+  );
   const [keyword, setKeyword] = createSignal("");
   const [titleOnly, setTitleOnly] = createSignal(false);
   const [hits, setHits] = createSignal<SearchHit[]>([]);
@@ -138,7 +148,11 @@ export function SearchPanel(props: SearchPanelProps): JSX.Element {
     }
     setLoading(true);
     try {
-      const results = await ipc.search({ keyword: query, titleOnly: onlyTitle, limit: 50 });
+      const results = await ipc.search({
+        keyword: query,
+        titleOnly: onlyTitle,
+        limit: 50,
+      });
       // 竞态：慢的旧请求回来时直接丢弃
       if (mine !== requestId) return;
       setHits(results.hits);
@@ -237,7 +251,11 @@ export function SearchPanel(props: SearchPanelProps): JSX.Element {
       initialFocus={() => inputEl ?? null}
       class="search-panel"
     >
-      <div class="search-panel__tabs" role="tablist" aria-label={t("search.title")}>
+      <div
+        class="search-panel__tabs"
+        role="tablist"
+        aria-label={t("search.title")}
+      >
         <button
           type="button"
           role="tab"
@@ -291,9 +309,14 @@ export function SearchPanel(props: SearchPanelProps): JSX.Element {
         <p class="search-panel__meta" role="status" aria-live="polite">
           <Show when={keyword().trim().length > 0} fallback={t("search.empty")}>
             <Show when={!loading()} fallback={t("search.searching")}>
-              <span class="yh-num">{t("search.resultCount", { count: total() })}</span>
+              <span class="yh-num">
+                {t("search.resultCount", { count: total() })}
+              </span>
               <Show when={tokens().length > 0}>
-                <span class="search-panel__tokens"> {t("search.tokens", { tokens: tokens().join(" / ") })}</span>
+                <span class="search-panel__tokens">
+                  {" "}
+                  {t("search.tokens", { tokens: tokens().join(" / ") })}
+                </span>
               </Show>
             </Show>
           </Show>
@@ -320,7 +343,11 @@ export function SearchPanel(props: SearchPanelProps): JSX.Element {
                       type="button"
                       class="hit"
                       classList={{ "is-active": index() === activeIndex() }}
-                      aria-current={current()?.chapterId === hit.chapterId ? "true" : undefined}
+                      aria-current={
+                        current()?.chapterId === hit.chapterId
+                          ? "true"
+                          : undefined
+                      }
                       tabindex={index() === activeIndex() ? 0 : -1}
                       onClick={() => jumpTo(hit)}
                       onFocus={() => setActiveIndex(index())}
@@ -356,7 +383,10 @@ export function SearchPanel(props: SearchPanelProps): JSX.Element {
           when={outline().length > 0}
           fallback={
             <Show when={!outlineLoading()}>
-              <EmptyState illustration={<IllustrationEmptyTree size={96} />} title={t("search.outlineEmpty")} />
+              <EmptyState
+                illustration={<IllustrationEmptyTree size={96} />}
+                title={t("search.outlineEmpty")}
+              />
             </Show>
           }
         >
@@ -381,16 +411,25 @@ export function SearchPanel(props: SearchPanelProps): JSX.Element {
                             <button
                               type="button"
                               class="outline__chapter"
-                              aria-current={selectedChapterId() === chapter.id ? "true" : undefined}
+                              aria-current={
+                                selectedChapterId() === chapter.id
+                                  ? "true"
+                                  : undefined
+                              }
                               onClick={() => {
                                 selectChapter(chapter.id);
                                 requestJump(chapter.id, 0);
                                 props.onClose();
                               }}
                             >
-                              <span class="outline__chapter-title">{chapter.title}</span>
+                              <span class="outline__chapter-title">
+                                {chapter.title}
+                              </span>
                               <span class="outline__meta yh-num">
-                                {t("search.outlineChapterMeta", { words: chapter.wordCount.toLocaleString("zh-CN") })}
+                                {t("search.outlineChapterMeta", {
+                                  words:
+                                    chapter.wordCount.toLocaleString("zh-CN"),
+                                })}
                               </span>
                             </button>
                           </li>
@@ -434,7 +473,8 @@ export function SearchPanel(props: SearchPanelProps): JSX.Element {
  * 拿它去定位会把光标送到一个无关的位置，比不跳更让人困惑。
  */
 export function computeOffset(hit: SearchHit, keyword: string): number {
-  const preferred = hit.snippets.find((s) => s.ranges.length > 0) ?? hit.snippets[0];
+  const preferred =
+    hit.snippets.find((s) => s.ranges.length > 0) ?? hit.snippets[0];
   if (!preferred) return 0;
   const range = preferred.ranges[0];
   if (range) return Math.max(0, range[0]);
@@ -451,7 +491,8 @@ export function computeOffset(hit: SearchHit, keyword: string): number {
  * （云盘同步、外部编辑器改过）就找不到。
  */
 export function hitAnchor(hit: SearchHit): string {
-  const preferred = hit.snippets.find((s) => s.ranges.length > 0) ?? hit.snippets[0];
+  const preferred =
+    hit.snippets.find((s) => s.ranges.length > 0) ?? hit.snippets[0];
   if (!preferred) return "";
   return preferred.text.slice(0, Math.min(16, preferred.text.length)).trim();
 }

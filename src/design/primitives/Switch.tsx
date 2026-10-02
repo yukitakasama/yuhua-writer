@@ -13,8 +13,10 @@ import { Show, splitProps, type Component, type JSX } from "solid-js";
 import { cx, usePrimitivesStyle } from "./styles";
 
 /** {@link Switch} 的 props。 */
-export interface SwitchProps
-  extends Omit<JSX.ButtonHTMLAttributes<HTMLButtonElement>, "onChange" | "onClick" | "class" | "children" | "type"> {
+export interface SwitchProps extends Omit<
+  JSX.ButtonHTMLAttributes<HTMLButtonElement>,
+  "onChange" | "onClick" | "class" | "children" | "type"
+> {
   /** 是否打开。 */
   checked?: boolean;
   /** 切换回调。 */
@@ -36,7 +38,13 @@ export interface SwitchProps
 export const Switch: Component<SwitchProps> = (props) => {
   usePrimitivesStyle();
 
-  const [local, rest] = splitProps(props, ["checked", "onChange", "disabled", "children", "class"]);
+  const [local, rest] = splitProps(props, [
+    "checked",
+    "onChange",
+    "disabled",
+    "children",
+    "class",
+  ]);
 
   const isChecked = (): boolean => local.checked === true;
 

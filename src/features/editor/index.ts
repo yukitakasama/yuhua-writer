@@ -6,12 +6,66 @@
  * 改动被限制在这个目录里。
  */
 
-export { MarkdownEditor, createEditorExtensions, fontCompartmentExtension, type EditorHandle, type MarkdownEditorProps } from "./MarkdownEditor";
-export { MARKDOWN_SUBSET, FIRST_CLASS_SYNTAXES, DEGRADED_SYNTAXES, isMarkdownMarker, type SubsetRule } from "./markdown-subset";
+export {
+  MarkdownEditor,
+  createEditorExtensions,
+  fontCompartmentExtension,
+  type EditorHandle,
+  type MarkdownEditorProps,
+} from "./MarkdownEditor";
+export {
+  MARKDOWN_SUBSET,
+  FIRST_CLASS_SYNTAXES,
+  DEGRADED_SYNTAXES,
+  isMarkdownMarker,
+  type SubsetRule,
+} from "./markdown-subset";
 export { hiddenRangesForLine } from "./instant-render";
-export { AutosaveScheduler, AUTOSAVE_DEBOUNCE_MS, AUTOSAVE_MAX_WAIT_MS, isUserEdit, type AutosaveOptions } from "./autosave";
-export { isComposing, compositionSettled, compositionStart, imeCompositionGuard, type CompositionListener } from "./ime";
-export { captureCursor, resolveCursor, isCursorResolvable, rememberCursor, recallCursor, CURSOR_STORE_LIMIT, type ChapterCursor, type CursorStore } from "./cursor-memory";
-export { DEFAULT_BINDINGS, eventToChord, findConflicts, applyOverrides, bindingById, detectMac, displayChord, type KeyBinding } from "./shortcuts";
-export { normalizePastedText, htmlToMarkdown, isSafeHref, isSafeSrc, pickPastedText } from "./paste";
-export { focusMode, toggleFocusMode, enterFocusMode, exitFocusMode, focusModeClass } from "./focus";
+export {
+  AutosaveScheduler,
+  AUTOSAVE_DEBOUNCE_MS,
+  AUTOSAVE_MAX_WAIT_MS,
+  isUserEdit,
+  type AutosaveOptions,
+} from "./autosave";
+export {
+  isComposing,
+  compositionSettled,
+  compositionStart,
+  imeCompositionGuard,
+  type CompositionListener,
+} from "./ime";
+export {
+  captureCursor,
+  resolveCursor,
+  isCursorResolvable,
+  rememberCursor,
+  recallCursor,
+  CURSOR_STORE_LIMIT,
+  type ChapterCursor,
+  type CursorStore,
+} from "./cursor-memory";
+export {
+  DEFAULT_BINDINGS,
+  eventToChord,
+  findConflicts,
+  applyOverrides,
+  bindingById,
+  detectMac,
+  displayChord,
+  type KeyBinding,
+} from "./shortcuts";
+export {
+  normalizePastedText,
+  htmlToMarkdown,
+  isSafeHref,
+  isSafeSrc,
+  pickPastedText,
+} from "./paste";
+export {
+  focusMode,
+  toggleFocusMode,
+  enterFocusMode,
+  exitFocusMode,
+  focusModeClass,
+} from "./focus";

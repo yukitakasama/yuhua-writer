@@ -30,10 +30,17 @@ export function statusLabel(status: ChapterStatus): string {
 export function StatusDot(props: StatusDotProps): JSX.Element {
   const label = () => statusLabel(props.status);
   return (
-    <span class={`status-dot status-dot--${props.status}`} role="img" aria-label={label()} title={label()}>
+    <span
+      class={`status-dot status-dot--${props.status}`}
+      role="img"
+      aria-label={label()}
+      title={label()}
+    >
       {/* 形状在 CSS 里用伪元素画，避免多一层 DOM */}
       <span class="status-dot__mark" aria-hidden="true" />
-      {props.withLabel ? <span class="status-dot__label">{label()}</span> : null}
+      {props.withLabel ? (
+        <span class="status-dot__label">{label()}</span>
+      ) : null}
     </span>
   );
 }

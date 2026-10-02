@@ -49,7 +49,10 @@ type DeepKeys<T> = {
 }[keyof T & string];
 
 /** 按键路径取值；路径不存在返回 undefined。 */
-export function lookup(key: string, locale: Locale = DEFAULT_LOCALE): string | undefined {
+export function lookup(
+  key: string,
+  locale: Locale = DEFAULT_LOCALE,
+): string | undefined {
   let node: unknown = DICTS[locale];
   for (const part of key.split(".")) {
     if (!isRecord(node)) return undefined;
@@ -64,7 +67,11 @@ export function lookup(key: string, locale: Locale = DEFAULT_LOCALE): string | u
  * 找不到键时**返回键名本身**而不是抛错：界面上一处文案缺失
  * 不值得让整个应用崩掉，而把键名显示出来还能让测试立刻抓到它。
  */
-export function t(key: StringKey, params?: Interpolation, locale: Locale = DEFAULT_LOCALE): string {
+export function t(
+  key: StringKey,
+  params?: Interpolation,
+  locale: Locale = DEFAULT_LOCALE,
+): string {
   const raw = lookup(key, locale);
   if (raw === undefined) return key;
   return params ? interpolate(raw, params) : raw;
@@ -79,7 +86,9 @@ export function interpolate(template: string, params: Interpolation): string {
 }
 
 /** 当前语言下的字数口径标签。 */
-export function countModeLabel(mode: "withPunctuation" | "withoutPunctuation" | "wordsForEnglish"): string {
+export function countModeLabel(
+  mode: "withPunctuation" | "withoutPunctuation" | "wordsForEnglish",
+): string {
   return t(`wordCount.${mode}`);
 }
 

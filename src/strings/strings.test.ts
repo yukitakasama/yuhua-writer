@@ -41,7 +41,9 @@ describe("文案字典结构", () => {
   });
 
   it("没有任何空字符串值", () => {
-    const empty = [...ALL_STRINGS.entries()].filter(([, v]) => v.trim().length === 0);
+    const empty = [...ALL_STRINGS.entries()].filter(
+      ([, v]) => v.trim().length === 0,
+    );
     expect(empty.map(([k]) => k)).toEqual([]);
   });
 
@@ -53,14 +55,17 @@ describe("文案字典结构", () => {
   it("不含任何 emoji（全仓硬约定）", () => {
     // 覆盖面比 \u{1F600}-\u{1F64F} 宽：包含杂项符号、交通、旗帜、
     // 变体选择符等所有 Emoji 区段
-    const emoji = /[\u{1F300}-\u{1FAFF}\u{2600}-\u{27BF}\u{FE0F}\u{1F000}-\u{1F2FF}]/u;
+    const emoji =
+      /[\u{1F300}-\u{1FAFF}\u{2600}-\u{27BF}\u{FE0F}\u{1F000}-\u{1F2FF}]/u;
     const found = [...ALL_STRINGS.entries()].filter(([, v]) => emoji.test(v));
     expect(found.map(([k, v]) => `${k}: ${v}`)).toEqual([]);
   });
 
   it("不含 emoji 的肤色修饰符与零宽连接符", () => {
     const modifiers = /[\u{1F3FB}-\u{1F3FF}\u{200D}]/u;
-    const found = [...ALL_STRINGS.entries()].filter(([, v]) => modifiers.test(v));
+    const found = [...ALL_STRINGS.entries()].filter(([, v]) =>
+      modifiers.test(v),
+    );
     expect(found.map(([k]) => k)).toEqual([]);
   });
 });
@@ -137,7 +142,9 @@ describe("查找与插值", () => {
   });
 
   it("interpolate 保留未知占位符，方便发现漏传的参数", () => {
-    expect(interpolate("找到 {count} 条，共 {total} 页", { count: 3 })).toBe("找到 3 条，共 {total} 页");
+    expect(interpolate("找到 {count} 条，共 {total} 页", { count: 3 })).toBe(
+      "找到 3 条，共 {total} 页",
+    );
   });
 
   it("interpolate 支持数字与字符串", () => {
@@ -171,7 +178,8 @@ describe("多语言结构", () => {
       const matches = value.matchAll(/\{([^}]*)\}/g);
       for (const m of matches) {
         const name = m[1] ?? "";
-        if (!/^[A-Za-z_][A-Za-z0-9_]*$/.test(name)) bad.push(`${key}: {${name}}`);
+        if (!/^[A-Za-z_][A-Za-z0-9_]*$/.test(name))
+          bad.push(`${key}: {${name}}`);
       }
     }
     expect(bad).toEqual([]);

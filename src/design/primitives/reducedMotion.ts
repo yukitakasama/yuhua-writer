@@ -19,7 +19,8 @@ export type MatchMediaLike = (query: string) => MediaQueryList;
 /** 取当前的 matchMedia；不存在时返回 undefined，由调用方决定如何降级。 */
 function resolveMatchMedia(): MatchMediaLike | undefined {
   if (typeof window === "undefined") return undefined;
-  const candidate = (window as Window & { matchMedia?: MatchMediaLike }).matchMedia;
+  const candidate = (window as Window & { matchMedia?: MatchMediaLike })
+    .matchMedia;
   return typeof candidate === "function" ? candidate.bind(window) : undefined;
 }
 
@@ -67,7 +68,15 @@ export function motionPolicy(options: {
 }): MotionPolicy {
   const reduced = prefersReducedMotion();
   if (!reduced) {
-    return { allowTransform: true, duration: options.duration, easing: options.easing ?? "linear" };
+    return {
+      allowTransform: true,
+      duration: options.duration,
+      easing: options.easing ?? "linear",
+    };
   }
-  return { allowTransform: false, duration: Math.min(options.duration, 80), easing: "linear" };
+  return {
+    allowTransform: false,
+    duration: Math.min(options.duration, 80),
+    easing: "linear",
+  };
 }

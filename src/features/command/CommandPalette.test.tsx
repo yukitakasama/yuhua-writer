@@ -36,7 +36,10 @@ import { CommandPalette, type CommandItem } from "./CommandPalette";
  * 退场动画）。用例之间不清理会让后面的断言读到前面留下的内容 ——
  * 那种串味极难定位。
  */
-function mount(component: () => unknown): { root: HTMLElement; dispose: () => void } {
+function mount(component: () => unknown): {
+  root: HTMLElement;
+  dispose: () => void;
+} {
   const before = new Set(document.body.children);
   const host = document.createElement("div");
   document.body.appendChild(host);
@@ -77,7 +80,11 @@ function items(root: HTMLElement): HTMLButtonElement[] {
 describe("命令面板基础", () => {
   it("打开时渲染输入框与全部命令", () => {
     const { root, dispose } = mount(() => (
-      <CommandPalette open={true} onClose={() => undefined} commands={makeCommands()} />
+      <CommandPalette
+        open={true}
+        onClose={() => undefined}
+        commands={makeCommands()}
+      />
     ));
     expect(root.querySelector("input.cmd__input")).not.toBeNull();
     expect(items(root)).toHaveLength(4);
@@ -86,7 +93,11 @@ describe("命令面板基础", () => {
 
   it("关闭时不渲染任何内容", () => {
     const { root, dispose } = mount(() => (
-      <CommandPalette open={false} onClose={() => undefined} commands={makeCommands()} />
+      <CommandPalette
+        open={false}
+        onClose={() => undefined}
+        commands={makeCommands()}
+      />
     ));
     expect(root.querySelector("input.cmd__input")).toBeNull();
     dispose();
@@ -94,7 +105,11 @@ describe("命令面板基础", () => {
 
   it("每项显示分组与名字", () => {
     const { root, dispose } = mount(() => (
-      <CommandPalette open={true} onClose={() => undefined} commands={makeCommands()} />
+      <CommandPalette
+        open={true}
+        onClose={() => undefined}
+        commands={makeCommands()}
+      />
     ));
     expect(root.textContent).toContain("全文检索");
     expect(root.textContent).toContain("导航");
@@ -103,7 +118,11 @@ describe("命令面板基础", () => {
 
   it("列表带 listbox 语义与可读标签", () => {
     const { root, dispose } = mount(() => (
-      <CommandPalette open={true} onClose={() => undefined} commands={makeCommands()} />
+      <CommandPalette
+        open={true}
+        onClose={() => undefined}
+        commands={makeCommands()}
+      />
     ));
     const list = root.querySelector("[role='listbox']");
     expect(list?.getAttribute("aria-label")).toBe("可用命令");
@@ -115,7 +134,11 @@ describe("命令面板基础", () => {
 describe("模糊搜索", () => {
   it("输入后只留下匹配项", async () => {
     const { root, dispose } = mount(() => (
-      <CommandPalette open={true} onClose={() => undefined} commands={makeCommands()} />
+      <CommandPalette
+        open={true}
+        onClose={() => undefined}
+        commands={makeCommands()}
+      />
     ));
     const input = root.querySelector("input.cmd__input") as HTMLInputElement;
     input.value = "统计";
@@ -128,7 +151,11 @@ describe("模糊搜索", () => {
 
   it("子序列也能匹配（新章 → 新建一章）", async () => {
     const { root, dispose } = mount(() => (
-      <CommandPalette open={true} onClose={() => undefined} commands={makeCommands()} />
+      <CommandPalette
+        open={true}
+        onClose={() => undefined}
+        commands={makeCommands()}
+      />
     ));
     const input = root.querySelector("input.cmd__input") as HTMLInputElement;
     input.value = "新章";
@@ -140,7 +167,11 @@ describe("模糊搜索", () => {
 
   it("没有匹配时给出说明而不是空白", async () => {
     const { root, dispose } = mount(() => (
-      <CommandPalette open={true} onClose={() => undefined} commands={makeCommands()} />
+      <CommandPalette
+        open={true}
+        onClose={() => undefined}
+        commands={makeCommands()}
+      />
     ));
     const input = root.querySelector("input.cmd__input") as HTMLInputElement;
     input.value = "zzzzz";
@@ -152,7 +183,11 @@ describe("模糊搜索", () => {
 
   it("清空关键词后恢复全部命令", async () => {
     const { root, dispose } = mount(() => (
-      <CommandPalette open={true} onClose={() => undefined} commands={makeCommands()} />
+      <CommandPalette
+        open={true}
+        onClose={() => undefined}
+        commands={makeCommands()}
+      />
     ));
     const input = root.querySelector("input.cmd__input") as HTMLInputElement;
     input.value = "统计";
@@ -169,7 +204,11 @@ describe("模糊搜索", () => {
 describe("键盘可达（A9）", () => {
   it("第一项在 Tab 序里（roving tabindex）", () => {
     const { root, dispose } = mount(() => (
-      <CommandPalette open={true} onClose={() => undefined} commands={makeCommands()} />
+      <CommandPalette
+        open={true}
+        onClose={() => undefined}
+        commands={makeCommands()}
+      />
     ));
     const all = items(root);
     expect(all[0]?.getAttribute("tabindex")).toBe("0");
@@ -179,14 +218,22 @@ describe("键盘可达（A9）", () => {
 
   it("↓ 在列表里下移，↑ 上移", async () => {
     const { root, dispose } = mount(() => (
-      <CommandPalette open={true} onClose={() => undefined} commands={makeCommands()} />
+      <CommandPalette
+        open={true}
+        onClose={() => undefined}
+        commands={makeCommands()}
+      />
     ));
     const list = root.querySelector(".cmd__list") as HTMLElement;
-    list.dispatchEvent(new KeyboardEvent("keydown", { key: "ArrowDown", bubbles: true }));
+    list.dispatchEvent(
+      new KeyboardEvent("keydown", { key: "ArrowDown", bubbles: true }),
+    );
     await Promise.resolve();
     expect(items(root)[1]?.getAttribute("tabindex")).toBe("0");
 
-    list.dispatchEvent(new KeyboardEvent("keydown", { key: "ArrowUp", bubbles: true }));
+    list.dispatchEvent(
+      new KeyboardEvent("keydown", { key: "ArrowUp", bubbles: true }),
+    );
     await Promise.resolve();
     expect(items(root)[0]?.getAttribute("tabindex")).toBe("0");
     dispose();
@@ -194,10 +241,16 @@ describe("键盘可达（A9）", () => {
 
   it("↑ 在首项处停住（不循环，避免误操作）", async () => {
     const { root, dispose } = mount(() => (
-      <CommandPalette open={true} onClose={() => undefined} commands={makeCommands()} />
+      <CommandPalette
+        open={true}
+        onClose={() => undefined}
+        commands={makeCommands()}
+      />
     ));
     const list = root.querySelector(".cmd__list") as HTMLElement;
-    list.dispatchEvent(new KeyboardEvent("keydown", { key: "ArrowUp", bubbles: true }));
+    list.dispatchEvent(
+      new KeyboardEvent("keydown", { key: "ArrowUp", bubbles: true }),
+    );
     await Promise.resolve();
     expect(items(root)[0]?.getAttribute("tabindex")).toBe("0");
     dispose();
@@ -205,15 +258,23 @@ describe("键盘可达（A9）", () => {
 
   it("End 跳到末项，Home 回到首项", async () => {
     const { root, dispose } = mount(() => (
-      <CommandPalette open={true} onClose={() => undefined} commands={makeCommands()} />
+      <CommandPalette
+        open={true}
+        onClose={() => undefined}
+        commands={makeCommands()}
+      />
     ));
     const list = root.querySelector(".cmd__list") as HTMLElement;
-    list.dispatchEvent(new KeyboardEvent("keydown", { key: "End", bubbles: true }));
+    list.dispatchEvent(
+      new KeyboardEvent("keydown", { key: "End", bubbles: true }),
+    );
     await Promise.resolve();
     const all = items(root);
     expect(all[all.length - 1]?.getAttribute("tabindex")).toBe("0");
 
-    list.dispatchEvent(new KeyboardEvent("keydown", { key: "Home", bubbles: true }));
+    list.dispatchEvent(
+      new KeyboardEvent("keydown", { key: "Home", bubbles: true }),
+    );
     await Promise.resolve();
     expect(items(root)[0]?.getAttribute("tabindex")).toBe("0");
     dispose();
@@ -222,12 +283,16 @@ describe("键盘可达（A9）", () => {
   it("回车执行当前项并关闭面板", () => {
     const run = vi.fn();
     const onClose = vi.fn();
-    const commands: CommandItem[] = [{ id: "x", label: "做点什么", group: "视图", run }];
+    const commands: CommandItem[] = [
+      { id: "x", label: "做点什么", group: "视图", run },
+    ];
     const { root, dispose } = mount(() => (
       <CommandPalette open={true} onClose={onClose} commands={commands} />
     ));
     const list = root.querySelector(".cmd__list") as HTMLElement;
-    list.dispatchEvent(new KeyboardEvent("keydown", { key: "Enter", bubbles: true }));
+    list.dispatchEvent(
+      new KeyboardEvent("keydown", { key: "Enter", bubbles: true }),
+    );
     expect(run).toHaveBeenCalledTimes(1);
     expect(onClose).toHaveBeenCalledTimes(1);
     dispose();
@@ -236,7 +301,9 @@ describe("键盘可达（A9）", () => {
   it("点击同样执行并关闭", () => {
     const run = vi.fn();
     const onClose = vi.fn();
-    const commands: CommandItem[] = [{ id: "x", label: "做点什么", group: "视图", run }];
+    const commands: CommandItem[] = [
+      { id: "x", label: "做点什么", group: "视图", run },
+    ];
     const { root, dispose } = mount(() => (
       <CommandPalette open={true} onClose={onClose} commands={commands} />
     ));
@@ -249,10 +316,20 @@ describe("键盘可达（A9）", () => {
   it("禁用项被点击时不执行", () => {
     const run = vi.fn();
     const commands: CommandItem[] = [
-      { id: "x", label: "暂时不可用", group: "视图", run, enabled: () => false },
+      {
+        id: "x",
+        label: "暂时不可用",
+        group: "视图",
+        run,
+        enabled: () => false,
+      },
     ];
     const { root, dispose } = mount(() => (
-      <CommandPalette open={true} onClose={() => undefined} commands={commands} />
+      <CommandPalette
+        open={true}
+        onClose={() => undefined}
+        commands={commands}
+      />
     ));
     const item = items(root)[0];
     item?.dispatchEvent(new MouseEvent("click", { bubbles: true }));
@@ -264,10 +341,20 @@ describe("键盘可达（A9）", () => {
 
   it("禁用项仍然可以被搜到（否则用户以为功能不存在）", async () => {
     const commands: CommandItem[] = [
-      { id: "x", label: "写作统计", group: "导航", run: () => undefined, enabled: () => false },
+      {
+        id: "x",
+        label: "写作统计",
+        group: "导航",
+        run: () => undefined,
+        enabled: () => false,
+      },
     ];
     const { root, dispose } = mount(() => (
-      <CommandPalette open={true} onClose={() => undefined} commands={commands} />
+      <CommandPalette
+        open={true}
+        onClose={() => undefined}
+        commands={commands}
+      />
     ));
     const input = root.querySelector("input.cmd__input") as HTMLInputElement;
     input.value = "统计";
@@ -279,14 +366,20 @@ describe("键盘可达（A9）", () => {
 
   it("↓ 把焦点从输入框送进列表", async () => {
     const { root, dispose } = mount(() => (
-      <CommandPalette open={true} onClose={() => undefined} commands={makeCommands()} />
+      <CommandPalette
+        open={true}
+        onClose={() => undefined}
+        commands={makeCommands()}
+      />
     ));
     // Dialog 的 initialFocus 与 mount 都是**异步**排的（它要等
     // Portal 把节点插进 body 才能聚焦）。因此这里必须先等一拍 ——
     // 不然输入框还没拿到焦点，keydown 的事件目标就不对
     await Promise.resolve();
     const input = root.querySelector("input.cmd__input") as HTMLInputElement;
-    input.dispatchEvent(new KeyboardEvent("keydown", { key: "ArrowDown", bubbles: true }));
+    input.dispatchEvent(
+      new KeyboardEvent("keydown", { key: "ArrowDown", bubbles: true }),
+    );
     // 焦点转移是同步的（focusActiveItem 直接调 .focus()），
     // 但 Solid 的渲染是批处理的，因此再让一拍微任务落地
     await Promise.resolve();
@@ -305,17 +398,25 @@ describe("键盘可达（A9）", () => {
     // 命令列表按匹配度排序，写死"第 N 项是哪个命令"会让测试
     // 与排序算法耦合，那种测试改一次排序就得改一遍。
     const { root, dispose } = mount(() => (
-      <CommandPalette open={true} onClose={() => undefined} commands={makeCommands()} />
+      <CommandPalette
+        open={true}
+        onClose={() => undefined}
+        commands={makeCommands()}
+      />
     ));
     await Promise.resolve();
     const input = root.querySelector("input.cmd__input") as HTMLInputElement;
 
     // 按两次 ↓：每次都应前移一项，且焦点始终跟着高亮
     for (let step = 0; step < 2; step += 1) {
-      input.dispatchEvent(new KeyboardEvent("keydown", { key: "ArrowDown", bubbles: true }));
+      input.dispatchEvent(
+        new KeyboardEvent("keydown", { key: "ArrowDown", bubbles: true }),
+      );
       await Promise.resolve();
       const focused = document.activeElement as HTMLElement | null;
-      const highlighted = root.querySelector<HTMLElement>('[aria-selected="true"]');
+      const highlighted = root.querySelector<HTMLElement>(
+        '[aria-selected="true"]',
+      );
       expect(highlighted).not.toBeNull();
       // 核心断言：焦点落在**当前高亮项**上
       expect(focused).toBe(highlighted);
@@ -328,14 +429,20 @@ describe("键盘可达（A9）", () => {
 
   it("↑ 在列表首项上不会越界（两端不循环）", async () => {
     const { root, dispose } = mount(() => (
-      <CommandPalette open={true} onClose={() => undefined} commands={makeCommands()} />
+      <CommandPalette
+        open={true}
+        onClose={() => undefined}
+        commands={makeCommands()}
+      />
     ));
     await Promise.resolve();
     const input = root.querySelector("input.cmd__input") as HTMLInputElement;
 
     // 连按更多次 ↑ 也不应把高亮推到负数或把它弄丢
     for (let i = 0; i < 5; i += 1) {
-      input.dispatchEvent(new KeyboardEvent("keydown", { key: "ArrowUp", bubbles: true }));
+      input.dispatchEvent(
+        new KeyboardEvent("keydown", { key: "ArrowUp", bubbles: true }),
+      );
       await Promise.resolve();
     }
     expect(document.activeElement).toBe(items(root)[0]);
@@ -344,7 +451,11 @@ describe("键盘可达（A9）", () => {
 
   it("显示键盘提示", () => {
     const { root, dispose } = mount(() => (
-      <CommandPalette open={true} onClose={() => undefined} commands={makeCommands()} />
+      <CommandPalette
+        open={true}
+        onClose={() => undefined}
+        commands={makeCommands()}
+      />
     ));
     expect(root.textContent).toContain("回车执行");
     dispose();

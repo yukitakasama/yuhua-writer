@@ -17,7 +17,7 @@ export function CharacterIcon(props: SvgIconProps) {
   return (
     <svg {...iconProps(props)}>
       <circle cx="12" cy="8.4" r="3.9" />
-    <path d="M4.8 20.5a7.2 7.2 0 0 1 14.4 0" />
+      <path d="M4.8 20.5a7.2 7.2 0 0 1 14.4 0" />
     </svg>
   );
 }

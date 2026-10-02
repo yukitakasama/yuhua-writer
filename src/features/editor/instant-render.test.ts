@@ -60,7 +60,9 @@ describe("即时渲染：标记折叠", () => {
   });
 
   it("链接折叠方括号与圆括号", () => {
-    expect(rendered("见 [文档](https://a.b) 说明")).toBe("见 文档https://a.b 说明");
+    expect(rendered("见 [文档](https://a.b) 说明")).toBe(
+      "见 文档https://a.b 说明",
+    );
   });
 
   it("图片折叠感叹号与括号", () => {

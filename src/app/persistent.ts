@@ -17,7 +17,11 @@
 const PREFIX = "yuhua.";
 
 /** 读取一个 JSON 值；任何失败都回退到 fallback。 */
-export function readJson<T>(key: string, fallback: T, validate?: (value: unknown) => value is T): T {
+export function readJson<T>(
+  key: string,
+  fallback: T,
+  validate?: (value: unknown) => value is T,
+): T {
   try {
     const raw = storage()?.getItem(PREFIX + key);
     if (raw === null || raw === undefined) return fallback;
@@ -65,7 +69,9 @@ function storage(): Storage | null {
 }
 
 /** 判定一个值是否为普通对象。 */
-export function isPlainObject(value: unknown): value is Record<string, unknown> {
+export function isPlainObject(
+  value: unknown,
+): value is Record<string, unknown> {
   return typeof value === "object" && value !== null && !Array.isArray(value);
 }
 

@@ -55,23 +55,34 @@ const WEEKDAY_HEADS = ["一", "二", "三", "四", "五", "六", "日"] as const
 
 /** 码字日历。 */
 export function CalendarView(props: CalendarViewProps): JSX.Element {
-  const cells = createMemo(() => monthGrid(props.days, props.month, props.thresholds, props.hasSamples));
+  const cells = createMemo(() =>
+    monthGrid(props.days, props.month, props.thresholds, props.hasSamples),
+  );
   const total = createMemo(() => summarizeCells(cells()));
   const canvas = calendarCanvas();
 
   /** 月份的展示文本，日历网格的无障碍标签里也要用。 */
-  const monthText = (): string => `${props.month.year} 年 ${props.month.month} 月`;
+  const monthText = (): string =>
+    `${props.month.year} 年 ${props.month.month} 月`;
 
   return (
     <div class="stats-cal">
       <div class="stats-cal__head">
         <p class="stats-cal__total yh-num">
-          {t("stats.calendarMonthTotal", { words: total().totalWords.toLocaleString("zh-CN") })}
+          {t("stats.calendarMonthTotal", {
+            words: total().totalWords.toLocaleString("zh-CN"),
+          })}
         </p>
         <ul class="stats-legend" aria-label={t("stats.heatmapLegend")}>
           <li class="stats-legend__text">{t("stats.heatmapLess")}</li>
           <For each={palette()}>
-            {(color) => <li class="stats-legend__swatch" style={{ background: color }} aria-hidden="true" />}
+            {(color) => (
+              <li
+                class="stats-legend__swatch"
+                style={{ background: color }}
+                aria-hidden="true"
+              />
+            )}
           </For>
           <li class="stats-legend__text">{t("stats.heatmapMore")}</li>
         </ul>
@@ -88,7 +99,11 @@ export function CalendarView(props: CalendarViewProps): JSX.Element {
         <button type="button" class="stats-nav-btn" onClick={props.onNext}>
           {t("stats.calendarNext")}
         </button>
-        <button type="button" class="stats-nav-btn stats-nav-btn--quiet" onClick={props.onToday}>
+        <button
+          type="button"
+          class="stats-nav-btn stats-nav-btn--quiet"
+          onClick={props.onToday}
+        >
           {t("stats.calendarToday")}
         </button>
       </div>
@@ -104,7 +119,14 @@ export function CalendarView(props: CalendarViewProps): JSX.Element {
 
         <CellGrid
           cells={cells()}
-          spec={{ columns: 7, rows: 6, cellSize: CALENDAR_CELL, gap: CALENDAR_GAP, headHeight: 0, headWidth: 0 }}
+          spec={{
+            columns: 7,
+            rows: 6,
+            cellSize: CALENDAR_CELL,
+            gap: CALENDAR_GAP,
+            headHeight: 0,
+            headWidth: 0,
+          }}
           width={canvas.width}
           height={canvas.height}
           label={t("stats.calendarGrid", { month: monthText() })}
@@ -114,10 +136,14 @@ export function CalendarView(props: CalendarViewProps): JSX.Element {
               <p class="stats-pop__date">{cell.date}</p>
               <Show
                 when={cell.words > 0}
-                fallback={<p class="stats-pop__muted">{t("stats.calendarNoRecord")}</p>}
+                fallback={
+                  <p class="stats-pop__muted">{t("stats.calendarNoRecord")}</p>
+                }
               >
                 <p class="stats-pop__value yh-num">
-                  {t("stats.calendarDayWords", { words: cell.words.toLocaleString("zh-CN") })}
+                  {t("stats.calendarDayWords", {
+                    words: cell.words.toLocaleString("zh-CN"),
+                  })}
                 </p>
               </Show>
             </>

@@ -85,7 +85,9 @@ describe("应用启动", () => {
   it("失效的工作区被标记且不可点击", async () => {
     const host = await mountApp();
     // 示例数据里有一条 available=false 的记录
-    const disabled = [...host.querySelectorAll("button")].filter((b) => (b as HTMLButtonElement).disabled);
+    const disabled = [...host.querySelectorAll("button")].filter(
+      (b) => (b as HTMLButtonElement).disabled,
+    );
     expect(disabled.length).toBeGreaterThan(0);
   });
 
@@ -103,7 +105,9 @@ describe("应用启动", () => {
 describe("进入写作台", () => {
   it("点击书籍卡片后切到三栏布局", async () => {
     const host = await mountApp();
-    const card = host.querySelector(".shelf__card-btn") as HTMLButtonElement | null;
+    const card = host.querySelector(
+      ".shelf__card-btn",
+    ) as HTMLButtonElement | null;
     card?.dispatchEvent(new MouseEvent("click", { bubbles: true }));
     // 打开工作区是异步的，多等几拍
     for (let i = 0; i < 8; i += 1) await Promise.resolve();
@@ -112,9 +116,9 @@ describe("进入写作台", () => {
 
   it("写作台渲染出卷章树、编辑区与右侧面板", async () => {
     const host = await mountApp();
-    (host.querySelector(".shelf__card-btn") as HTMLButtonElement | null)?.dispatchEvent(
-      new MouseEvent("click", { bubbles: true }),
-    );
+    (
+      host.querySelector(".shelf__card-btn") as HTMLButtonElement | null
+    )?.dispatchEvent(new MouseEvent("click", { bubbles: true }));
     for (let i = 0; i < 8; i += 1) await Promise.resolve();
 
     expect(host.querySelector(".tree")).not.toBeNull();
@@ -124,27 +128,27 @@ describe("进入写作台", () => {
 
   it("卷章树里出现示例卷名", async () => {
     const host = await mountApp();
-    (host.querySelector(".shelf__card-btn") as HTMLButtonElement | null)?.dispatchEvent(
-      new MouseEvent("click", { bubbles: true }),
-    );
+    (
+      host.querySelector(".shelf__card-btn") as HTMLButtonElement | null
+    )?.dispatchEvent(new MouseEvent("click", { bubbles: true }));
     for (let i = 0; i < 8; i += 1) await Promise.resolve();
     expect(host.textContent).toContain("第一卷 落羽");
   });
 
   it("卷章树是可访问的 tree 角色", async () => {
     const host = await mountApp();
-    (host.querySelector(".shelf__card-btn") as HTMLButtonElement | null)?.dispatchEvent(
-      new MouseEvent("click", { bubbles: true }),
-    );
+    (
+      host.querySelector(".shelf__card-btn") as HTMLButtonElement | null
+    )?.dispatchEvent(new MouseEvent("click", { bubbles: true }));
     for (let i = 0; i < 8; i += 1) await Promise.resolve();
     expect(host.querySelector("[role='tree']")).not.toBeNull();
   });
 
   it("工具栏有新建卷与新建章入口", async () => {
     const host = await mountApp();
-    (host.querySelector(".shelf__card-btn") as HTMLButtonElement | null)?.dispatchEvent(
-      new MouseEvent("click", { bubbles: true }),
-    );
+    (
+      host.querySelector(".shelf__card-btn") as HTMLButtonElement | null
+    )?.dispatchEvent(new MouseEvent("click", { bubbles: true }));
     for (let i = 0; i < 8; i += 1) await Promise.resolve();
     expect(host.textContent).toContain("新建卷");
     expect(host.textContent).toContain("新建章");
@@ -154,7 +158,8 @@ describe("进入写作台", () => {
 describe("没有 emoji 泄漏到渲染结果", () => {
   it("书架页面的文本节点不含 emoji", async () => {
     const host = await mountApp();
-    const emoji = /[\u{1F300}-\u{1FAFF}\u{2600}-\u{27BF}\u{FE0F}\u{1F000}-\u{1F2FF}]/u;
+    const emoji =
+      /[\u{1F300}-\u{1FAFF}\u{2600}-\u{27BF}\u{FE0F}\u{1F000}-\u{1F2FF}]/u;
     expect(emoji.test(host.textContent ?? "")).toBe(false);
   });
 });

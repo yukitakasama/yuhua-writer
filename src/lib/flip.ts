@@ -30,7 +30,9 @@ export type PositionSnapshot = Map<string, DOMRect>;
 export const FLIP_DURATION_MS = 180;
 
 /** 采集当前所有带 `data-flip-id` 元素的位置。 */
-export function capturePositions(root: ParentNode = document): PositionSnapshot {
+export function capturePositions(
+  root: ParentNode = document,
+): PositionSnapshot {
   const map: PositionSnapshot = new Map();
   root.querySelectorAll<HTMLElement>("[data-flip-id]").forEach((el) => {
     const id = el.dataset["flipId"];
@@ -48,7 +50,11 @@ export function capturePositions(root: ParentNode = document): PositionSnapshot 
  * 返回实际开始动画的元素数量：调用方据此判断是否需要等待，
  * 也为性能监控（计划书 5.4 节"同时动画元素不超过 30"）提供数据。
  */
-export function playFlip(before: PositionSnapshot, root: ParentNode = document, durationMs = FLIP_DURATION_MS): number {
+export function playFlip(
+  before: PositionSnapshot,
+  root: ParentNode = document,
+  durationMs = FLIP_DURATION_MS,
+): number {
   if (prefersReducedMotion()) return 0;
 
   let animated = 0;
@@ -92,7 +98,8 @@ export function playFlip(before: PositionSnapshot, root: ParentNode = document, 
 
 /** 系统是否要求减弱动效。 */
 export function prefersReducedMotion(): boolean {
-  if (typeof window === "undefined" || typeof window.matchMedia !== "function") return false;
+  if (typeof window === "undefined" || typeof window.matchMedia !== "function")
+    return false;
   return window.matchMedia("(prefers-reduced-motion: reduce)").matches;
 }
 
@@ -103,7 +110,10 @@ export function prefersReducedMotion(): boolean {
  * 某个调用点忘了采样，或者采样与改动之间插入了别的 DOM 操作
  * 导致快照过期。
  */
-export function withFlip(mutate: () => void, root: ParentNode = document): number {
+export function withFlip(
+  mutate: () => void,
+  root: ParentNode = document,
+): number {
   const before = capturePositions(root);
   mutate();
   return playFlip(before, root);

@@ -16,7 +16,15 @@
  * 避免把一次简单交互变成常驻滚动监听。
  */
 
-import { createEffect, createSignal, onCleanup, Show, splitProps, type Component, type JSX } from "solid-js";
+import {
+  createEffect,
+  createSignal,
+  onCleanup,
+  Show,
+  splitProps,
+  type Component,
+  type JSX,
+} from "solid-js";
 import { motionPolicy } from "./reducedMotion";
 import { cx, usePrimitivesStyle } from "./styles";
 
@@ -50,14 +58,26 @@ function computePosition(
   const layerHeight = layer.height;
   switch (placement) {
     case "bottom":
-      return { x: anchor.left + anchor.width / 2 - layerWidth / 2, y: anchor.bottom + gap };
+      return {
+        x: anchor.left + anchor.width / 2 - layerWidth / 2,
+        y: anchor.bottom + gap,
+      };
     case "left":
-      return { x: anchor.left - layerWidth - gap, y: anchor.top + anchor.height / 2 - layerHeight / 2 };
+      return {
+        x: anchor.left - layerWidth - gap,
+        y: anchor.top + anchor.height / 2 - layerHeight / 2,
+      };
     case "right":
-      return { x: anchor.right + gap, y: anchor.top + anchor.height / 2 - layerHeight / 2 };
+      return {
+        x: anchor.right + gap,
+        y: anchor.top + anchor.height / 2 - layerHeight / 2,
+      };
     case "top":
     default:
-      return { x: anchor.left + anchor.width / 2 - layerWidth / 2, y: anchor.top - layerHeight - gap };
+      return {
+        x: anchor.left + anchor.width / 2 - layerWidth / 2,
+        y: anchor.top - layerHeight - gap,
+      };
   }
 }
 
@@ -70,7 +90,14 @@ function computePosition(
 export const Tooltip: Component<TooltipProps> = (props) => {
   usePrimitivesStyle();
 
-  const [local, rest] = splitProps(props, ["content", "placement", "delay", "disabled", "class", "children"]);
+  const [local, rest] = splitProps(props, [
+    "content",
+    "placement",
+    "delay",
+    "disabled",
+    "class",
+    "children",
+  ]);
 
   const [open, setOpen] = createSignal(false);
   const [visible, setVisible] = createSignal(false);
@@ -95,7 +122,11 @@ export const Tooltip: Component<TooltipProps> = (props) => {
       // 等元素进入 DOM 拿到尺寸后再定位，否则首帧会闪到左上角。
       queueMicrotask(() => {
         if (!wrapper || !bubble) return;
-        const position = computePosition(wrapper.getBoundingClientRect(), bubble.getBoundingClientRect(), local.placement ?? "top");
+        const position = computePosition(
+          wrapper.getBoundingClientRect(),
+          bubble.getBoundingClientRect(),
+          local.placement ?? "top",
+        );
         bubble.style.left = position.x + "px";
         bubble.style.top = position.y + "px";
         setVisible(true);

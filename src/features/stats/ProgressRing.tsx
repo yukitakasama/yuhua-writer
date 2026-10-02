@@ -58,7 +58,8 @@ export function ProgressRing(props: ProgressRingProps): JSX.Element {
     if (!Number.isFinite(props.goal) || props.goal <= 0) return 0;
     return props.done / props.goal;
   };
-  const geometry = (): { dashArray: string; circumference: number } => progressRing(radius(), progress());
+  const geometry = (): { dashArray: string; circumference: number } =>
+    progressRing(radius(), progress());
   const reached = (): boolean => props.goal > 0 && props.done >= props.goal;
 
   const aria = (): string => {
@@ -100,7 +101,12 @@ export function ProgressRing(props: ProgressRingProps): JSX.Element {
         />
       </svg>
       <div class="ring__center" aria-hidden="true">
-        <Show when={props.centerText} fallback={<span class="ring__text ring__text--muted">{props.caption}</span>}>
+        <Show
+          when={props.centerText}
+          fallback={
+            <span class="ring__text ring__text--muted">{props.caption}</span>
+          }
+        >
           <span class="ring__text yh-num">{props.centerText}</span>
           <Show when={props.caption}>
             <span class="ring__caption">{props.caption}</span>

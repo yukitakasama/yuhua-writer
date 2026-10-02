@@ -33,8 +33,19 @@
  */
 
 import { Compartment, EditorState, type Extension } from "@codemirror/state";
-import { EditorView, keymap, drawSelection, highlightActiveLine, rectangularSelection } from "@codemirror/view";
-import { defaultKeymap, history, historyKeymap, indentWithTab } from "@codemirror/commands";
+import {
+  EditorView,
+  keymap,
+  drawSelection,
+  highlightActiveLine,
+  rectangularSelection,
+} from "@codemirror/view";
+import {
+  defaultKeymap,
+  history,
+  historyKeymap,
+  indentWithTab,
+} from "@codemirror/commands";
 import { search, searchKeymap, openSearchPanel } from "@codemirror/search";
 import { onCleanup, onMount, type JSX } from "solid-js";
 
@@ -109,14 +120,18 @@ export function createEditorExtensions(options: {
     if (!update.docChanged) return;
     options.onDocChange?.(update.state.doc.toString());
     // 区分"用户编辑"与"程序替换"：后者不该触发自动保存（见 autosave.ts）
-    const userEdit = update.transactions.some((tr) => tr.isUserEvent("input") || tr.isUserEvent("delete"));
+    const userEdit = update.transactions.some(
+      (tr) => tr.isUserEvent("input") || tr.isUserEvent("delete"),
+    );
     if (userEdit) options.onUserEdit?.();
   });
 
   /** 滚动监听：把当前视口顶部所在的行号报出去。 */
   const scrollListener = EditorView.domEventHandlers({
     scroll: (_event, view) => {
-      const line = view.state.doc.lineAt(view.lineBlockAtHeight(view.scrollDOM.scrollTop).from).number;
+      const line = view.state.doc.lineAt(
+        view.lineBlockAtHeight(view.scrollDOM.scrollTop).from,
+      ).number;
       options.onScrollLine?.(line);
       return false;
     },
@@ -154,7 +169,12 @@ export function createEditorExtensions(options: {
     EditorState.allowMultipleSelections.of(true),
     EditorView.lineWrapping,
     search({ top: false }),
-    keymap.of([...defaultKeymap, ...historyKeymap, ...searchKeymap, indentWithTab]),
+    keymap.of([
+      ...defaultKeymap,
+      ...historyKeymap,
+      ...searchKeymap,
+      indentWithTab,
+    ]),
     markdownHighlighting(),
     instantRender(),
     imeCompositionGuard(),
@@ -251,7 +271,12 @@ export function MarkdownEditor(props: MarkdownEditorProps): JSX.Element {
     view = null;
   });
 
-  return <div class={["cm-host", props.class ?? ""].filter(Boolean).join(" ")} ref={(el) => (container = el)} />;
+  return (
+    <div
+      class={["cm-host", props.class ?? ""].filter(Boolean).join(" ")}
+      ref={(el) => (container = el)}
+    />
+  );
 }
 
 /**
@@ -263,7 +288,8 @@ export function MarkdownEditor(props: MarkdownEditorProps): JSX.Element {
 function flashLine(view: EditorView): void {
   const line = view.state.doc.lineAt(view.state.selection.main.head);
   const domAt = view.domAtPos(line.from);
-  const element = domAt.node instanceof HTMLElement ? domAt.node : domAt.node.parentElement;
+  const element =
+    domAt.node instanceof HTMLElement ? domAt.node : domAt.node.parentElement;
   if (!element) return;
   element.classList.add(REVEAL_CLASS);
   setTimeout(() => element.classList.remove(REVEAL_CLASS), 1200);

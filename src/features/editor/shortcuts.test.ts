@@ -1,6 +1,14 @@
 import { describe, expect, it } from "vitest";
 
-import { applyOverrides, bindingById, DEFAULT_BINDINGS, displayChord, eventToChord, findConflicts, type KeyBinding } from "./shortcuts";
+import {
+  applyOverrides,
+  bindingById,
+  DEFAULT_BINDINGS,
+  displayChord,
+  eventToChord,
+  findConflicts,
+  type KeyBinding,
+} from "./shortcuts";
 
 /**
  * 造一个键盘事件。
@@ -8,7 +16,13 @@ import { applyOverrides, bindingById, DEFAULT_BINDINGS, displayChord, eventToCho
  * `altGraph` 会变成 `getModifierState("AltGraph")` 的返回值 ——
  * 真实的 AltGr 事件就是这样被识别的（见 shortcuts.ts 的说明）。
  */
-function key(init: Partial<KeyboardEvent> & { key: string; code: string; altGraph?: boolean }): KeyboardEvent {
+function key(
+  init: Partial<KeyboardEvent> & {
+    key: string;
+    code: string;
+    altGraph?: boolean;
+  },
+): KeyboardEvent {
   const { altGraph = false, ...rest } = init;
   return {
     ctrlKey: false,
@@ -24,37 +38,74 @@ describe("快捷键：事件归一（Windows）", () => {
   const win = false;
 
   it("Ctrl+K => Mod+K", () => {
-    expect(eventToChord(key({ key: "k", code: "KeyK", ctrlKey: true }), win)).toBe("Mod+K");
+    expect(
+      eventToChord(key({ key: "k", code: "KeyK", ctrlKey: true }), win),
+    ).toBe("Mod+K");
   });
 
   it("Cmd 在 Windows 上不算 Mod", () => {
-    expect(eventToChord(key({ key: "k", code: "KeyK", metaKey: true }), win)).toBe("K");
+    expect(
+      eventToChord(key({ key: "k", code: "KeyK", metaKey: true }), win),
+    ).toBe("K");
   });
 
   it("Ctrl+Shift+F => Mod+Shift+F", () => {
-    expect(eventToChord(key({ key: "F", code: "KeyF", ctrlKey: true, shiftKey: true }), win)).toBe("Mod+Shift+F");
+    expect(
+      eventToChord(
+        key({ key: "F", code: "KeyF", ctrlKey: true, shiftKey: true }),
+        win,
+      ),
+    ).toBe("Mod+Shift+F");
   });
 
   it("Ctrl+Alt+N => Mod+Alt+N", () => {
-    expect(eventToChord(key({ key: "n", code: "KeyN", ctrlKey: true, altKey: true }), win)).toBe("Mod+Alt+N");
+    expect(
+      eventToChord(
+        key({ key: "n", code: "KeyN", ctrlKey: true, altKey: true }),
+        win,
+      ),
+    ).toBe("Mod+Alt+N");
   });
 
   it("单个修饰键不构成组合", () => {
-    expect(eventToChord(key({ key: "Control", code: "ControlLeft", ctrlKey: true }), win)).toBe("");
-    expect(eventToChord(key({ key: "Shift", code: "ShiftLeft", shiftKey: true }), win)).toBe("");
+    expect(
+      eventToChord(
+        key({ key: "Control", code: "ControlLeft", ctrlKey: true }),
+        win,
+      ),
+    ).toBe("");
+    expect(
+      eventToChord(
+        key({ key: "Shift", code: "ShiftLeft", shiftKey: true }),
+        win,
+      ),
+    ).toBe("");
   });
 
   it("方向键用命名键名", () => {
-    expect(eventToChord(key({ key: "ArrowUp", code: "ArrowUp", ctrlKey: true, altKey: true }), win)).toBe("Mod+Alt+ArrowUp");
+    expect(
+      eventToChord(
+        key({ key: "ArrowUp", code: "ArrowUp", ctrlKey: true, altKey: true }),
+        win,
+      ),
+    ).toBe("Mod+Alt+ArrowUp");
   });
 
   it("数字键用 code 而不是 key（避开 Shift 产生的符号）", () => {
-    expect(eventToChord(key({ key: "!", code: "Digit1", ctrlKey: true, shiftKey: true }), win)).toBe("Mod+Shift+1");
+    expect(
+      eventToChord(
+        key({ key: "!", code: "Digit1", ctrlKey: true, shiftKey: true }),
+        win,
+      ),
+    ).toBe("Mod+Shift+1");
   });
 
   it("Shift+/ 得到 Mod+Shift+/（斜杠键没有 code 归一分支）", () => {
     // 符号键不做 code 归一，用 key 本身
-    const chord = eventToChord(key({ key: "?", code: "Slash", ctrlKey: true, shiftKey: true }), win);
+    const chord = eventToChord(
+      key({ key: "?", code: "Slash", ctrlKey: true, shiftKey: true }),
+      win,
+    );
     expect(chord).toContain("Mod");
     expect(chord).toContain("Shift");
   });
@@ -63,14 +114,28 @@ describe("快捷键：事件归一（Windows）", () => {
     // AltGr 会同时报告 ctrlKey 与 altKey，同时 getModifierState 返回 true。
     // 此时 Alt 不该进入组合键，否则 AltGr+7（打 { 的欧洲布局写法）
     // 会被误判成一个不存在的快捷键
-    const chord = eventToChord(key({ key: "{", code: "Digit7", ctrlKey: true, altKey: true, altGraph: true }), win);
+    const chord = eventToChord(
+      key({
+        key: "{",
+        code: "Digit7",
+        ctrlKey: true,
+        altKey: true,
+        altGraph: true,
+      }),
+      win,
+    );
     expect(chord).not.toContain("Alt");
   });
 
   it("Ctrl+Alt 的真实快捷键不受 AltGr 判定影响", () => {
     // 这是上一条的反面：没有 AltGraph 状态时，Ctrl+Alt 必须正常识别。
     // 用"ctrl && alt"去排除 AltGr 的实现在这里会失败
-    expect(eventToChord(key({ key: "n", code: "KeyN", ctrlKey: true, altKey: true }), win)).toBe("Mod+Alt+N");
+    expect(
+      eventToChord(
+        key({ key: "n", code: "KeyN", ctrlKey: true, altKey: true }),
+        win,
+      ),
+    ).toBe("Mod+Alt+N");
   });
 });
 
@@ -78,15 +143,24 @@ describe("快捷键：事件归一（macOS）", () => {
   const mac = true;
 
   it("Cmd+K => Mod+K", () => {
-    expect(eventToChord(key({ key: "k", code: "KeyK", metaKey: true }), mac)).toBe("Mod+K");
+    expect(
+      eventToChord(key({ key: "k", code: "KeyK", metaKey: true }), mac),
+    ).toBe("Mod+K");
   });
 
   it("Ctrl 在 macOS 上不算 Mod", () => {
-    expect(eventToChord(key({ key: "k", code: "KeyK", ctrlKey: true }), mac)).toBe("K");
+    expect(
+      eventToChord(key({ key: "k", code: "KeyK", ctrlKey: true }), mac),
+    ).toBe("K");
   });
 
   it("Cmd+Shift+F => Mod+Shift+F", () => {
-    expect(eventToChord(key({ key: "F", code: "KeyF", metaKey: true, shiftKey: true }), mac)).toBe("Mod+Shift+F");
+    expect(
+      eventToChord(
+        key({ key: "F", code: "KeyF", metaKey: true, shiftKey: true }),
+        mac,
+      ),
+    ).toBe("Mod+Shift+F");
   });
 });
 
@@ -157,7 +231,15 @@ describe("快捷键：用户改键", () => {
 describe("快捷键：默认表内容", () => {
   it("包含计划书要求的核心动作", () => {
     const ids = DEFAULT_BINDINGS.map((b) => b.id);
-    for (const required of ["commandPalette", "search", "find", "replace", "save", "focusMode", "shortcutPanel"]) {
+    for (const required of [
+      "commandPalette",
+      "search",
+      "find",
+      "replace",
+      "save",
+      "focusMode",
+      "shortcutPanel",
+    ]) {
       expect(ids).toContain(required);
     }
   });

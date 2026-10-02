@@ -45,7 +45,9 @@ export function PrivacyNote(): JSX.Element {
       </h3>
       <p class="stats-privacy__body">{t("stats.privacyBody")}</p>
       <ul class="stats-privacy__list">
-        <For each={points}>{(point) => <li class="stats-privacy__item">{point}</li>}</For>
+        <For each={points}>
+          {(point) => <li class="stats-privacy__item">{point}</li>}
+        </For>
       </ul>
       <p class="stats-privacy__path">
         <span>{t("stats.privacyPath")}</span>

@@ -68,8 +68,13 @@ export function sortVolumes(volumes: readonly Volume[]): Volume[] {
 }
 
 /** 取某一卷下的章节，按 sort 升序。 */
-export function chaptersOf(snapshot: TreeSnapshot, volumeId: string): ChapterSummary[] {
-  return snapshot.chapters.filter((c) => c.volumeId === volumeId).sort((a, b) => a.sort - b.sort);
+export function chaptersOf(
+  snapshot: TreeSnapshot,
+  volumeId: string,
+): ChapterSummary[] {
+  return snapshot.chapters
+    .filter((c) => c.volumeId === volumeId)
+    .sort((a, b) => a.sort - b.sort);
 }
 
 /**
@@ -88,7 +93,9 @@ export function chaptersOf(snapshot: TreeSnapshot, volumeId: string): ChapterSum
  * `snapshot` 为 `null` 时返回空数组 —— 调用方（应用壳）在没打开
  * 工作区时会走到这里，让它返回空比让它抛错更合适。
  */
-export function allChaptersInOrder(snapshot: TreeSnapshot | null): ChapterSummary[] {
+export function allChaptersInOrder(
+  snapshot: TreeSnapshot | null,
+): ChapterSummary[] {
   if (snapshot === null) return [];
   const out: ChapterSummary[] = [];
   for (const volume of sortVolumes(snapshot.volumes)) {
@@ -103,7 +110,10 @@ export function allChaptersInOrder(snapshot: TreeSnapshot | null): ChapterSummar
  * 返回新数组而不是就地修改：调用方需要在「算完成功」与「算完失败」
  * 两条路径上都能拿到干净的数据。
  */
-export function renumber(chapters: readonly ChapterSummary[], volumeId: string): ChapterSummary[] {
+export function renumber(
+  chapters: readonly ChapterSummary[],
+  volumeId: string,
+): ChapterSummary[] {
   const list = chaptersOf({ volumes: [], chapters }, volumeId);
   const order = new Map<string, number>();
   list.forEach((c, i) => order.set(c.id, i));
@@ -134,8 +144,14 @@ export function renumberVolumes(volumes: readonly Volume[]): Volume[] {
  * `index` 会被夹紧到合法区间：调用方（拖拽）常常会传出越界值，
  * 比如「拖到列表最下方之外」，这时应当理解为「放到末尾」而不是报错。
  */
-export function insertChapter(snapshot: TreeSnapshot, chapter: ChapterSummary, target: MoveTarget): TreeSnapshot {
-  const siblings = chaptersOf(snapshot, target.volumeId).filter((c) => c.id !== chapter.id);
+export function insertChapter(
+  snapshot: TreeSnapshot,
+  chapter: ChapterSummary,
+  target: MoveTarget,
+): TreeSnapshot {
+  const siblings = chaptersOf(snapshot, target.volumeId).filter(
+    (c) => c.id !== chapter.id,
+  );
   const index = clampIndex(target.index, siblings.length);
 
   // 先给被插入项一个「半整数锚点」，再统一收敛回整数。
@@ -146,7 +162,11 @@ export function insertChapter(snapshot: TreeSnapshot, chapter: ChapterSummary, t
   const previous = index > 0 ? siblings[index - 1] : undefined;
   const provisional = provisionalSort(anchor?.sort, previous?.sort);
 
-  const placed: ChapterSummary = { ...chapter, volumeId: target.volumeId, sort: provisional };
+  const placed: ChapterSummary = {
+    ...chapter,
+    volumeId: target.volumeId,
+    sort: provisional,
+  };
   const others = snapshot.chapters.filter((c) => c.id !== chapter.id);
   const next = [...others, placed];
   return {
@@ -161,8 +181,12 @@ export function insertChapter(snapshot: TreeSnapshot, chapter: ChapterSummary, t
  * 取值落在目标位置前后两项之间，这样按 sort 排序时新项恰好落在中间。
  * 边界用 `±0.5` 外扩；两者都缺席时（列表为空）用 0。
  */
-function provisionalSort(anchor: number | undefined, previous: number | undefined): number {
-  if (anchor !== undefined && previous !== undefined) return (anchor + previous) / 2;
+function provisionalSort(
+  anchor: number | undefined,
+  previous: number | undefined,
+): number {
+  if (anchor !== undefined && previous !== undefined)
+    return (anchor + previous) / 2;
   if (anchor !== undefined) return anchor - 0.5;
   if (previous !== undefined) return previous + 0.5;
   return 0;
@@ -174,8 +198,16 @@ function provisionalSort(anchor: number | undefined, previous: number | undefine
  * 与 {@link insertChapter} 分开是因为语义不同：这是「写新的一章」，
  * 序号由当前卷的章数决定，与任何拖拽位置无关。
  */
-export function addChapter(snapshot: TreeSnapshot, chapter: ChapterSummary, volumeId: string): TreeSnapshot {
-  const sheet: ChapterSummary = { ...chapter, volumeId, sort: chaptersOf(snapshot, volumeId).length };
+export function addChapter(
+  snapshot: TreeSnapshot,
+  chapter: ChapterSummary,
+  volumeId: string,
+): TreeSnapshot {
+  const sheet: ChapterSummary = {
+    ...chapter,
+    volumeId,
+    sort: chaptersOf(snapshot, volumeId).length,
+  };
   return {
     volumes: snapshot.volumes,
     chapters: [...snapshot.chapters, sheet],
@@ -188,7 +220,10 @@ export function addChapter(snapshot: TreeSnapshot, chapter: ChapterSummary, volu
  * 删除后同卷内其余章节的序号必须前移，否则会出现「第 2 章、第 4 章」
  * 这种断层。这是回收站恢复时最容易出错的地方，因此在这里一次性做对。
  */
-export function removeChapter(snapshot: TreeSnapshot, chapterId: string): TreeSnapshot {
+export function removeChapter(
+  snapshot: TreeSnapshot,
+  chapterId: string,
+): TreeSnapshot {
   const target = snapshot.chapters.find((c) => c.id === chapterId);
   if (!target) return snapshot;
   const rest = snapshot.chapters.filter((c) => c.id !== chapterId);
@@ -206,12 +241,18 @@ export function removeChapter(snapshot: TreeSnapshot, chapterId: string): TreeSn
  * 以为自己删掉的内容还在。拒绝并保持原状是最不容易误解的行为，
  * 由调用方负责提示。
  */
-export function renameChapter(snapshot: TreeSnapshot, chapterId: string, title: string): TreeSnapshot {
+export function renameChapter(
+  snapshot: TreeSnapshot,
+  chapterId: string,
+  title: string,
+): TreeSnapshot {
   const trimmed = title.trim();
   if (trimmed.length === 0) return snapshot;
   return {
     volumes: snapshot.volumes,
-    chapters: snapshot.chapters.map((c) => (c.id === chapterId && c.title !== trimmed ? { ...c, title: trimmed } : c)),
+    chapters: snapshot.chapters.map((c) =>
+      c.id === chapterId && c.title !== trimmed ? { ...c, title: trimmed } : c,
+    ),
   };
 }
 
@@ -222,12 +263,18 @@ export function renameChapter(snapshot: TreeSnapshot, chapterId: string, title: 
  * 但路径是由 Rust 侧负责维护的（只有它知道磁盘上的真实目录名），
  * 因此这里只改内存里的标题，落盘后由 {@link reloadDocument} 整体刷新。
  */
-export function renameVolume(snapshot: TreeSnapshot, volumeId: string, title: string): TreeSnapshot {
+export function renameVolume(
+  snapshot: TreeSnapshot,
+  volumeId: string,
+  title: string,
+): TreeSnapshot {
   const trimmed = title.trim();
   if (trimmed.length === 0) return snapshot;
   return {
     ...snapshot,
-    volumes: snapshot.volumes.map((v) => (v.id === volumeId && v.title !== trimmed ? { ...v, title: trimmed } : v)),
+    volumes: snapshot.volumes.map((v) =>
+      v.id === volumeId && v.title !== trimmed ? { ...v, title: trimmed } : v,
+    ),
   };
 }
 
@@ -246,13 +293,19 @@ export function renameVolume(snapshot: TreeSnapshot, volumeId: string, title: st
  * UI 需要知道哪些卷的行序变了才能播放 FLIP 让位动效。
  * 让这个函数算出来而不是让 UI 再推断一次，避免两边逻辑不一致。
  */
-export function moveChapter(snapshot: TreeSnapshot, chapterId: string, target: MoveTarget): MoveResult {
+export function moveChapter(
+  snapshot: TreeSnapshot,
+  chapterId: string,
+  target: MoveTarget,
+): MoveResult {
   const moving = snapshot.chapters.find((c) => c.id === chapterId);
   if (!moving) {
     return { snapshot, affectedVolumeIds: [], changed: false };
   }
 
-  const targetSiblings = chaptersOf(snapshot, target.volumeId).filter((c) => c.id !== chapterId);
+  const targetSiblings = chaptersOf(snapshot, target.volumeId).filter(
+    (c) => c.id !== chapterId,
+  );
   const index = clampIndex(target.index, targetSiblings.length);
 
   // 同卷内位置没变：直接返回，UI 可以据此跳过动效
@@ -277,7 +330,11 @@ export function moveChapter(snapshot: TreeSnapshot, chapterId: string, target: M
     provisional = 0;
   }
 
-  const moved: ChapterSummary = { ...moving, volumeId: target.volumeId, sort: provisional };
+  const moved: ChapterSummary = {
+    ...moving,
+    volumeId: target.volumeId,
+    sort: provisional,
+  };
   let chapters = snapshot.chapters.map((c) => (c.id === chapterId ? moved : c));
 
   const affected = new Set<string>();
@@ -304,7 +361,11 @@ export function moveChapter(snapshot: TreeSnapshot, chapterId: string, target: M
  * 这样 UI 层面「卷拖拽」只需要重排卷，行数据引用不变，
  * Solid 的 store 不会触发任何章节行的重渲染。
  */
-export function moveVolume(snapshot: TreeSnapshot, volumeId: string, toIndex: number): MoveResult {
+export function moveVolume(
+  snapshot: TreeSnapshot,
+  volumeId: string,
+  toIndex: number,
+): MoveResult {
   const sorted = sortVolumes(snapshot.volumes);
   const from = sorted.findIndex((v) => v.id === volumeId);
   if (from < 0) return { snapshot, affectedVolumeIds: [], changed: false };
@@ -317,7 +378,8 @@ export function moveVolume(snapshot: TreeSnapshot, volumeId: string, toIndex: nu
   if (!picked) return { snapshot, affectedVolumeIds: [], changed: false };
 
   const clamped = clampIndex(toIndex, rest.length);
-  if (from === clamped) return { snapshot, affectedVolumeIds: [], changed: false };
+  if (from === clamped)
+    return { snapshot, affectedVolumeIds: [], changed: false };
 
   const next = rest;
   next.splice(clamped, 0, picked);
@@ -354,7 +416,10 @@ export function volumeOrderOf(snapshot: TreeSnapshot): string[] {
  * **必须按 sort 排序后取** —— `snapshot.chapters` 的顺序是插入顺序，
  * 不是展示顺序。
  */
-export function chapterOrderOf(snapshot: TreeSnapshot, volumeId: string): string[] {
+export function chapterOrderOf(
+  snapshot: TreeSnapshot,
+  volumeId: string,
+): string[] {
   return chaptersOf(snapshot, volumeId).map((c) => c.id);
 }
 
@@ -365,7 +430,10 @@ export function chapterOrderOf(snapshot: TreeSnapshot, volumeId: string): string
  * 卷列表为空的状态在 UI 上没有可用的落点（无法新建章），
  * 因此这个约束在纯函数层就守住，而不是指望每个调用点记得处理。
  */
-export function removeVolume(snapshot: TreeSnapshot, volumeId: string): TreeSnapshot {
+export function removeVolume(
+  snapshot: TreeSnapshot,
+  volumeId: string,
+): TreeSnapshot {
   const remaining = snapshot.volumes.filter((v) => v.id !== volumeId);
   const chapters = snapshot.chapters.filter((c) => c.volumeId !== volumeId);
   if (remaining.length === 0) {
@@ -405,7 +473,10 @@ export function defaultChapterTitle(index: number): string {
  * 返回 `null` 表示通过，否则返回错误码（由调用方翻译成文案）。
  * 校验放在纯函数里，这样界面与测试用的是同一套规则。
  */
-export function validateTitle(title: string, maxLength = 200): "empty" | "tooLong" | null {
+export function validateTitle(
+  title: string,
+  maxLength = 200,
+): "empty" | "tooLong" | null {
   if (title.trim().length === 0) return "empty";
   if (title.trim().length > maxLength) return "tooLong";
   return null;
@@ -423,7 +494,11 @@ export function validateTitle(title: string, maxLength = 200): "empty" | "tooLon
  * 返回的 `index` 使用与 {@link moveChapter} 相同的语义
  * （移除被拖项之后的位置），两个函数可以直接串起来用。
  */
-export function resolveDropIndex(rows: ReadonlyArray<{ id: string; top: number; height: number }>, pointerY: number, draggedId: string): number {
+export function resolveDropIndex(
+  rows: ReadonlyArray<{ id: string; top: number; height: number }>,
+  pointerY: number,
+  draggedId: string,
+): number {
   let index = 0;
   for (const row of rows) {
     if (row.id === draggedId) continue;

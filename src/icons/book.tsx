@@ -17,9 +17,9 @@ export function BookIcon(props: SvgIconProps) {
   return (
     <svg {...iconProps(props)}>
       <path d="M4.5 4.5h9a3 3 0 0 1 3 3v12h-9a3 3 0 0 0-3 3z" />
-    <path d="M19.5 6v13.5" />
-    <path d="M7.5 8.5h6" />
-    <path d="M7.5 12h6" />
+      <path d="M19.5 6v13.5" />
+      <path d="M7.5 8.5h6" />
+      <path d="M7.5 12h6" />
     </svg>
   );
 }

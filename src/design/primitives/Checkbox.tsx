@@ -10,12 +10,20 @@
  * - indeterminate 是 DOM 属性而非 HTML 属性，必须在 ref 里显式赋值。
  */
 
-import { createUniqueId, Show, splitProps, type Component, type JSX } from "solid-js";
+import {
+  createUniqueId,
+  Show,
+  splitProps,
+  type Component,
+  type JSX,
+} from "solid-js";
 import { cx, usePrimitivesStyle } from "./styles";
 
 /** {@link Checkbox} 的 props。 */
-export interface CheckboxProps
-  extends Omit<JSX.InputHTMLAttributes<HTMLInputElement>, "type" | "checked" | "onChange" | "class" | "children"> {
+export interface CheckboxProps extends Omit<
+  JSX.InputHTMLAttributes<HTMLInputElement>,
+  "type" | "checked" | "onChange" | "class" | "children"
+> {
   /** 是否选中。 */
   checked?: boolean;
   /** 不确定态（例如「部分章节已选」）。视觉上是横杠，与选中/未选形成形状差异。 */
@@ -68,7 +76,11 @@ export const Checkbox: Component<CheckboxProps> = (props) => {
 
   return (
     <label
-      class={cx("yh-checkbox", local.invalid ? "yh-checkbox--invalid" : undefined, local.class)}
+      class={cx(
+        "yh-checkbox",
+        local.invalid ? "yh-checkbox--invalid" : undefined,
+        local.class,
+      )}
       data-checked={isChecked() ? "true" : "false"}
       data-indeterminate={isIndeterminate() ? "true" : "false"}
       data-disabled={local.disabled ? "true" : undefined}

@@ -67,7 +67,10 @@ export interface CompositionResult {
  */
 export function isCompositionEvent(update: ViewUpdate): boolean {
   for (const tr of update.transactions) {
-    if (tr.isUserEvent("input.type.compose") || tr.isUserEvent("input.compose")) {
+    if (
+      tr.isUserEvent("input.type.compose") ||
+      tr.isUserEvent("input.compose")
+    ) {
       return true;
     }
   }
@@ -93,14 +96,22 @@ export function shouldDeferWork(composing: boolean): boolean {
  * 当前文档长度（因为它算的是删除之前的坐标）。不夹紧就会 panic
  * 或读到错位内容。
  */
-export function settleComposition(view: EditorView, from: number, to: number): CompositionResult | null {
+export function settleComposition(
+  view: EditorView,
+  from: number,
+  to: number,
+): CompositionResult | null {
   const doc = view.state.doc;
   const max = doc.length;
   // 夹到合法区间。from > to 说明坐标已经不可信，直接放弃这次结算
   const safeFrom = Math.max(0, Math.min(from, max));
   const safeTo = Math.max(0, Math.min(to, max));
   if (safeFrom > safeTo) return null;
-  return { text: doc.sliceString(safeFrom, safeTo), from: safeFrom, to: safeTo };
+  return {
+    text: doc.sliceString(safeFrom, safeTo),
+    from: safeFrom,
+    to: safeTo,
+  };
 }
 
 /**
@@ -186,7 +197,8 @@ const compositionPlugin = ViewPlugin.fromClass(
       this.onChange?.(false);
     }
 
-    private handleStart = (): void => this.enter(this.view.state.selection.main.from);
+    private handleStart = (): void =>
+      this.enter(this.view.state.selection.main.from);
 
     private handleEnd = (): void => this.leave();
 

@@ -22,7 +22,14 @@
  * 具体做什么，因此新增一个命令是往数组里加一行，而不是改这个组件。
  */
 
-import { For, Show, createEffect, createMemo, createSignal, type JSX } from "solid-js";
+import {
+  For,
+  Show,
+  createEffect,
+  createMemo,
+  createSignal,
+  type JSX,
+} from "solid-js";
 
 import { t } from "@/strings";
 import { Dialog } from "@/design/primitives";
@@ -79,7 +86,9 @@ export function CommandPalette(props: CommandPaletteProps): JSX.Element {
     const list = ranked();
     if (list.length === 0) return;
     // 两端不循环：在命令列表里"从头跳到尾"通常意味着按错了
-    setActiveIndex((index) => Math.max(0, Math.min(index + delta, list.length - 1)));
+    setActiveIndex((index) =>
+      Math.max(0, Math.min(index + delta, list.length - 1)),
+    );
   };
 
   const handleKeyDown = (event: KeyboardEvent): void => {
@@ -215,7 +224,8 @@ export function CommandPalette(props: CommandPaletteProps): JSX.Element {
         >
           <For each={ranked()}>
             {(entry, index) => {
-              const disabled = (): boolean => entry.item.enabled !== undefined && !entry.item.enabled();
+              const disabled = (): boolean =>
+                entry.item.enabled !== undefined && !entry.item.enabled();
               return (
                 <li>
                   <button
@@ -223,7 +233,10 @@ export function CommandPalette(props: CommandPaletteProps): JSX.Element {
                     role="option"
                     aria-selected={index() === activeIndex() ? "true" : "false"}
                     class="cmd__item"
-                    classList={{ "is-active": index() === activeIndex(), "is-disabled": disabled() }}
+                    classList={{
+                      "is-active": index() === activeIndex(),
+                      "is-disabled": disabled(),
+                    }}
                     aria-disabled={disabled() ? "true" : undefined}
                     // roving tabindex：整张列表在 Tab 序里只占一格
                     tabindex={index() === activeIndex() ? 0 : -1}

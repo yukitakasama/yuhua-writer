@@ -88,15 +88,49 @@ describe("动效令牌与 CSS 一致", () => {
 
 describe("设计令牌完整性", () => {
   const required = [
-    "c-bg", "c-bg-subtle", "c-surface", "c-border", "c-text", "c-text-muted",
-    "c-accent", "c-danger",
-    "sp-1", "sp-2", "sp-3", "sp-4", "sp-5", "sp-6", "sp-7", "sp-8",
-    "fs-xs", "fs-sm", "fs-base", "fs-lg", "fs-xl", "fs-2xl",
-    "r-sm", "r-md", "r-lg", "r-full",
-    "font-body", "font-heading", "font-ui",
-    "shadow-sm", "shadow-md", "shadow-lg",
-    "z-base", "z-dropdown", "z-overlay", "z-dialog", "z-toast", "z-tooltip",
-    "c-heat-0", "c-heat-1", "c-heat-2", "c-heat-3", "c-heat-4",
+    "c-bg",
+    "c-bg-subtle",
+    "c-surface",
+    "c-border",
+    "c-text",
+    "c-text-muted",
+    "c-accent",
+    "c-danger",
+    "sp-1",
+    "sp-2",
+    "sp-3",
+    "sp-4",
+    "sp-5",
+    "sp-6",
+    "sp-7",
+    "sp-8",
+    "fs-xs",
+    "fs-sm",
+    "fs-base",
+    "fs-lg",
+    "fs-xl",
+    "fs-2xl",
+    "r-sm",
+    "r-md",
+    "r-lg",
+    "r-full",
+    "font-body",
+    "font-heading",
+    "font-ui",
+    "shadow-sm",
+    "shadow-md",
+    "shadow-lg",
+    "z-base",
+    "z-dropdown",
+    "z-overlay",
+    "z-dialog",
+    "z-toast",
+    "z-tooltip",
+    "c-heat-0",
+    "c-heat-1",
+    "c-heat-2",
+    "c-heat-3",
+    "c-heat-4",
   ];
 
   it.each(required)("亮色主题定义了 --%s", (name) => {
@@ -105,8 +139,14 @@ describe("设计令牌完整性", () => {
 
   it("间距符合 4px 基准栅格", () => {
     const expected: Record<string, number> = {
-      "sp-1": 4, "sp-2": 8, "sp-3": 12, "sp-4": 16,
-      "sp-5": 20, "sp-6": 24, "sp-7": 28, "sp-8": 32,
+      "sp-1": 4,
+      "sp-2": 8,
+      "sp-3": 12,
+      "sp-4": 16,
+      "sp-5": 20,
+      "sp-6": 24,
+      "sp-7": 28,
+      "sp-8": 32,
     };
     for (const [name, px] of Object.entries(expected)) {
       expect(cssVar(name)).toBe(`${px}px`);
@@ -114,9 +154,16 @@ describe("设计令牌完整性", () => {
   });
 
   it("间距梯度严格递增且均为 4 的倍数", () => {
-    const values = ["sp-1", "sp-2", "sp-3", "sp-4", "sp-5", "sp-6", "sp-7", "sp-8"].map(
-      (n) => Number.parseInt(cssVar(n) ?? "0", 10),
-    );
+    const values = [
+      "sp-1",
+      "sp-2",
+      "sp-3",
+      "sp-4",
+      "sp-5",
+      "sp-6",
+      "sp-7",
+      "sp-8",
+    ].map((n) => Number.parseInt(cssVar(n) ?? "0", 10));
     for (let i = 1; i < values.length; i += 1) {
       expect(values[i]!).toBeGreaterThan(values[i - 1]!);
       expect(values[i]! % 4).toBe(0);
@@ -124,9 +171,14 @@ describe("设计令牌完整性", () => {
   });
 
   it("字阶严格递增", () => {
-    const values = ["fs-xs", "fs-sm", "fs-base", "fs-lg", "fs-xl", "fs-2xl"].map((n) =>
-      Number.parseInt(cssVar(n) ?? "0", 10),
-    );
+    const values = [
+      "fs-xs",
+      "fs-sm",
+      "fs-base",
+      "fs-lg",
+      "fs-xl",
+      "fs-2xl",
+    ].map((n) => Number.parseInt(cssVar(n) ?? "0", 10));
     for (let i = 1; i < values.length; i += 1) {
       expect(values[i]!).toBeGreaterThan(values[i - 1]!);
     }
@@ -147,7 +199,14 @@ describe("设计令牌完整性", () => {
 });
 
 describe("亮暗双主题", () => {
-  const vars = ["c-bg", "c-surface", "c-text", "c-accent", "c-heat-0", "c-heat-4"];
+  const vars = [
+    "c-bg",
+    "c-surface",
+    "c-text",
+    "c-accent",
+    "c-heat-0",
+    "c-heat-4",
+  ];
 
   it.each(vars)("暗色主题覆盖了 --%s", (name) => {
     const dark = cssVar(name, '[data-theme="dark"]');
@@ -183,7 +242,10 @@ describe("无障碍降级", () => {
 
   it("查询内标记动效关闭开关", () => {
     const start = css.indexOf(REDUCED_MOTION_QUERY);
-    const block = css.slice(start, css.indexOf("】", start) === -1 ? start + 900 : start + 900);
+    const block = css.slice(
+      start,
+      css.indexOf("】", start) === -1 ? start + 900 : start + 900,
+    );
     expect(block).toContain("--motion-enabled: 0");
   });
 });
@@ -264,7 +326,15 @@ describe("性能铁律写进了注释", () => {
   it("CSS 中明示只动画 transform 与 opacity", () => {
     expect(css).toContain("只动画 transform 与 opacity");
     // 明确列出被禁止的属性，避免后来者「顺手」加上过渡
-    for (const banned of ["width", "height", "top", "left", "margin", "box-shadow", "filter"]) {
+    for (const banned of [
+      "width",
+      "height",
+      "top",
+      "left",
+      "margin",
+      "box-shadow",
+      "filter",
+    ]) {
       expect(css).toContain(banned);
     }
   });

@@ -23,7 +23,9 @@ export interface IllustrationProps {
 }
 
 /** 外层 SVG，统一视图框与描边风格。 */
-function Art(props: IllustrationProps & { children: JSX.Element; viewBox?: string }): JSX.Element {
+function Art(
+  props: IllustrationProps & { children: JSX.Element; viewBox?: string },
+): JSX.Element {
   const size = () => props.size ?? 128;
   return (
     <svg
@@ -49,7 +51,9 @@ function Art(props: IllustrationProps & { children: JSX.Element; viewBox?: strin
  * 语义刻意选"空书架"而不是"打开的书"——后者容易被误读成
  * "正在加载书籍"。
  */
-export function IllustrationEmptyLibrary(props: IllustrationProps): JSX.Element {
+export function IllustrationEmptyLibrary(
+  props: IllustrationProps,
+): JSX.Element {
   return (
     <Art {...props}>
       {/* 书架底板 */}
@@ -62,7 +66,11 @@ export function IllustrationEmptyLibrary(props: IllustrationProps): JSX.Element 
       </g>
       <rect x="88" y="60" width="16" height="40" rx="2" />
       {/* 书脊上的分隔线，暗示"排版"而不是"空白方块" */}
-      <path d="M49 50h8M49 58h8M71 54h6M71 62h6M93 70h6M93 78h6" stroke-width="1" opacity="0.5" />
+      <path
+        d="M49 50h8M49 58h8M71 54h6M71 62h6M93 70h6M93 78h6"
+        stroke-width="1"
+        opacity="0.5"
+      />
       {/* 斜靠的笔 */}
       <path d="M36 30l14 14" />
       <path d="M34 26l4 4-6 2z" />
@@ -122,7 +130,11 @@ export function IllustrationEmptyEditor(props: IllustrationProps): JSX.Element {
       <path d="M34 22h44l16 16v68H34z" />
       <path d="M78 22v16h16" />
       {/* 文字行：长度参差，读起来才像"稿纸"而不是"表格" */}
-      <path d="M46 56h32M46 66h40M46 76h26M46 86h34" stroke-width="1.2" opacity="0.55" />
+      <path
+        d="M46 56h32M46 66h40M46 76h26M46 86h34"
+        stroke-width="1.2"
+        opacity="0.55"
+      />
       {/* 笔 */}
       <path d="M92 74l14-14 6 6-14 14-7 1z" />
       <path d="M100 66l6 6" />

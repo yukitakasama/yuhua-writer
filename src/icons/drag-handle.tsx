@@ -17,11 +17,11 @@ export function DragHandleIcon(props: SvgIconProps) {
   return (
     <svg {...iconProps(props)}>
       <circle cx="9.2" cy="6.6" r="1.15" />
-    <circle cx="14.8" cy="6.6" r="1.15" />
-    <circle cx="9.2" cy="12" r="1.15" />
-    <circle cx="14.8" cy="12" r="1.15" />
-    <circle cx="9.2" cy="17.4" r="1.15" />
-    <circle cx="14.8" cy="17.4" r="1.15" />
+      <circle cx="14.8" cy="6.6" r="1.15" />
+      <circle cx="9.2" cy="12" r="1.15" />
+      <circle cx="14.8" cy="12" r="1.15" />
+      <circle cx="9.2" cy="17.4" r="1.15" />
+      <circle cx="14.8" cy="17.4" r="1.15" />
     </svg>
   );
 }

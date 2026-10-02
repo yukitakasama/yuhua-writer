@@ -58,7 +58,12 @@ export function ChapterRow(props: ChapterRowProps): JSX.Element {
         rowRef = el;
         props.registerRef(el);
       }}
-      class={["tree-row", "tree-row--chapter", props.selected ? "is-selected" : "", props.dragging ? "is-dragging" : ""]
+      class={[
+        "tree-row",
+        "tree-row--chapter",
+        props.selected ? "is-selected" : "",
+        props.dragging ? "is-dragging" : "",
+      ]
         .filter(Boolean)
         .join(" ")}
       data-flip-id={props.chapter.id}
@@ -68,7 +73,11 @@ export function ChapterRow(props: ChapterRowProps): JSX.Element {
       tabindex={props.selected ? 0 : -1}
       onClick={(event) => {
         // 点击改名框或按钮时不触发选中，否则会打断编辑
-        if (event.target instanceof HTMLElement && event.target.closest("button, .inline-edit")) return;
+        if (
+          event.target instanceof HTMLElement &&
+          event.target.closest("button, .inline-edit")
+        )
+          return;
         props.onSelect();
       }}
       onDblClick={() => setEditing(true)}
@@ -137,7 +146,9 @@ export function ChapterRow(props: ChapterRowProps): JSX.Element {
       <Show when={!editing()}>
         <span class="tree-row__meta">
           <StatusDot status={props.chapter.status} />
-          <span class="tree-row__words">{props.chapter.wordCount.toLocaleString("zh-CN")}</span>
+          <span class="tree-row__words">
+            {props.chapter.wordCount.toLocaleString("zh-CN")}
+          </span>
         </span>
       </Show>
 

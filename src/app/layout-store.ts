@@ -19,7 +19,12 @@
 
 import { createStore } from "solid-js/store";
 
-import { isFiniteNumber, isPlainObject, readJson, writeJson } from "./persistent";
+import {
+  isFiniteNumber,
+  isPlainObject,
+  readJson,
+  writeJson,
+} from "./persistent";
 
 /** 左栏宽度的合法区间。下限保证 240px 下标题还能显示两个汉字加省略号。 */
 export const LEFT_MIN = 200;
@@ -64,19 +69,40 @@ function validateLayout(value: unknown): value is Partial<LayoutState> {
 
 /** 把读回来的（可能缺字段、可能越界的）布局补全并夹紧。 */
 export function normalizeLayout(raw: Partial<LayoutState> | null): LayoutState {
-  const pickBool = (v: unknown, fallback: boolean): boolean => (typeof v === "boolean" ? v : fallback);
-  const pickWidth = (v: unknown, min: number, max: number, fallback: number): number =>
+  const pickBool = (v: unknown, fallback: boolean): boolean =>
+    typeof v === "boolean" ? v : fallback;
+  const pickWidth = (
+    v: unknown,
+    min: number,
+    max: number,
+    fallback: number,
+  ): number =>
     isFiniteNumber(v) ? Math.round(Math.min(max, Math.max(min, v))) : fallback;
 
   return {
-    leftWidth: pickWidth(raw?.leftWidth, LEFT_MIN, LEFT_MAX, DEFAULT_LAYOUT.leftWidth),
-    rightWidth: pickWidth(raw?.rightWidth, RIGHT_MIN, RIGHT_MAX, DEFAULT_LAYOUT.rightWidth),
+    leftWidth: pickWidth(
+      raw?.leftWidth,
+      LEFT_MIN,
+      LEFT_MAX,
+      DEFAULT_LAYOUT.leftWidth,
+    ),
+    rightWidth: pickWidth(
+      raw?.rightWidth,
+      RIGHT_MIN,
+      RIGHT_MAX,
+      DEFAULT_LAYOUT.rightWidth,
+    ),
     leftCollapsed: pickBool(raw?.leftCollapsed, DEFAULT_LAYOUT.leftCollapsed),
-    rightCollapsed: pickBool(raw?.rightCollapsed, DEFAULT_LAYOUT.rightCollapsed),
+    rightCollapsed: pickBool(
+      raw?.rightCollapsed,
+      DEFAULT_LAYOUT.rightCollapsed,
+    ),
     // 三个取值都要显式列出：只判两个的话，第三值会静默退回默认，
     // 用户每次重启都会从统计页被弹回书架
     view:
-      raw?.view === "workspace" || raw?.view === "library" || raw?.view === "stats"
+      raw?.view === "workspace" ||
+      raw?.view === "library" ||
+      raw?.view === "stats"
         ? raw.view
         : DEFAULT_LAYOUT.view,
   };
@@ -84,7 +110,9 @@ export function normalizeLayout(raw: Partial<LayoutState> | null): LayoutState {
 
 /** 从 localStorage 读取布局，读不到或坏了就用默认值。 */
 export function loadLayout(): LayoutState {
-  return normalizeLayout(readJson<Partial<LayoutState>>(STORAGE_KEY, {}, validateLayout));
+  return normalizeLayout(
+    readJson<Partial<LayoutState>>(STORAGE_KEY, {}, validateLayout),
+  );
 }
 
 const [layout, setLayout] = createStore<LayoutState>(loadLayout());
@@ -98,13 +126,19 @@ function persist(): void {
 
 /** 设置左栏宽度（自动夹紧）。 */
 export function setLeftWidth(width: number): void {
-  setLayout("leftWidth", Math.round(Math.min(LEFT_MAX, Math.max(LEFT_MIN, width))));
+  setLayout(
+    "leftWidth",
+    Math.round(Math.min(LEFT_MAX, Math.max(LEFT_MIN, width))),
+  );
   persist();
 }
 
 /** 设置右栏宽度（自动夹紧）。 */
 export function setRightWidth(width: number): void {
-  setLayout("rightWidth", Math.round(Math.min(RIGHT_MAX, Math.max(RIGHT_MIN, width))));
+  setLayout(
+    "rightWidth",
+    Math.round(Math.min(RIGHT_MAX, Math.max(RIGHT_MIN, width))),
+  );
   persist();
 }
 

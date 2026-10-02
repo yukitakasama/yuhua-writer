@@ -30,7 +30,13 @@ import { ProgressRing } from "@/features/stats/ProgressRing";
 import { loadStats, statsState } from "@/features/stats/store";
 import { ratio } from "@/features/stats/model";
 import { onMount } from "solid-js";
-import { selectedChapter, totalChapters, totalWords, workspaceState, volumes } from "./workspace-store";
+import {
+  selectedChapter,
+  totalChapters,
+  totalWords,
+  workspaceState,
+  volumes,
+} from "./workspace-store";
 
 /** 右侧信息面板。 */
 export function MetaPanel(): JSX.Element {
@@ -40,7 +46,8 @@ export function MetaPanel(): JSX.Element {
   // 什么都不做，没有时才拉一次。放在 onMount 里而不是 createMemo 里，
   // 是因为它在语义上是副作用而不是派生值
   onMount(() => {
-    if (Object.keys(statsState.days).length === 0 && !statsState.loading) void loadStats();
+    if (Object.keys(statsState.days).length === 0 && !statsState.loading)
+      void loadStats();
   });
 
   /** 本章的目标进度。没设目标时返回 null，环整个不渲染。 */
@@ -74,7 +81,10 @@ export function MetaPanel(): JSX.Element {
               <h3 class="meta__heading">{t("meta.panelTitle")}</h3>
               <dl class="meta__list">
                 <MetaRow label={t("meta.title")} value={current().title} />
-                <MetaRow label={t("meta.volume")} value={volumeName(current().volumeId)} />
+                <MetaRow
+                  label={t("meta.volume")}
+                  value={volumeName(current().volumeId)}
+                />
                 <div class="meta__row">
                   <dt class="meta__key">{t("meta.status")}</dt>
                   <dd class="meta__value">
@@ -83,7 +93,11 @@ export function MetaPanel(): JSX.Element {
                 </div>
                 <MetaRow
                   label={t("meta.wordGoal")}
-                  value={current().wordGoal > 0 ? `${current().wordGoal.toLocaleString("zh-CN")} ${t("wordCount.unit")}` : t("meta.wordGoalPlaceholder")}
+                  value={
+                    current().wordGoal > 0
+                      ? `${current().wordGoal.toLocaleString("zh-CN")} ${t("wordCount.unit")}`
+                      : t("meta.wordGoalPlaceholder")
+                  }
                 />
                 <MetaRow label={t("meta.updated")} value={current().updated} />
                 <MetaRow label={t("meta.path")} value={current().path} mono />
@@ -139,8 +153,14 @@ export function MetaPanel(): JSX.Element {
                   label={t("wordCount.today")}
                   value={`${statsState.summary.today.toLocaleString("zh-CN")} ${t("wordCount.unit")}`}
                 />
-                <MetaRow label={t("wordCount.chapterCount")} value={`${totalChapters()}`} />
-                <MetaRow label={t("wordCount.volumeCount")} value={`${volumes().length}`} />
+                <MetaRow
+                  label={t("wordCount.chapterCount")}
+                  value={`${totalChapters()}`}
+                />
+                <MetaRow
+                  label={t("wordCount.volumeCount")}
+                  value={`${volumes().length}`}
+                />
               </dl>
               <p class="meta__note">{t("wordCount.todayHint")}</p>
             </section>
@@ -152,11 +172,20 @@ export function MetaPanel(): JSX.Element {
 }
 
 /** 一行"标签 — 值"。 */
-function MetaRow(props: { label: string; value: string; mono?: boolean }): JSX.Element {
+function MetaRow(props: {
+  label: string;
+  value: string;
+  mono?: boolean;
+}): JSX.Element {
   return (
     <div class="meta__row">
       <dt class="meta__key">{props.label}</dt>
-      <dd class={["meta__value", props.mono ? "meta__value--mono" : ""].filter(Boolean).join(" ")} title={props.value}>
+      <dd
+        class={["meta__value", props.mono ? "meta__value--mono" : ""]
+          .filter(Boolean)
+          .join(" ")}
+        title={props.value}
+      >
         {props.value}
       </dd>
     </div>
@@ -178,5 +207,7 @@ function volumeName(volumeId: string): string {
 function volumeWords(volumeId: string): number {
   const doc = workspaceState.document;
   if (!doc) return 0;
-  return doc.chapters.filter((c) => c.volumeId === volumeId).reduce((sum, c) => sum + c.wordCount, 0);
+  return doc.chapters
+    .filter((c) => c.volumeId === volumeId)
+    .reduce((sum, c) => sum + c.wordCount, 0);
 }

@@ -114,7 +114,10 @@ export function heatColorFor(
  * @param theme 主题
  * @returns 长度 5 的档位颜色数组
  */
-export function buildPalette(goal: number, theme: ChartTheme = "light"): readonly string[] {
+export function buildPalette(
+  goal: number,
+  theme: ChartTheme = "light",
+): readonly string[] {
   const palette = heatColors(theme);
   const table: string[] = [];
   for (let i = 0; i < HEAT_LEVELS; i += 1) {

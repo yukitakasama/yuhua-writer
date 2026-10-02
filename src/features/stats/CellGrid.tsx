@@ -22,7 +22,14 @@
  * 跟随指针时只改 `transform`，符合「只动画 transform 与 opacity」。
  */
 
-import { For, Show, createSignal, onCleanup, onMount, type JSX } from "solid-js";
+import {
+  For,
+  Show,
+  createSignal,
+  onCleanup,
+  onMount,
+  type JSX,
+} from "solid-js";
 
 import { delegateEvents, type DelegatedHit } from "@/design/charts";
 import { colorForLevel } from "./heat";
@@ -62,7 +69,11 @@ export interface CellGridProps {
 
 /** 一次插入的 SVG 格子网格。 */
 export function CellGrid(props: CellGridProps): JSX.Element {
-  const [hover, setHover] = createSignal<{ cell: GridCell; x: number; y: number } | null>(null);
+  const [hover, setHover] = createSignal<{
+    cell: GridCell;
+    x: number;
+    y: number;
+  } | null>(null);
   let svg: SVGSVGElement | undefined;
 
   // 委托：整张 SVG 只挂一个监听器
@@ -85,8 +96,10 @@ export function CellGrid(props: CellGridProps): JSX.Element {
     setHover({ cell, x: hit.offsetX, y: hit.offsetY });
   };
 
-  const xOf = (column: number): number => props.spec.headWidth + column * (props.spec.cellSize + props.spec.gap);
-  const yOf = (row: number): number => props.spec.headHeight + row * (props.spec.cellSize + props.spec.gap);
+  const xOf = (column: number): number =>
+    props.spec.headWidth + column * (props.spec.cellSize + props.spec.gap);
+  const yOf = (row: number): number =>
+    props.spec.headHeight + row * (props.spec.cellSize + props.spec.gap);
 
   return (
     <div class="stats-grid">
@@ -141,7 +154,9 @@ export function CellGrid(props: CellGridProps): JSX.Element {
           <div
             class="stats-pop"
             role="tooltip"
-            style={{ transform: `translate3d(${state().x + 12}px, ${state().y + 10}px, 0)` }}
+            style={{
+              transform: `translate3d(${state().x + 12}px, ${state().y + 10}px, 0)`,
+            }}
           >
             {props.tooltip(state().cell)}
           </div>

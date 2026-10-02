@@ -17,10 +17,10 @@ export function CollapseIcon(props: SvgIconProps) {
   return (
     <svg {...iconProps(props)}>
       <path d="M12 3.5v5.2" />
-    <path d="M9.6 6.3L12 8.7l2.4-2.4" />
-    <path d="M12 20.5v-5.2" />
-    <path d="M9.6 17.7l2.4-2.4 2.4 2.4" />
-    <path d="M4.5 12h15" />
+      <path d="M9.6 6.3L12 8.7l2.4-2.4" />
+      <path d="M12 20.5v-5.2" />
+      <path d="M9.6 17.7l2.4-2.4 2.4 2.4" />
+      <path d="M4.5 12h15" />
     </svg>
   );
 }

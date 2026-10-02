@@ -24,7 +24,13 @@ import { t } from "@/strings";
 import { Input } from "@/design/primitives";
 import { Button } from "@/app/ui/Button";
 import { ProgressRing } from "./ProgressRing";
-import { GOAL_MAX, ratio, validateGoal, type GoalConfig, type StatsSummary } from "./model";
+import {
+  GOAL_MAX,
+  ratio,
+  validateGoal,
+  type GoalConfig,
+  type StatsSummary,
+} from "./model";
 
 /** 目标视图属性。 */
 export interface GoalViewProps {
@@ -40,7 +46,9 @@ export interface GoalViewProps {
 export function GoalView(props: GoalViewProps): JSX.Element {
   const [daily, setDaily] = createSignal(String(props.goal.daily));
   const [weekly, setWeekly] = createSignal(String(props.goal.weekly));
-  const [threshold, setThreshold] = createSignal(String(props.goal.streakThreshold));
+  const [threshold, setThreshold] = createSignal(
+    String(props.goal.streakThreshold),
+  );
   const [saved, setSaved] = createSignal(false);
 
   /** 三个字段各自的错误文案；返回 null 表示这一项没问题。 */
@@ -50,7 +58,12 @@ export function GoalView(props: GoalViewProps): JSX.Element {
     return t("stats.goalInvalid");
   };
 
-  const hasError = createMemo(() => errorFor(daily()) !== null || errorFor(weekly()) !== null || errorFor(threshold()) !== null);
+  const hasError = createMemo(
+    () =>
+      errorFor(daily()) !== null ||
+      errorFor(weekly()) !== null ||
+      errorFor(threshold()) !== null,
+  );
 
   const handleSave = (): void => {
     if (hasError()) return;
@@ -62,8 +75,12 @@ export function GoalView(props: GoalViewProps): JSX.Element {
     setSaved(true);
   };
 
-  const dailyProgress = createMemo(() => ratio(props.summary.today, props.goal.daily));
-  const weeklyProgress = createMemo(() => ratio(props.summary.thisWeek, props.goal.weekly));
+  const dailyProgress = createMemo(() =>
+    ratio(props.summary.today, props.goal.daily),
+  );
+  const weeklyProgress = createMemo(() =>
+    ratio(props.summary.thisWeek, props.goal.weekly),
+  );
 
   return (
     <div class="stats-goal">
@@ -72,7 +89,11 @@ export function GoalView(props: GoalViewProps): JSX.Element {
           done={props.summary.today}
           goal={props.goal.daily}
           label={t("stats.goalProgressTitle")}
-          centerText={props.goal.daily > 0 ? `${Math.round((dailyProgress() ?? 0) * 100)}%` : undefined}
+          centerText={
+            props.goal.daily > 0
+              ? `${Math.round((dailyProgress() ?? 0) * 100)}%`
+              : undefined
+          }
           caption={t("stats.goalProgressTitle")}
           percentText={`${Math.round((dailyProgress() ?? 0) * 100)}%`}
         />
@@ -80,7 +101,11 @@ export function GoalView(props: GoalViewProps): JSX.Element {
           done={props.summary.thisWeek}
           goal={props.goal.weekly}
           label={t("stats.goalProgressWeek")}
-          centerText={props.goal.weekly > 0 ? `${Math.round((weeklyProgress() ?? 0) * 100)}%` : undefined}
+          centerText={
+            props.goal.weekly > 0
+              ? `${Math.round((weeklyProgress() ?? 0) * 100)}%`
+              : undefined
+          }
           caption={t("stats.goalProgressWeek")}
           percentText={`${Math.round((weeklyProgress() ?? 0) * 100)}%`}
         />
@@ -100,7 +125,9 @@ export function GoalView(props: GoalViewProps): JSX.Element {
           inputmode="numeric"
           maxlength={7}
           onInput={setDaily}
-          {...(errorFor(daily()) !== null ? { error: errorFor(daily()) as string } : {})}
+          {...(errorFor(daily()) !== null
+            ? { error: errorFor(daily()) as string }
+            : {})}
         />
         <Input
           label={t("stats.goalWeekly")}
@@ -109,7 +136,9 @@ export function GoalView(props: GoalViewProps): JSX.Element {
           inputmode="numeric"
           maxlength={7}
           onInput={setWeekly}
-          {...(errorFor(weekly()) !== null ? { error: errorFor(weekly()) as string } : {})}
+          {...(errorFor(weekly()) !== null
+            ? { error: errorFor(weekly()) as string }
+            : {})}
         />
         <Input
           label={t("stats.goalStreakThreshold")}
@@ -118,7 +147,9 @@ export function GoalView(props: GoalViewProps): JSX.Element {
           inputmode="numeric"
           maxlength={7}
           onInput={setThreshold}
-          {...(errorFor(threshold()) !== null ? { error: errorFor(threshold()) as string } : {})}
+          {...(errorFor(threshold()) !== null
+            ? { error: errorFor(threshold()) as string }
+            : {})}
         />
 
         <div class="stats-goal__actions">
@@ -131,7 +162,11 @@ export function GoalView(props: GoalViewProps): JSX.Element {
               setDaily("0");
               setWeekly("0");
               setThreshold(String(props.goal.streakThreshold));
-              props.onSave({ daily: 0, weekly: 0, streakThreshold: props.goal.streakThreshold });
+              props.onSave({
+                daily: 0,
+                weekly: 0,
+                streakThreshold: props.goal.streakThreshold,
+              });
             }}
           >
             {t("stats.goalClear")}

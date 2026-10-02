@@ -77,7 +77,10 @@ export function formatDuration(minutes: number): string {
  * @returns 例如 42.5%
  */
 export function formatPercent(progress: number): string {
-  const clamped = Math.min(Math.max(Number.isFinite(progress) ? progress : 0, 0), 1);
+  const clamped = Math.min(
+    Math.max(Number.isFinite(progress) ? progress : 0, 0),
+    1,
+  );
   return `${(clamped * 100).toFixed(1)}%`;
 }
 

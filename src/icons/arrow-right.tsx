@@ -17,7 +17,7 @@ export function ArrowRightIcon(props: SvgIconProps) {
   return (
     <svg {...iconProps(props)}>
       <path d="M4.5 12H19" />
-    <path d="M12.5 5.5L19 12l-6.5 6.5" />
+      <path d="M12.5 5.5L19 12l-6.5 6.5" />
     </svg>
   );
 }

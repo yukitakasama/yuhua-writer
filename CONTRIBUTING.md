@@ -4,12 +4,12 @@
 
 ## 开发环境
 
-| 工具 | 版本要求 | 说明 |
-| --- | --- | --- |
-| Node.js | ≥ 20 | 前端构建 |
-| pnpm | ≥ 9 | 包管理（**不要用 npm / yarn**，锁文件是 pnpm 的） |
-| Rust | ≥ 1.77 | 内核 |
-| WebView2 | Evergreen | Windows 运行必需 |
+| 工具     | 版本要求  | 说明                                              |
+| -------- | --------- | ------------------------------------------------- |
+| Node.js  | ≥ 20      | 前端构建                                          |
+| pnpm     | ≥ 9       | 包管理（**不要用 npm / yarn**，锁文件是 pnpm 的） |
+| Rust     | ≥ 1.77    | 内核                                              |
+| WebView2 | Evergreen | Windows 运行必需                                  |
 
 ```bash
 pnpm install

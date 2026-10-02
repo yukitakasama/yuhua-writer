@@ -48,7 +48,11 @@ export function LevelToggle(props: LevelToggleProps): JSX.Element {
       <span class="level-toggle__label" id="yh-level-label">
         {t("settings.level.label")}
       </span>
-      <div class="level-toggle__group" role="radiogroup" aria-labelledby="yh-level-label">
+      <div
+        class="level-toggle__group"
+        role="radiogroup"
+        aria-labelledby="yh-level-label"
+      >
         <button
           type="button"
           role="radio"
@@ -77,9 +81,13 @@ export function LevelToggle(props: LevelToggleProps): JSX.Element {
         </button>
       </div>
       <p class="level-toggle__hint">
-        {props.level === "global" ? t("settings.level.globalHint") : t("settings.level.workspaceHint")}
+        {props.level === "global"
+          ? t("settings.level.globalHint")
+          : t("settings.level.workspaceHint")}
       </p>
-      {!canWorkspace() && <p class="level-toggle__note">{t("settings.level.noWorkspace")}</p>}
+      {!canWorkspace() && (
+        <p class="level-toggle__note">{t("settings.level.noWorkspace")}</p>
+      )}
     </div>
   );
 }

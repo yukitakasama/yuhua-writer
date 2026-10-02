@@ -17,7 +17,7 @@ export function UndoIcon(props: SvgIconProps) {
   return (
     <svg {...iconProps(props)}>
       <path d="M19.5 18.5a7 7 0 0 0-7-7h-8" />
-    <path d="M8 8L4.5 11.5 8 15" />
+      <path d="M8 8L4.5 11.5 8 15" />
     </svg>
   );
 }

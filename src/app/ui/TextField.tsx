@@ -19,6 +19,9 @@ export interface TextFieldProps extends JSX.InputHTMLAttributes<HTMLInputElement
 /** 一个受控文本输入框。 */
 export function TextField(props: TextFieldProps): JSX.Element {
   const [local, rest] = splitProps(props, ["inline", "class", "label"]);
-  const classes = () => ["field", local.inline ? "field--inline" : "", local.class ?? ""].filter(Boolean).join(" ");
+  const classes = () =>
+    ["field", local.inline ? "field--inline" : "", local.class ?? ""]
+      .filter(Boolean)
+      .join(" ");
   return <input class={classes()} aria-label={local.label} {...rest} />;
 }

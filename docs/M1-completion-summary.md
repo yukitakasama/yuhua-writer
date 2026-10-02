@@ -11,6 +11,7 @@ This document summarizes the completion of remaining M1 tasks (T1.9 - T1.13).
 **Location**: `src/features/devkit/DevKit.tsx`
 
 **What was delivered**:
+
 - Comprehensive component showcase accessible via `?kit=1` in dev mode
 - All base primitives: Button (4 variants, 3 sizes, loading/disabled states), IconButton, Input, Textarea, Select, Checkbox, Switch
 - All container primitives: Dialog, Drawer, Popover, Menu, Tooltip, Toast, Tabs, ScrollArea
@@ -20,6 +21,7 @@ This document summarizes the completion of remaining M1 tasks (T1.9 - T1.13).
 - Properly excluded from production builds via dynamic import + build verification script
 
 **Key features**:
+
 - Every component state displayed side-by-side for visual comparison
 - Motion primitives with "replay" buttons for frame-by-frame verification
 - Design token values shown inline for specification compliance checking
@@ -30,7 +32,8 @@ This document summarizes the completion of remaining M1 tasks (T1.9 - T1.13).
 
 **Status**: ✅ Complete
 
-**Location**: 
+**Location**:
+
 - `src/design/motion/performance.ts` (new)
 - `src/design/motion/performance.test.ts` (new)
 - Exported from `src/design/motion/index.ts`
@@ -56,8 +59,9 @@ This document summarizes the completion of remaining M1 tasks (T1.9 - T1.13).
    - Degradation behavior when concurrency exceeds 30
 
 **Usage**:
+
 ```typescript
-import { frameMonitor } from '@/design/motion';
+import { frameMonitor } from "@/design/motion";
 
 frameMonitor.start();
 await fadeIn(element);
@@ -74,6 +78,7 @@ console.log(report); // { avgFps: 60, droppedFrames: 0, passed: true }
 **Location**: `src/design/fonts/loader.ts`
 
 **What was delivered**:
+
 - `FontLoader` class with LRU cache (max 2 families per M5 indicator)
 - On-demand loading via FontFace API with proper timeout handling (8s default)
 - Automatic cleanup: `document.fonts.delete()` when evicting from LRU
@@ -83,6 +88,7 @@ console.log(report); // { avgFps: 60, droppedFrames: 0, passed: true }
 - Comprehensive test coverage in `src/design/fonts/fonts.test.ts`
 
 **Key features**:
+
 - **LRU eviction**: Oldest unused font is released when cache exceeds 2 families
 - **Preload → Apply sequence**: Eliminates FOUT by ensuring fonts are ready before CSS variables are written
 - **No duplicate loading**: Same font family requested multiple times returns cached instance
@@ -95,6 +101,7 @@ console.log(report); // { avgFps: 60, droppedFrames: 0, passed: true }
 **Location**: `src/features/settings/no-flicker.test.ts`
 
 **What was delivered**:
+
 - Comprehensive test suite verifying font switching only uses CSS custom properties
 - Structural assertions that prove no layout thrash:
   - Only writes to `:root` custom properties, never inline `font-family`
@@ -108,6 +115,7 @@ console.log(report); // { avgFps: 60, droppedFrames: 0, passed: true }
   4. High-frequency changes leave no intermediate state
 
 **What the tests prove**:
+
 - Font switching writes **only** `--font-body`, `--fs-body`, `--lh-body`, etc.
 - No inline styles on any DOM element (prevents mass style recalculation)
 - Custom properties are not transitionable (prevents accidental animations)
@@ -122,22 +130,30 @@ console.log(report); // { avgFps: 60, droppedFrames: 0, passed: true }
 **Location**: `src/design/charts/`
 
 **What was delivered**:
+
 - **`scale.ts`**: Pre-computed 5-level heat color scales (light/dark), word count → level mapping
 - **`geometry.ts`**: Grid calculations for calendar (7×6), heatmap (53×7), progress rings
 - **`delegate.ts`**: Event delegation for 365+ cells with single listener, cross-highlighting
 - **`format.ts`**: Tabular-nums number formatting, duration, percentage, date labels
 
 **Key features**:
+
 - **No per-cell computation**: Heat colors are pre-calculated arrays, never computed per render
 - **Single event listener**: 365 calendar cells share one delegated listener
 - **Pure functions**: All geometry/format functions are stateless and unit-tested
 - **Accessibility**: `tabular-nums` ensures numbers don't jump when values change
 
 **Exported API**:
-```typescript
-import { heatColors, levelForWords, progressRing, formatNumber } from '@/design/charts';
 
-const colors = heatColors('light'); // ['#ebedea', '#cfe0d9', ...]
+```typescript
+import {
+  heatColors,
+  levelForWords,
+  progressRing,
+  formatNumber,
+} from "@/design/charts";
+
+const colors = heatColors("light"); // ['#ebedea', '#cfe0d9', ...]
 const level = levelForWords(2500); // 0-4
 const ring = progressRing(20, 0.75); // { dashArray: "...", offset: ... }
 ```
@@ -146,21 +162,21 @@ const ring = progressRing(20, 0.75); // { dashArray: "...", offset: ... }
 
 All M1 Design System tasks are now **100% complete**:
 
-| Task | Status | Notes |
-|------|--------|-------|
-| T1.1 | ✅ | Design tokens (tokens.css) |
-| T1.2 | ✅ | Motion tokens (motion/tokens.ts) |
-| T1.3 | ✅ | 61 SVG icons (src/icons/*.tsx) |
-| T1.4 | ✅ | Base primitives |
-| T1.5 | ✅ | Container primitives |
-| T1.6 | ✅ | Motion primitives + spring |
-| T1.7 | ✅ | Drag & resize gestures |
-| T1.8 | ✅ | Accessibility (focus trap, keyboard nav, reduced-motion) |
-| T1.9 | ✅ | Component preview page `/dev/kit` |
-| T1.10 | ✅ | Motion performance monitoring |
-| T1.11 | ✅ | Font loader with LRU |
-| T1.12 | ✅ | Font-switch no-flicker tests |
-| T1.13 | ✅ | SVG chart foundation |
+| Task  | Status | Notes                                                    |
+| ----- | ------ | -------------------------------------------------------- |
+| T1.1  | ✅     | Design tokens (tokens.css)                               |
+| T1.2  | ✅     | Motion tokens (motion/tokens.ts)                         |
+| T1.3  | ✅     | 61 SVG icons (src/icons/*.tsx)                           |
+| T1.4  | ✅     | Base primitives                                          |
+| T1.5  | ✅     | Container primitives                                     |
+| T1.6  | ✅     | Motion primitives + spring                               |
+| T1.7  | ✅     | Drag & resize gestures                                   |
+| T1.8  | ✅     | Accessibility (focus trap, keyboard nav, reduced-motion) |
+| T1.9  | ✅     | Component preview page `/dev/kit`                        |
+| T1.10 | ✅     | Motion performance monitoring                            |
+| T1.11 | ✅     | Font loader with LRU                                     |
+| T1.12 | ✅     | Font-switch no-flicker tests                             |
+| T1.13 | ✅     | SVG chart foundation                                     |
 
 ## Verification
 
@@ -175,6 +191,7 @@ To verify the completed work:
 ## Next Steps
 
 With M1 complete, the design system is ready for:
+
 - Integration into application features (M2-M8)
 - E2E performance testing with Playwright (for browser-only fps measurements)
 - Production build verification (`pnpm build` + verify DevKit exclusion)

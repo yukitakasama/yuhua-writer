@@ -66,7 +66,8 @@ const SERIF_STACK =
 const KAI_STACK = '"Yuhua Kai SC", "LXGW WenKai", "KaiTi", "STKaiti", serif';
 
 /** 等宽回退链，供将来的「代码块字体」设置复用。 */
-const MONO_STACK = '"Cascadia Mono", "Consolas", "Menlo", "Noto Sans Mono", monospace';
+const MONO_STACK =
+  '"Cascadia Mono", "Consolas", "Menlo", "Noto Sans Mono", monospace';
 
 /**
  * 全部可选字体族。
@@ -142,7 +143,9 @@ export const FONT_CATALOG: readonly FontFamily[] = [
 ];
 
 /** 目录索引：id -> 字体族。 */
-const BY_ID: ReadonlyMap<string, FontFamily> = new Map(FONT_CATALOG.map((f) => [f.id, f]));
+const BY_ID: ReadonlyMap<string, FontFamily> = new Map(
+  FONT_CATALOG.map((f) => [f.id, f]),
+);
 
 /** 默认字体族 id（与 tokens.css 的默认值一致）。 */
 export const DEFAULT_FAMILY = "yuhua-serif";

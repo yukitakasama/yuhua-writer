@@ -54,7 +54,8 @@
 
     --font-body: "Yuhua Serif SC", "Noto Serif CJK SC", "SimSun", serif;
     --font-heading: "Yuhua Kai SC", "LXGW WenKai", "KaiTi", serif;
-    --font-ui: system-ui, -apple-system, "Segoe UI", "Microsoft YaHei", sans-serif;
+    --font-ui:
+      system-ui, -apple-system, "Segoe UI", "Microsoft YaHei", sans-serif;
 
     --d-instant: 80ms;
     --d-fast: 120ms;

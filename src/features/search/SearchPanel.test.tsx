@@ -27,7 +27,10 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { render } from "solid-js/web";
 
 import type { OutlineNode, SearchResults } from "@/lib/ipc";
-import { __resetWorkspaceState, selectedChapterId } from "@/app/workspace-store";
+import {
+  __resetWorkspaceState,
+  selectedChapterId,
+} from "@/app/workspace-store";
 import { SearchPanel } from "./SearchPanel";
 import { clearJump, pendingJump } from "./search-store";
 
@@ -99,7 +102,10 @@ vi.mock("@/lib/ipc", () => ({
  * `document.body.textContent` 之类的断言读到别人留下的内容。
  * 因此这里收窄到"这个用例期间新增的 body 子节点"再删。
  */
-function mount(component: () => unknown): { root: HTMLElement; dispose: () => void } {
+function mount(component: () => unknown): {
+  root: HTMLElement;
+  dispose: () => void;
+} {
   // 记下挂载前的既有节点，dispose 时只删新增的
   const before = new Set(document.body.children);
   const host = document.createElement("div");
@@ -118,12 +124,20 @@ function mount(component: () => unknown): { root: HTMLElement; dispose: () => vo
 }
 
 /** 造一份检索结果。 */
-function results(hits: SearchResults["hits"], total = hits.length): SearchResults {
+function results(
+  hits: SearchResults["hits"],
+  total = hits.length,
+): SearchResults {
   return { hits, total, limit: 50, offset: 0, tokens: ["测试"] };
 }
 
 /** 一条命中。 */
-function hit(chapterId: string, title: string, snippet: string, range: [number, number]) {
+function hit(
+  chapterId: string,
+  title: string,
+  snippet: string,
+  range: [number, number],
+) {
   return {
     chapterId,
     title,
@@ -168,20 +182,26 @@ afterEach(() => {
 
 describe("检索面板基础", () => {
   it("打开时渲染输入框与两个标签页", () => {
-    const { root, dispose } = mount(() => <SearchPanel open={true} onClose={() => undefined} />);
+    const { root, dispose } = mount(() => (
+      <SearchPanel open={true} onClose={() => undefined} />
+    ));
     expect(root.querySelector("#search-panel-input")).not.toBeNull();
     expect(root.querySelectorAll("[role='tab']")).toHaveLength(2);
     dispose();
   });
 
   it("关闭时不渲染任何内容", () => {
-    const { root, dispose } = mount(() => <SearchPanel open={false} onClose={() => undefined} />);
+    const { root, dispose } = mount(() => (
+      <SearchPanel open={false} onClose={() => undefined} />
+    ));
     expect(root.querySelector("#search-panel-input")).toBeNull();
     dispose();
   });
 
   it("刚打开时给的是引导文案而不是「没有找到」", () => {
-    const { root, dispose } = mount(() => <SearchPanel open={true} onClose={() => undefined} />);
+    const { root, dispose } = mount(() => (
+      <SearchPanel open={true} onClose={() => undefined} />
+    ));
     expect(root.textContent).toContain("输入关键词开始检索");
     expect(root.textContent).not.toContain("没有找到");
     dispose();
@@ -190,7 +210,9 @@ describe("检索面板基础", () => {
 
 describe("检索（T6.1）", () => {
   it("输入后经过防抖才发起检索", async () => {
-    const { root, dispose } = mount(() => <SearchPanel open={true} onClose={() => undefined} />);
+    const { root, dispose } = mount(() => (
+      <SearchPanel open={true} onClose={() => undefined} />
+    ));
     const input = root.querySelector("#search-panel-input") as HTMLInputElement;
     input.value = "雨夜";
     input.dispatchEvent(new InputEvent("input", { bubbles: true }));
@@ -200,12 +222,17 @@ describe("检索（T6.1）", () => {
     expect(searchMock).not.toHaveBeenCalled();
     await settle();
     expect(searchMock).toHaveBeenCalledTimes(1);
-    expect(searchMock.mock.calls[0]?.[0]).toMatchObject({ keyword: "雨夜", titleOnly: false });
+    expect(searchMock.mock.calls[0]?.[0]).toMatchObject({
+      keyword: "雨夜",
+      titleOnly: false,
+    });
     dispose();
   });
 
   it("连续输入只发一次请求（防抖生效）", async () => {
-    const { root, dispose } = mount(() => <SearchPanel open={true} onClose={() => undefined} />);
+    const { root, dispose } = mount(() => (
+      <SearchPanel open={true} onClose={() => undefined} />
+    ));
     const input = root.querySelector("#search-panel-input") as HTMLInputElement;
     // 三拍输入全部落在同一个防抖窗口内（每拍只等 30ms，远小于 180ms）
     for (const value of ["雨", "雨夜", "雨夜里"]) {
@@ -220,8 +247,12 @@ describe("检索（T6.1）", () => {
   });
 
   it("渲染结果条数与路径", async () => {
-    searchMock.mockResolvedValue(results([hit("c1", "第一章 落羽", "雨下了整整一夜", [0, 1])], 1));
-    const { root, dispose } = mount(() => <SearchPanel open={true} onClose={() => undefined} />);
+    searchMock.mockResolvedValue(
+      results([hit("c1", "第一章 落羽", "雨下了整整一夜", [0, 1])], 1),
+    );
+    const { root, dispose } = mount(() => (
+      <SearchPanel open={true} onClose={() => undefined} />
+    ));
     const input = root.querySelector("#search-panel-input") as HTMLInputElement;
     input.value = "雨";
     input.dispatchEvent(new InputEvent("input", { bubbles: true }));
@@ -232,8 +263,12 @@ describe("检索（T6.1）", () => {
   });
 
   it("命中部分用 mark 高亮（而不是拼 innerHTML）", async () => {
-    searchMock.mockResolvedValue(results([hit("c1", "第一章", "雨下了整整一夜", [0, 1])], 1));
-    const { root, dispose } = mount(() => <SearchPanel open={true} onClose={() => undefined} />);
+    searchMock.mockResolvedValue(
+      results([hit("c1", "第一章", "雨下了整整一夜", [0, 1])], 1),
+    );
+    const { root, dispose } = mount(() => (
+      <SearchPanel open={true} onClose={() => undefined} />
+    ));
     const input = root.querySelector("#search-panel-input") as HTMLInputElement;
     input.value = "雨";
     input.dispatchEvent(new InputEvent("input", { bubbles: true }));
@@ -241,25 +276,35 @@ describe("检索（T6.1）", () => {
     const mark = root.querySelector("mark.hit__mark");
     expect(mark?.textContent).toBe("雨");
     // 高亮之外的文本必须原样保留
-    expect(root.querySelector(".hit__snippet")?.textContent).toBe("雨下了整整一夜");
+    expect(root.querySelector(".hit__snippet")?.textContent).toBe(
+      "雨下了整整一夜",
+    );
     dispose();
   });
 
   it("正文里的尖括号被转义，不会变成元素", async () => {
-    searchMock.mockResolvedValue(results([hit("c1", "第一章", "<script>alert(1)</script>", [0, 1])], 1));
-    const { root, dispose } = mount(() => <SearchPanel open={true} onClose={() => undefined} />);
+    searchMock.mockResolvedValue(
+      results([hit("c1", "第一章", "<script>alert(1)</script>", [0, 1])], 1),
+    );
+    const { root, dispose } = mount(() => (
+      <SearchPanel open={true} onClose={() => undefined} />
+    ));
     const input = root.querySelector("#search-panel-input") as HTMLInputElement;
     input.value = "<";
     input.dispatchEvent(new InputEvent("input", { bubbles: true }));
     await settle();
     expect(root.querySelector("script")).toBeNull();
-    expect(root.querySelector(".hit__snippet")?.textContent).toContain("<script>");
+    expect(root.querySelector(".hit__snippet")?.textContent).toContain(
+      "<script>",
+    );
     dispose();
   });
 
   it("搜完之后没有结果才显示「没有找到」", async () => {
     searchMock.mockResolvedValue(results([], 0));
-    const { root, dispose } = mount(() => <SearchPanel open={true} onClose={() => undefined} />);
+    const { root, dispose } = mount(() => (
+      <SearchPanel open={true} onClose={() => undefined} />
+    ));
     const input = root.querySelector("#search-panel-input") as HTMLInputElement;
     input.value = "不存在的词";
     input.dispatchEvent(new InputEvent("input", { bubbles: true }));
@@ -269,22 +314,30 @@ describe("检索（T6.1）", () => {
   });
 
   it("「只搜标题」立刻重查并带 titleOnly", async () => {
-    const { root, dispose } = mount(() => <SearchPanel open={true} onClose={() => undefined} />);
+    const { root, dispose } = mount(() => (
+      <SearchPanel open={true} onClose={() => undefined} />
+    ));
     const input = root.querySelector("#search-panel-input") as HTMLInputElement;
     input.value = "落羽";
     input.dispatchEvent(new InputEvent("input", { bubbles: true }));
     await settle();
 
-    const toggle = [...root.querySelectorAll("button")].find((b) => b.textContent === "只搜标题");
+    const toggle = [...root.querySelectorAll("button")].find(
+      (b) => b.textContent === "只搜标题",
+    );
     toggle?.dispatchEvent(new MouseEvent("click", { bubbles: true }));
     await settle();
-    expect(searchMock).toHaveBeenLastCalledWith(expect.objectContaining({ titleOnly: true }));
+    expect(searchMock).toHaveBeenLastCalledWith(
+      expect.objectContaining({ titleOnly: true }),
+    );
     expect(toggle?.getAttribute("aria-pressed")).toBe("true");
     dispose();
   });
 
   it("清空关键词后回到引导态", async () => {
-    const { root, dispose } = mount(() => <SearchPanel open={true} onClose={() => undefined} />);
+    const { root, dispose } = mount(() => (
+      <SearchPanel open={true} onClose={() => undefined} />
+    ));
     const input = root.querySelector("#search-panel-input") as HTMLInputElement;
     input.value = "雨";
     input.dispatchEvent(new InputEvent("input", { bubbles: true }));
@@ -300,9 +353,13 @@ describe("检索（T6.1）", () => {
 
 describe("结果跳转（T6.2）", () => {
   it("点结果：选中该章 + 发布跳转 + 关闭面板", async () => {
-    searchMock.mockResolvedValue(results([hit("c1", "第一章", "雨下了整整一夜", [0, 1])], 1));
+    searchMock.mockResolvedValue(
+      results([hit("c1", "第一章", "雨下了整整一夜", [0, 1])], 1),
+    );
     const onClose = vi.fn();
-    const { root, dispose } = mount(() => <SearchPanel open={true} onClose={onClose} />);
+    const { root, dispose } = mount(() => (
+      <SearchPanel open={true} onClose={onClose} />
+    ));
     const input = root.querySelector("#search-panel-input") as HTMLInputElement;
     input.value = "雨";
     input.dispatchEvent(new InputEvent("input", { bubbles: true }));
@@ -317,8 +374,12 @@ describe("结果跳转（T6.2）", () => {
 
   it("跳转偏移取的是片段内的高亮起点", async () => {
     // 片段"他说道：关键词在后面"，高亮区间是 [5, 8]
-    searchMock.mockResolvedValue(results([hit("c1", "第一章", "他说道：关键词在后面", [5, 8])], 1));
-    const { root, dispose } = mount(() => <SearchPanel open={true} onClose={() => undefined} />);
+    searchMock.mockResolvedValue(
+      results([hit("c1", "第一章", "他说道：关键词在后面", [5, 8])], 1),
+    );
+    const { root, dispose } = mount(() => (
+      <SearchPanel open={true} onClose={() => undefined} />
+    ));
     const input = root.querySelector("#search-panel-input") as HTMLInputElement;
     input.value = "关键词";
     input.dispatchEvent(new InputEvent("input", { bubbles: true }));
@@ -330,8 +391,12 @@ describe("结果跳转（T6.2）", () => {
   });
 
   it("跳转带自增 token（同一位置连跳两次也要能识别）", async () => {
-    searchMock.mockResolvedValue(results([hit("c1", "第一章", "雨夜", [0, 1])], 1));
-    const { root, dispose } = mount(() => <SearchPanel open={true} onClose={() => undefined} />);
+    searchMock.mockResolvedValue(
+      results([hit("c1", "第一章", "雨夜", [0, 1])], 1),
+    );
+    const { root, dispose } = mount(() => (
+      <SearchPanel open={true} onClose={() => undefined} />
+    ));
     const input = root.querySelector("#search-panel-input") as HTMLInputElement;
     input.value = "雨";
     input.dispatchEvent(new InputEvent("input", { bubbles: true }));
@@ -345,9 +410,13 @@ describe("结果跳转（T6.2）", () => {
   });
 
   it("键盘：↓ 从输入框进入列表，回车跳转", async () => {
-    searchMock.mockResolvedValue(results([hit("c1", "第一章", "雨夜", [0, 1])], 1));
+    searchMock.mockResolvedValue(
+      results([hit("c1", "第一章", "雨夜", [0, 1])], 1),
+    );
     const onClose = vi.fn();
-    const { root, dispose } = mount(() => <SearchPanel open={true} onClose={onClose} />);
+    const { root, dispose } = mount(() => (
+      <SearchPanel open={true} onClose={onClose} />
+    ));
     const input = root.querySelector("#search-panel-input") as HTMLInputElement;
     input.value = "雨";
     input.dispatchEvent(new InputEvent("input", { bubbles: true }));
@@ -355,7 +424,9 @@ describe("结果跳转（T6.2）", () => {
 
     const item = root.querySelector("button.hit") as HTMLButtonElement;
     item.focus();
-    item.dispatchEvent(new KeyboardEvent("keydown", { key: "Enter", bubbles: true }));
+    item.dispatchEvent(
+      new KeyboardEvent("keydown", { key: "Enter", bubbles: true }),
+    );
     expect(selectedChapterId()).toBe("c1");
     expect(onClose).toHaveBeenCalledTimes(1);
     dispose();
@@ -363,9 +434,17 @@ describe("结果跳转（T6.2）", () => {
 
   it("↑↓ 在结果之间移动并保持 roving tabindex", async () => {
     searchMock.mockResolvedValue(
-      results([hit("c1", "第一章", "雨夜", [0, 1]), hit("c2", "第二章", "夜雨", [0, 1])], 2),
+      results(
+        [
+          hit("c1", "第一章", "雨夜", [0, 1]),
+          hit("c2", "第二章", "夜雨", [0, 1]),
+        ],
+        2,
+      ),
     );
-    const { root, dispose } = mount(() => <SearchPanel open={true} onClose={() => undefined} />);
+    const { root, dispose } = mount(() => (
+      <SearchPanel open={true} onClose={() => undefined} />
+    ));
     const input = root.querySelector("#search-panel-input") as HTMLInputElement;
     input.value = "雨";
     input.dispatchEvent(new InputEvent("input", { bubbles: true }));
@@ -376,7 +455,9 @@ describe("结果跳转（T6.2）", () => {
     expect(items[0]?.getAttribute("tabindex")).toBe("0");
     expect(items[1]?.getAttribute("tabindex")).toBe("-1");
 
-    list.dispatchEvent(new KeyboardEvent("keydown", { key: "ArrowDown", bubbles: true }));
+    list.dispatchEvent(
+      new KeyboardEvent("keydown", { key: "ArrowDown", bubbles: true }),
+    );
     await settle();
     const after = [...root.querySelectorAll<HTMLButtonElement>("button.hit")];
     expect(after[1]?.getAttribute("tabindex")).toBe("0");
@@ -384,12 +465,18 @@ describe("结果跳转（T6.2）", () => {
   });
 
   it("Enter 在空结果时不会抛异常", async () => {
-    const { root, dispose } = mount(() => <SearchPanel open={true} onClose={() => undefined} />);
+    const { root, dispose } = mount(() => (
+      <SearchPanel open={true} onClose={() => undefined} />
+    ));
     const input = root.querySelector("#search-panel-input") as HTMLInputElement;
     input.value = "没有";
     input.dispatchEvent(new InputEvent("input", { bubbles: true }));
     await settle();
-    expect(() => input.dispatchEvent(new KeyboardEvent("keydown", { key: "Enter", bubbles: true }))).not.toThrow();
+    expect(() =>
+      input.dispatchEvent(
+        new KeyboardEvent("keydown", { key: "Enter", bubbles: true }),
+      ),
+    ).not.toThrow();
     dispose();
   });
 });
@@ -421,8 +508,12 @@ describe("大纲视图（T6.3）", () => {
 
   it("切到大纲标签页会载入并渲染卷章", async () => {
     outlineMock.mockResolvedValue(outline);
-    const { root, dispose } = mount(() => <SearchPanel open={true} onClose={() => undefined} />);
-    const tab = [...root.querySelectorAll("[role='tab']")].find((t) => t.textContent?.includes("大纲"));
+    const { root, dispose } = mount(() => (
+      <SearchPanel open={true} onClose={() => undefined} />
+    ));
+    const tab = [...root.querySelectorAll("[role='tab']")].find((t) =>
+      t.textContent?.includes("大纲"),
+    );
     tab?.dispatchEvent(new MouseEvent("click", { bubbles: true }));
     await settle();
     expect(outlineMock).toHaveBeenCalled();
@@ -433,8 +524,12 @@ describe("大纲视图（T6.3）", () => {
 
   it("大纲里显示卷的字数与章数", async () => {
     outlineMock.mockResolvedValue(outline);
-    const { root, dispose } = mount(() => <SearchPanel open={true} onClose={() => undefined} />);
-    const tab = [...root.querySelectorAll("[role='tab']")].find((t) => t.textContent?.includes("大纲"));
+    const { root, dispose } = mount(() => (
+      <SearchPanel open={true} onClose={() => undefined} />
+    ));
+    const tab = [...root.querySelectorAll("[role='tab']")].find((t) =>
+      t.textContent?.includes("大纲"),
+    );
     tab?.dispatchEvent(new MouseEvent("click", { bubbles: true }));
     await settle();
     expect(root.textContent).toContain("12,000");
@@ -444,12 +539,18 @@ describe("大纲视图（T6.3）", () => {
   it("点大纲里的章会跳转并关闭", async () => {
     outlineMock.mockResolvedValue(outline);
     const onClose = vi.fn();
-    const { root, dispose } = mount(() => <SearchPanel open={true} onClose={onClose} />);
-    const tab = [...root.querySelectorAll("[role='tab']")].find((t) => t.textContent?.includes("大纲"));
+    const { root, dispose } = mount(() => (
+      <SearchPanel open={true} onClose={onClose} />
+    ));
+    const tab = [...root.querySelectorAll("[role='tab']")].find((t) =>
+      t.textContent?.includes("大纲"),
+    );
     tab?.dispatchEvent(new MouseEvent("click", { bubbles: true }));
     await settle();
 
-    (root.querySelector("button.outline__chapter") as HTMLButtonElement).click();
+    (
+      root.querySelector("button.outline__chapter") as HTMLButtonElement
+    ).click();
     expect(selectedChapterId()).toBe("c1");
     expect(pendingJump()?.chapterId).toBe("c1");
     expect(onClose).toHaveBeenCalledTimes(1);
@@ -458,8 +559,12 @@ describe("大纲视图（T6.3）", () => {
 
   it("大纲为空时给出空状态而不是白屏", async () => {
     outlineMock.mockResolvedValue([]);
-    const { root, dispose } = mount(() => <SearchPanel open={true} onClose={() => undefined} />);
-    const tab = [...root.querySelectorAll("[role='tab']")].find((t) => t.textContent?.includes("大纲"));
+    const { root, dispose } = mount(() => (
+      <SearchPanel open={true} onClose={() => undefined} />
+    ));
+    const tab = [...root.querySelectorAll("[role='tab']")].find((t) =>
+      t.textContent?.includes("大纲"),
+    );
     tab?.dispatchEvent(new MouseEvent("click", { bubbles: true }));
     await settle();
     expect(root.textContent).toContain("还没有可展示的大纲");
@@ -468,8 +573,12 @@ describe("大纲视图（T6.3）", () => {
 
   it("大纲载入失败时退化为空状态而不是抛异常", async () => {
     outlineMock.mockRejectedValue(new Error("boom"));
-    const { root, dispose } = mount(() => <SearchPanel open={true} onClose={() => undefined} />);
-    const tab = [...root.querySelectorAll("[role='tab']")].find((t) => t.textContent?.includes("大纲"));
+    const { root, dispose } = mount(() => (
+      <SearchPanel open={true} onClose={() => undefined} />
+    ));
+    const tab = [...root.querySelectorAll("[role='tab']")].find((t) =>
+      t.textContent?.includes("大纲"),
+    );
     tab?.dispatchEvent(new MouseEvent("click", { bubbles: true }));
     await settle();
     expect(root.textContent).toContain("还没有可展示的大纲");

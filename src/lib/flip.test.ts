@@ -15,13 +15,35 @@
 
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-import { capturePositions, playFlip, prefersReducedMotion, withFlip } from "./flip";
+import {
+  capturePositions,
+  playFlip,
+  prefersReducedMotion,
+  withFlip,
+} from "./flip";
 
 /** 造一个带 flip id 的元素，并伪造它的位置。 */
-function makeRow(id: string, top: number, left = 0, height = 28, width = 200): HTMLElement {
+function makeRow(
+  id: string,
+  top: number,
+  left = 0,
+  height = 28,
+  width = 200,
+): HTMLElement {
   const el = document.createElement("div");
   el.dataset["flipId"] = id;
-  el.getBoundingClientRect = () => ({ top, left, height, width, bottom: top + height, right: left + width, x: left, y: top, toJSON: () => ({}) }) as DOMRect;
+  el.getBoundingClientRect = () =>
+    ({
+      top,
+      left,
+      height,
+      width,
+      bottom: top + height,
+      right: left + width,
+      x: left,
+      y: top,
+      toJSON: () => ({}),
+    }) as DOMRect;
   document.body.appendChild(el);
   return el;
 }
@@ -69,7 +91,18 @@ describe("playFlip", () => {
     const el = makeRow("a", 0);
     const before = capturePositions();
     // 元素"移动"到新位置
-    el.getBoundingClientRect = () => ({ top: 60, left: 0, height: 28, width: 200, bottom: 88, right: 200, x: 0, y: 60, toJSON: () => ({}) }) as DOMRect;
+    el.getBoundingClientRect = () =>
+      ({
+        top: 60,
+        left: 0,
+        height: 28,
+        width: 200,
+        bottom: 88,
+        right: 200,
+        x: 0,
+        y: 60,
+        toJSON: () => ({}),
+      }) as DOMRect;
 
     const animated = playFlip(before);
     expect(animated).toBe(1);
@@ -81,7 +114,18 @@ describe("playFlip", () => {
   it("位移不足 1px 的元素被跳过（亚像素抖动不做动画）", () => {
     const el = makeRow("a", 0);
     const before = capturePositions();
-    el.getBoundingClientRect = () => ({ top: 0.4, left: 0, height: 28, width: 200, bottom: 28.4, right: 200, x: 0, y: 0.4, toJSON: () => ({}) }) as DOMRect;
+    el.getBoundingClientRect = () =>
+      ({
+        top: 0.4,
+        left: 0,
+        height: 28,
+        width: 200,
+        bottom: 28.4,
+        right: 200,
+        x: 0,
+        y: 0.4,
+        toJSON: () => ({}),
+      }) as DOMRect;
 
     expect(playFlip(before)).toBe(0);
     expect(el.style.transform).toBe("");
@@ -102,7 +146,18 @@ describe("playFlip", () => {
   it("动画完成后 will-change 被移除（不长期占用合成层）", () => {
     const el = makeRow("a", 0);
     const before = capturePositions();
-    el.getBoundingClientRect = () => ({ top: 60, left: 0, height: 28, width: 200, bottom: 88, right: 200, x: 0, y: 60, toJSON: () => ({}) }) as DOMRect;
+    el.getBoundingClientRect = () =>
+      ({
+        top: 60,
+        left: 0,
+        height: 28,
+        width: 200,
+        bottom: 88,
+        right: 200,
+        x: 0,
+        y: 60,
+        toJSON: () => ({}),
+      }) as DOMRect;
 
     playFlip(before, document, 16);
     // 手动触发 transitionend 模拟动画结束
@@ -115,7 +170,18 @@ describe("playFlip", () => {
     vi.useFakeTimers();
     const el = makeRow("a", 0);
     const before = capturePositions();
-    el.getBoundingClientRect = () => ({ top: 60, left: 0, height: 28, width: 200, bottom: 88, right: 200, x: 0, y: 60, toJSON: () => ({}) }) as DOMRect;
+    el.getBoundingClientRect = () =>
+      ({
+        top: 60,
+        left: 0,
+        height: 28,
+        width: 200,
+        bottom: 88,
+        right: 200,
+        x: 0,
+        y: 60,
+        toJSON: () => ({}),
+      }) as DOMRect;
 
     playFlip(before, document, 16);
     expect(el.style.willChange).toBe("transform");
@@ -127,11 +193,26 @@ describe("playFlip", () => {
   it("减少动效时完全不动画", () => {
     vi.stubGlobal(
       "matchMedia",
-      vi.fn().mockReturnValue({ matches: true, addEventListener: () => undefined, removeEventListener: () => undefined }),
+      vi.fn().mockReturnValue({
+        matches: true,
+        addEventListener: () => undefined,
+        removeEventListener: () => undefined,
+      }),
     );
     const el = makeRow("a", 0);
     const before = capturePositions();
-    el.getBoundingClientRect = () => ({ top: 60, left: 0, height: 28, width: 200, bottom: 88, right: 200, x: 0, y: 60, toJSON: () => ({}) }) as DOMRect;
+    el.getBoundingClientRect = () =>
+      ({
+        top: 60,
+        left: 0,
+        height: 28,
+        width: 200,
+        bottom: 88,
+        right: 200,
+        x: 0,
+        y: 60,
+        toJSON: () => ({}),
+      }) as DOMRect;
 
     expect(playFlip(before)).toBe(0);
   });
@@ -140,8 +221,30 @@ describe("playFlip", () => {
     const a = makeRow("a", 0);
     const b = makeRow("b", 40);
     const before = capturePositions();
-    a.getBoundingClientRect = () => ({ top: 80, left: 0, height: 28, width: 200, bottom: 108, right: 200, x: 0, y: 80, toJSON: () => ({}) }) as DOMRect;
-    b.getBoundingClientRect = () => ({ top: 0, left: 0, height: 28, width: 200, bottom: 28, right: 200, x: 0, y: 0, toJSON: () => ({}) }) as DOMRect;
+    a.getBoundingClientRect = () =>
+      ({
+        top: 80,
+        left: 0,
+        height: 28,
+        width: 200,
+        bottom: 108,
+        right: 200,
+        x: 0,
+        y: 80,
+        toJSON: () => ({}),
+      }) as DOMRect;
+    b.getBoundingClientRect = () =>
+      ({
+        top: 0,
+        left: 0,
+        height: 28,
+        width: 200,
+        bottom: 28,
+        right: 200,
+        x: 0,
+        y: 0,
+        toJSON: () => ({}),
+      }) as DOMRect;
 
     expect(playFlip(before)).toBe(2);
   });
@@ -151,7 +254,9 @@ describe("playFlip", () => {
     const outside = makeRow("outside", 100);
     const scope = document.createElement("div");
     document.body.appendChild(scope);
-    scope.appendChild(document.querySelector("[data-flip-id='inside']") as Node);
+    scope.appendChild(
+      document.querySelector("[data-flip-id='inside']") as Node,
+    );
 
     const before = capturePositions(scope);
     expect(before.size).toBe(1);
@@ -186,7 +291,18 @@ describe("withFlip", () => {
     const animated = withFlip(() => {
       calls.push("mutate");
       // 改动中元素移动到新位置
-      el.getBoundingClientRect = () => ({ top: 60, left: 0, height: 28, width: 200, bottom: 88, right: 200, x: 0, y: 60, toJSON: () => ({}) }) as DOMRect;
+      el.getBoundingClientRect = () =>
+        ({
+          top: 60,
+          left: 0,
+          height: 28,
+          width: 200,
+          bottom: 88,
+          right: 200,
+          x: 0,
+          y: 60,
+          toJSON: () => ({}),
+        }) as DOMRect;
     });
 
     expect(calls).toEqual(["mutate"]);

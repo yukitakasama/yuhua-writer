@@ -28,7 +28,10 @@ export interface ListNavigationOptions {
  *
  * Home / End 单独用 {@link isEdgeKey} 判断，因为它们的目标是列表两端而非相对移动。
  */
-export function axisDelta(key: string, axis: NavigationAxis = "vertical"): -1 | 0 | 1 {
+export function axisDelta(
+  key: string,
+  axis: NavigationAxis = "vertical",
+): -1 | 0 | 1 {
   const vertical = axis === "vertical" || axis === "both";
   const horizontal = axis === "horizontal" || axis === "both";
   if (key === "ArrowDown" && vertical) return 1;
@@ -91,7 +94,12 @@ export function handleListNavigation(
   options: ListNavigationOptions = {},
 ): boolean {
   const { moveFocus = true } = options;
-  const index = nextIndexFor(items, document.activeElement as HTMLElement | null, event.key, options);
+  const index = nextIndexFor(
+    items,
+    document.activeElement as HTMLElement | null,
+    event.key,
+    options,
+  );
   if (index === null) return false;
   if (moveFocus) items[index]?.focus();
   return true;
@@ -107,10 +115,14 @@ export function handleListNavigation(
  * @param container 列表容器。
  * @param active 当前应保留在 Tab 序中的元素；不在容器内时退化为第一个元素。
  */
-export function applyRovingTabindex(container: HTMLElement, active: HTMLElement | null): HTMLElement[] {
+export function applyRovingTabindex(
+  container: HTMLElement,
+  active: HTMLElement | null,
+): HTMLElement[] {
   const items = getFocusableElements(container);
   if (items.length === 0) return items;
-  const target = active && items.includes(active) ? active : (items[0] as HTMLElement);
+  const target =
+    active && items.includes(active) ? active : (items[0] as HTMLElement);
   for (const item of items) {
     item.setAttribute("tabindex", item === target ? "0" : "-1");
   }

@@ -40,7 +40,12 @@ export interface ChapterCursor {
 const ANCHOR_LENGTH = 32;
 
 /** 从一段文本与光标偏移构造位置记录。 */
-export function captureCursor(text: string, anchor: number, head: number, line: number): ChapterCursor {
+export function captureCursor(
+  text: string,
+  anchor: number,
+  head: number,
+  line: number,
+): ChapterCursor {
   const from = Math.max(0, Math.min(anchor, text.length));
   const to = Math.min(text.length, from + ANCHOR_LENGTH);
   return {
@@ -58,7 +63,10 @@ export function captureCursor(text: string, anchor: number, head: number, line: 
  * 因为空文档（新建的章）本来就没什么可锚的，
  * 此时恢复到位置 0 是正确行为。
  */
-export function isCursorResolvable(text: string, cursor: ChapterCursor): boolean {
+export function isCursorResolvable(
+  text: string,
+  cursor: ChapterCursor,
+): boolean {
   if (cursor.textAnchor.length === 0) {
     // 锚点为空只有一个合法来源：捕获时**文档本身就是空的**
     // （见 captureCursor 的说明）。因此只有"当前文档也空"
@@ -105,7 +113,11 @@ export type CursorStore = Map<string, ChapterCursor>;
 export const CURSOR_STORE_LIMIT = 500;
 
 /** 存入一条记录，超过上限时淘汰最旧的一条。 */
-export function rememberCursor(store: CursorStore, chapterId: string, cursor: ChapterCursor): void {
+export function rememberCursor(
+  store: CursorStore,
+  chapterId: string,
+  cursor: ChapterCursor,
+): void {
   // Map 保证插入顺序：先删再插就是"移到最新"
   store.delete(chapterId);
   store.set(chapterId, cursor);
@@ -117,6 +129,9 @@ export function rememberCursor(store: CursorStore, chapterId: string, cursor: Ch
 }
 
 /** 取一条记录。不存在返回 null。 */
-export function recallCursor(store: CursorStore, chapterId: string): ChapterCursor | null {
+export function recallCursor(
+  store: CursorStore,
+  chapterId: string,
+): ChapterCursor | null {
   return store.get(chapterId) ?? null;
 }

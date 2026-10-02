@@ -67,7 +67,9 @@ describe("光标记忆：解析", () => {
     const resolved = resolveCursor(modified, c);
     // 应当落在"走过去"的"走"上，也就是原偏移 3 加上插入长度
     expect(resolved).toBe(3 + "补充的一段。".length);
-    expect(modified.slice(resolved, resolved + c.textAnchor.length)).toBe(c.textAnchor);
+    expect(modified.slice(resolved, resolved + c.textAnchor.length)).toBe(
+      c.textAnchor,
+    );
   });
 
   it("前面删除文字后跟着内容走", () => {
@@ -75,7 +77,9 @@ describe("光标记忆：解析", () => {
     const c = captureCursor(original, 4, 4, 1);
     const modified = original.slice(2);
     const resolved = resolveCursor(modified, c);
-    expect(modified.slice(resolved, resolved + c.textAnchor.length)).toBe(c.textAnchor);
+    expect(modified.slice(resolved, resolved + c.textAnchor.length)).toBe(
+      c.textAnchor,
+    );
   });
 
   it("锚点丢失时退回偏移并夹紧", () => {
@@ -87,7 +91,12 @@ describe("光标记忆：解析", () => {
   });
 
   it("偏移越界时夹到文末而不是报错", () => {
-    const c: ChapterCursor = { anchor: 99999, head: 99999, textAnchor: "不存在的锚", line: 1 };
+    const c: ChapterCursor = {
+      anchor: 99999,
+      head: 99999,
+      textAnchor: "不存在的锚",
+      line: 1,
+    };
     expect(resolveCursor("短", c)).toBe(1);
   });
 
@@ -112,7 +121,12 @@ describe("光标记忆：可用性判定", () => {
 
   it("锚点为空但文档非空 => 不可用", () => {
     const c = captureCursor("原文", 2, 2, 1);
-    const empty: ChapterCursor = { anchor: 0, head: 0, textAnchor: "", line: 1 };
+    const empty: ChapterCursor = {
+      anchor: 0,
+      head: 0,
+      textAnchor: "",
+      line: 1,
+    };
     void c;
     expect(isCursorResolvable("有内容", empty)).toBe(false);
   });

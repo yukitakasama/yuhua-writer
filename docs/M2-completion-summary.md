@@ -11,6 +11,7 @@ This document summarizes the completion status of M2 tasks (T2.1 - T2.15).
 **Location**: `src-tauri/crates/yuhua-core/src/model.rs`
 
 **What was delivered**:
+
 - `Book`, `Volume`, `Chapter` domain models with full serialization support
 - `Document` aggregate root holding the complete manuscript structure
 - 5 centralized invariant validations enforced on every `Document::validate()` call:
@@ -24,6 +25,7 @@ This document summarizes the completion status of M2 tasks (T2.1 - T2.15).
 - Comprehensive test suite (784 lines) covering all invariant violations
 
 **Key design decisions**:
+
 - Chapters cannot exist without a volume (simpler mental model for authors)
 - Invariants fail fast on first violation rather than collecting all errors
 - Chapter body is optional to avoid loading entire manuscript into memory for tree views
@@ -32,7 +34,8 @@ This document summarizes the completion status of M2 tasks (T2.1 - T2.15).
 
 **Status**: ✅ Complete
 
-**Location**: 
+**Location**:
+
 - `src-tauri/crates/yuhua-fs/src/workspace.rs`
 - `src-tauri/src/recent.rs`
 
@@ -57,6 +60,7 @@ This document summarizes the completion status of M2 tasks (T2.1 - T2.15).
    - Invalid paths automatically removed on access attempt
 
 **Key features**:
+
 - Volume rename persistence: stores `dir_name` in config to survive renames
 - `#[serde(default)]` on `volumes` field ensures old workspaces can still open
 - Timezone-aware timestamps using `chrono::FixedOffset`
@@ -68,6 +72,7 @@ This document summarizes the completion status of M2 tasks (T2.1 - T2.15).
 **Location**: `src-tauri/crates/yuhua-fs/src/layout.rs`
 
 **What was delivered**:
+
 - `WorkspaceLayout` trait defining canonical directory structure:
   - `.yuhua/workspace.json` - Configuration file
   - `.yuhua/backups/` - Rotating backup storage
@@ -80,6 +85,7 @@ This document summarizes the completion status of M2 tasks (T2.1 - T2.15).
 - Path helper functions: `volume_dir_name()`, `chapter_file_name()`
 
 **Migration framework**:
+
 ```rust
 match config.format_version.cmp(&FORMAT_VERSION) {
     Ordering::Less => {
@@ -119,6 +125,7 @@ match config.format_version.cmp(&FORMAT_VERSION) {
    - Metadata merged from both `ChapterMeta` and `Chapter` fields
 
 **Front Matter format**:
+
 ```yaml
 ---
 id: ch_abc123
@@ -128,7 +135,6 @@ wordGoal: 3000
 created: 2026-01-01T09:00:00+08:00
 updated: 2026-01-02T14:30:00+08:00
 ---
-
 Chapter body content here...
 ```
 
@@ -141,6 +147,7 @@ Chapter body content here...
 **Location**: `src-tauri/crates/yuhua-fs/src/atomic.rs`
 
 **What was delivered**:
+
 - Classic atomic write pattern: write to temp → fsync → rename
 - Temp file naming: `{target}.tmp.{timestamp}`
 - Rollback on failure: removes temp file if any step fails
@@ -148,6 +155,7 @@ Chapter body content here...
 - Error handling: preserves original file if write fails at any stage
 
 **Sequence**:
+
 1. Write complete content to `{target}.tmp.{timestamp}`
 2. Call `fsync()` on the file descriptor
 3. Call `fsync()` on the parent directory (ensures directory entry is durable)
@@ -160,7 +168,8 @@ Chapter body content here...
 
 **Status**: ✅ Complete
 
-**Location**: 
+**Location**:
+
 - `src-tauri/crates/yuhua-fs/src/backup.rs`
 - `src-tauri/crates/yuhua-fs/src/journal.rs`
 
@@ -181,6 +190,7 @@ Chapter body content here...
    - Temp file sweep: finds and removes orphaned `.tmp.*` files
 
 **Recovery report structure**:
+
 ```rust
 pub struct RecoveryReport {
     pub swept_temp_files: usize,
@@ -198,6 +208,7 @@ pub struct RecoveryReport {
 **Location**: `src-tauri/crates/yuhua-core/src/trash.rs` and `yuhua-fs/src/trash.rs`
 
 **What was delivered**:
+
 - Soft delete: moves files to `.yuhua/trash/` instead of immediate deletion
 - `TrashEntry` metadata: original path, deletion timestamp, original filename
 - Restore operation: moves file back to original location
@@ -206,6 +217,7 @@ pub struct RecoveryReport {
 - **Path guard hardening** (code review fix): rejects reserved directories, prevents self-nesting
 
 **Trash entry format**:
+
 ```json
 {
   "originalPath": "manuscript/001/001-Chapter One.md",
@@ -215,6 +227,7 @@ pub struct RecoveryReport {
 ```
 
 **Security fixes from code review**:
+
 - Entry guard: refuses to trash reserved paths (`.yuhua/`, `manuscript/`, trash itself)
 - Self-nesting prevention: refuses to copy directory into its own descendant
 - Test coverage: `reserved_paths_cannot_be_trashed`, `copy_recursive_rejects_self_nesting`
@@ -226,6 +239,7 @@ pub struct RecoveryReport {
 **Location**: `src-tauri/crates/yuhua-fs/src/watch.rs`
 
 **What was delivered**:
+
 - File system monitoring using `notify` crate
 - Debounced event aggregation (300ms window)
 - Event semantic merging: CREATE + MODIFY → CREATE, REMOVE + CREATE → MODIFY
@@ -234,6 +248,7 @@ pub struct RecoveryReport {
 - Graceful handling of watch errors (logs but doesn't crash)
 
 **Event processing**:
+
 ```
 Raw events:  CREATE → MODIFY → MODIFY → MODIFY
 Debounced:   [CREATE, MODIFY × 3] after 300ms
@@ -246,7 +261,8 @@ Merged:      CREATE (since it's a new file)
 
 **Status**: ✅ Complete
 
-**Location**: 
+**Location**:
+
 - `src-tauri/src/commands.rs` (30 commands)
 - `src-tauri/src/error.rs`
 
@@ -255,7 +271,7 @@ Merged:      CREATE (since it's a new file)
 1. **Command Layer** (薄壳 / thin shell):
    - 30 Tauri commands covering all workspace operations
    - Commands follow three-step pattern: validate session → call domain logic → translate result
-  ssion access pattern: `session()` → `lock_session()` to minimize lock contention
+     ssion access pattern: `session()` → `lock_session()` to minimize lock contention
    - No business logic in commands (all logic in domain crates)
 
 2. **Unified Error Types**:
@@ -265,6 +281,7 @@ Merged:      CREATE (since it's a new file)
    - Frontend can branch on error codes for specific handling
 
 **Key commands**:
+
 - Workspace: `create_workspace`, `open_workspace`, `close_workspace`
 - Content: `get_outline`, `load_chapter`, `save_chapter`, `rename_chapter`
 - Structure: `create_volume`, `rename_volume`, `delete_volume`, `reorder_chapters`
@@ -279,6 +296,7 @@ Merged:      CREATE (since it's a new file)
 **Location**: Test files throughout `src-tauri/crates/`
 
 **What was delivered**:
+
 - **Unit tests**: 937 tests passing across all crates
 - **Integration tests**:
   - `yuhua-fs/tests/archive_roundtrip.rs` - Zip export/import
@@ -288,6 +306,7 @@ Merged:      CREATE (since it's a new file)
   - `yuhua-export/tests/subset_consistency.rs` - Markdown subset alignment
 
 **Coverage includes**:
+
 - Domain model invariant violations (all 5 invariants)
 - Atomic write failure scenarios
 - Backup rotation edge cases
@@ -297,6 +316,7 @@ Merged:      CREATE (since it's a new file)
 - Cloud conflict copy detection (7 naming patterns)
 
 **Test quality**:
+
 - All tests pass: `cargo test --workspace` → 937 passed, 0 failed
 - Zero clippy warnings: `cargo clippy --workspace --all-targets -- -D warnings`
 - Formatted: `cargo fmt --all -- --check`
@@ -308,6 +328,7 @@ Merged:      CREATE (since it's a new file)
 **Location**: `src-tauri/crates/yuhua-fs/src/layout.rs`
 
 **What was delivered**:
+
 - SQLite database stored in OS-appropriate app data directory:
   - Windows: `%APPDATA%/dev.yuhua.yuwriting/indices/`
   - macOS: `~/Library/Application Support/dev.yuhua.yuwriting/indices/`
@@ -317,6 +338,7 @@ Merged:      CREATE (since it's a new file)
 - Rationale: keeps workspace clean and avoids cloud sync conflicts
 
 **Why external**:
+
 - Cloud services (OneDrive, Dropbox) struggle with SQLite's lock files
 - Database can be rebuilt from source, not user content
 - Cleaner workspace structure (only `.yuhua/` and `manuscript/` visible)
@@ -328,6 +350,7 @@ Merged:      CREATE (since it's a new file)
 **Location**: `src-tauri/crates/yuhua-fs/src/conflict.rs`
 
 **What was delivered**:
+
 - Detects 7 cloud service conflict naming patterns:
   1. OneDrive: `file (User's conflicted copy 2026-01-15).md`
   2. Dropbox: `file (User's conflicted copy).md`
@@ -341,6 +364,7 @@ Merged:      CREATE (since it's a new file)
 - Test coverage ensures deletion protection
 
 **Detection in action**:
+
 ```rust
 let conflicts = detect_conflicts(&workspace_root);
 // Returns: Vec<DetectedConflict>
@@ -356,6 +380,7 @@ let conflicts = detect_conflicts(&workspace_root);
 **Location**: `src-tauri/src/commands.rs::save_chapter`
 
 **What was delivered**:
+
 - Complete save chain: validation → read existing → compare → atomic write → index update → **stats recording**
 - Save hook emits chapter save events consumed by `yuhua-stats` module
 - Event payload includes: chapter ID, old word count, new word count, timestamp
@@ -363,6 +388,7 @@ let conflicts = detect_conflicts(&workspace_root);
 - Integration point for M8 statistics dashboard
 
 **Save sequence**:
+
 1. Load existing chapter from disk (for "never silent overwrite" check)
 2. Validate new content doesn't break invariants
 3. Perform atomic write
@@ -381,6 +407,7 @@ let conflicts = detect_conflicts(&workspace_root);
 **Reason**: Requires large-scale real data generation and memory profiling
 
 **What's needed**:
+
 - Generate synthetic workspace with ~1000 chapters, 1M+ total words
 - Load workspace and measure RSS (Resident Set Size)
 - Verify memory usage scales with active chapters, not total content
@@ -395,6 +422,7 @@ let conflicts = detect_conflicts(&workspace_root);
 **Reason**: Marked as "Should have" rather than "Must have" in planning document
 
 **What's needed**:
+
 - Zip entire workspace directory
 - Include `.yuhua/` metadata for full backup
 - Exclude index database (can be rebuilt)
@@ -406,32 +434,34 @@ let conflicts = detect_conflicts(&workspace_root);
 
 M2 Rust Core is **functionally complete** with **13 out of 15 tasks (87%)** delivered and verified:
 
-| Task | Status | Notes |
-|------|--------|-------|
-| T2.1 | ✅ | Domain model with 5 invariants |
-| T2.2 | ✅ | Workspace create/open/recent list |
-| T2.3 | ✅ | Directory structure + migration hooks |
-| T2.4 | ✅ | Chapter I/O with custom YAML parser |
-| T2.5 | ✅ | Atomic writes with fsync |
-| T2.6 | ✅ | Rotating backups + crash journal |
-| T2.7 | ✅ | Trash with path guards (code review hardened) |
-| T2.8 | ✅ | File watching with debounce + merge |
-| T2.9 | ✅ | 30 commands + unified errors |
-| T2.10 | ✅ | 937 tests passing |
-| T2.11 | ❌ | 1 GB workspace test (needs real data) |
-| T2.12 | ✅ | Index database externalized |
-| T2.13 | ✅ | Conflict copy detection (warn-only) |
-| T2.14 | ❌ | Zip export (Should item, not done) |
-| T2.15 | ✅ | Save hook for statistics |
+| Task  | Status | Notes                                         |
+| ----- | ------ | --------------------------------------------- |
+| T2.1  | ✅     | Domain model with 5 invariants                |
+| T2.2  | ✅     | Workspace create/open/recent list             |
+| T2.3  | ✅     | Directory structure + migration hooks         |
+| T2.4  | ✅     | Chapter I/O with custom YAML parser           |
+| T2.5  | ✅     | Atomic writes with fsync                      |
+| T2.6  | ✅     | Rotating backups + crash journal              |
+| T2.7  | ✅     | Trash with path guards (code review hardened) |
+| T2.8  | ✅     | File watching with debounce + merge           |
+| T2.9  | ✅     | 30 commands + unified errors                  |
+| T2.10 | ✅     | 937 tests passing                             |
+| T2.11 | ❌     | 1 GB workspace test (needs real data)         |
+| T2.12 | ✅     | Index database externalized                   |
+| T2.13 | ✅     | Conflict copy detection (warn-only)           |
+| T2.14 | ❌     | Zip export (Should item, not done)            |
+| T2.15 | ✅     | Save hook for statistics                      |
 
 ## Code Quality Metrics
 
 **Rust**:
+
 - Tests: `cargo test --workspace` → **937 passed, 0 failed**
 - Lints: `cargo clippy --workspace --all-targets -- -D warnings` → **0 warnings**
 - Format: `cargo fmt --all -- --check` → **compliant**
 
 **Frontend** (related to M2 integration):
+
 - Tests: `pnpm test` → **1971 passed** (35 files)
 - Types: `pnpm typecheck` → **0 errors**
 - Lints: `pnpm lint` → **0 warnings**

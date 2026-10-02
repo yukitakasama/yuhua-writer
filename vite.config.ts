@@ -46,7 +46,8 @@ export default defineConfig({
       output: {
         manualChunks(id) {
           // 编辑器内核单独成 chunk：只在进入写作界面时加载
-          if (id.includes("codemirror") || id.includes("@lezer")) return "editor";
+          if (id.includes("codemirror") || id.includes("@lezer"))
+            return "editor";
           if (id.includes("node_modules/solid-js")) return "solid";
           return undefined;
         },

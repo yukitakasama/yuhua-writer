@@ -17,7 +17,7 @@ export function RedoIcon(props: SvgIconProps) {
   return (
     <svg {...iconProps(props)}>
       <path d="M4.5 18.5a7 7 0 0 1 7-7h8" />
-    <path d="M16 8l3.5 3.5L16 15" />
+      <path d="M16 8l3.5 3.5L16 15" />
     </svg>
   );
 }

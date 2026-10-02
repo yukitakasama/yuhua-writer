@@ -26,7 +26,10 @@ const here = dirname(fileURLToPath(import.meta.url));
 type IconComponent = (props: Record<string, unknown>) => unknown;
 
 /** 把组件渲染到游离容器里并返回 svg 元素。 */
-function renderIcon(Component: IconComponent, props: Record<string, unknown> = {}): SVGElement {
+function renderIcon(
+  Component: IconComponent,
+  props: Record<string, unknown> = {},
+): SVGElement {
   const host = document.createElement("div");
   const dispose = render(() => Component(props) as unknown as Element, host);
   const svg = host.querySelector("svg");
@@ -55,15 +58,58 @@ describe("图标数量与清单", () => {
 
   it("覆盖了计划书 7.3 的关键图标", () => {
     const required = [
-      "file", "folder", "book", "volume", "chapter", "plus", "minus", "close",
-      "check", "arrow-up", "arrow-down", "arrow-left", "arrow-right",
-      "collapse", "expand", "search", "replace", "undo", "redo",
-      "bold", "italic", "heading", "quote", "list", "list-ordered", "divider",
-      "code", "link", "image", "save", "settings", "moon", "sun", "fullscreen",
-      "focus", "export", "trash", "more", "drag-handle", "word-count",
-      "calendar", "character", "world", "panel-left", "panel-right",
-      "feather", "flame", "goal", "clock",
-      "format-docx", "format-pdf", "format-epub",
+      "file",
+      "folder",
+      "book",
+      "volume",
+      "chapter",
+      "plus",
+      "minus",
+      "close",
+      "check",
+      "arrow-up",
+      "arrow-down",
+      "arrow-left",
+      "arrow-right",
+      "collapse",
+      "expand",
+      "search",
+      "replace",
+      "undo",
+      "redo",
+      "bold",
+      "italic",
+      "heading",
+      "quote",
+      "list",
+      "list-ordered",
+      "divider",
+      "code",
+      "link",
+      "image",
+      "save",
+      "settings",
+      "moon",
+      "sun",
+      "fullscreen",
+      "focus",
+      "export",
+      "trash",
+      "more",
+      "drag-handle",
+      "word-count",
+      "calendar",
+      "character",
+      "world",
+      "panel-left",
+      "panel-right",
+      "feather",
+      "flame",
+      "goal",
+      "clock",
+      "format-docx",
+      "format-pdf",
+      "format-epub",
     ];
     for (const name of required) {
       expect(Object.keys(ALL_ICONS), name).toContain(name);
@@ -119,7 +165,9 @@ describe("图标规范（计划书 7.2）", () => {
   });
 
   it.each(names)("%s 支持自定义尺寸", (name) => {
-    const svg = renderIcon(ALL_ICONS[name as keyof typeof ALL_ICONS] as never, { size: 32 });
+    const svg = renderIcon(ALL_ICONS[name as keyof typeof ALL_ICONS] as never, {
+      size: 32,
+    });
     expect(svg.getAttribute("width")).toBe("32");
     expect(svg.getAttribute("height")).toBe("32");
   });
@@ -153,7 +201,9 @@ describe("图标规范（计划书 7.2）", () => {
     // 用单一线宽的描边无论怎么画都只像字母 B，读不出「加粗」。
     // 这条测试把这个例外钉死，避免后来者顺手给别的图标也加 fill。
     const filled = names.filter((name) => {
-      const svg = renderIcon(ALL_ICONS[name as keyof typeof ALL_ICONS] as never);
+      const svg = renderIcon(
+        ALL_ICONS[name as keyof typeof ALL_ICONS] as never,
+      );
       return svg.querySelector('[fill="currentColor"]') !== null;
     });
     expect(filled).toEqual(["bold"]);
@@ -178,7 +228,8 @@ describe("图标源码零违规", () => {
   it.each(files)("%s 不含 emoji", (file) => {
     const source = readFileSync(resolve(here, file), "utf8");
     // 覆盖常见 emoji 区段：杂项符号、装饰符号、交通、表情、补充符号
-    const emoji = /[\u{1F300}-\u{1FAFF}\u{2600}-\u{27BF}\u{2B00}-\u{2BFF}\u{FE0F}\u{2190}-\u{21FF}]/u;
+    const emoji =
+      /[\u{1F300}-\u{1FAFF}\u{2600}-\u{27BF}\u{2B00}-\u{2BFF}\u{FE0F}\u{2190}-\u{21FF}]/u;
     expect(emoji.test(source), `${file} 含 emoji 或箭头符号`).toBe(false);
   });
 
@@ -198,7 +249,8 @@ describe("图标源码零违规", () => {
 
   it("index.ts 不含 emoji", () => {
     const source = readFileSync(resolve(here, "index.ts"), "utf8");
-    const emoji = /[\u{1F300}-\u{1FAFF}\u{2600}-\u{27BF}\u{2B00}-\u{2BFF}\u{FE0F}]/u;
+    const emoji =
+      /[\u{1F300}-\u{1FAFF}\u{2600}-\u{27BF}\u{2B00}-\u{2BFF}\u{FE0F}]/u;
     expect(emoji.test(source)).toBe(false);
   });
 });

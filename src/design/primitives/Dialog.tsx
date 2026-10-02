@@ -12,7 +12,15 @@
  * 关闭时长严格一致，否则会出现「画面已经消失但元素还在拦截点击」的空窗。
  */
 
-import { createEffect, createSignal, createUniqueId, Show, splitProps, type Component, type JSX } from "solid-js";
+import {
+  createEffect,
+  createSignal,
+  createUniqueId,
+  Show,
+  splitProps,
+  type Component,
+  type JSX,
+} from "solid-js";
 import { ModalShell } from "./Modal";
 import { motionPolicy } from "./reducedMotion";
 import { cx } from "./styles";

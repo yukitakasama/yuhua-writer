@@ -57,7 +57,14 @@ export interface TabsProps {
 export const Tabs: Component<TabsProps> = (props) => {
   usePrimitivesStyle();
 
-  const [local] = splitProps(props, ["items", "value", "onChange", "children", "class", "label"]);
+  const [local] = splitProps(props, [
+    "items",
+    "value",
+    "onChange",
+    "children",
+    "class",
+    "label",
+  ]);
 
   const selected = (): string | undefined => local.value;
   // 记录键盘意图上的「当前标签」。它是 selection follows focus 的基础：
@@ -69,7 +76,8 @@ export const Tabs: Component<TabsProps> = (props) => {
   });
 
   /** 可导航的标签（跳过禁用项）。 */
-  const navigable = (): TabItem[] => local.items.filter((item) => item.disabled !== true);
+  const navigable = (): TabItem[] =>
+    local.items.filter((item) => item.disabled !== true);
 
   const onKeyDown = (event: KeyboardEvent): void => {
     if (event.key === "Home") {
@@ -94,8 +102,12 @@ export const Tabs: Component<TabsProps> = (props) => {
 
     const list = navigable();
     if (list.length === 0) return;
-    const currentIndex = list.findIndex((item) => item.value === (focused() ?? selected()));
-    const nextIndex = ((currentIndex < 0 ? 0 : currentIndex + delta) + list.length) % list.length;
+    const currentIndex = list.findIndex(
+      (item) => item.value === (focused() ?? selected()),
+    );
+    const nextIndex =
+      ((currentIndex < 0 ? 0 : currentIndex + delta) + list.length) %
+      list.length;
     const next = list[nextIndex];
     if (next) select(next.value);
   };
@@ -106,7 +118,9 @@ export const Tabs: Component<TabsProps> = (props) => {
     local.onChange?.(value);
     // 焦点移动放在下一帧：onChange 可能触发重渲染，提前 focus 会落到旧节点上。
     queueMicrotask(() => {
-      document.querySelector<HTMLElement>('[data-tab-value="' + value + '"]')?.focus();
+      document
+        .querySelector<HTMLElement>('[data-tab-value="' + value + '"]')
+        ?.focus();
     });
   };
 
@@ -116,7 +130,12 @@ export const Tabs: Component<TabsProps> = (props) => {
 
   return (
     <div class={cx("yh-tabs", local.class)}>
-      <div class="yh-tabs__list" role="tablist" aria-label={local.label} onKeyDown={onKeyDown}>
+      <div
+        class="yh-tabs__list"
+        role="tablist"
+        aria-label={local.label}
+        onKeyDown={onKeyDown}
+      >
         <For each={local.items}>
           {(item) => {
             const isSelected = (): boolean => selected() === item.value;

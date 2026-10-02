@@ -13,9 +13,24 @@
 
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-import { FONT_CATALOG, fontFamilyById, familiesFor, isBundled } from "./catalog";
-import { FontLoader, MAX_LOADED_FAMILIES, type FontFaceLike, type FontHost } from "./loader";
-import { applyTheme, applyTypography, resolveTheme, typographyVariables } from "./apply";
+import {
+  FONT_CATALOG,
+  fontFamilyById,
+  familiesFor,
+  isBundled,
+} from "./catalog";
+import {
+  FontLoader,
+  MAX_LOADED_FAMILIES,
+  type FontFaceLike,
+  type FontHost,
+} from "./loader";
+import {
+  applyTheme,
+  applyTypography,
+  resolveTheme,
+  typographyVariables,
+} from "./apply";
 import type { TypographySettings } from "@/app/appearance-store";
 import { DEFAULT_APPEARANCE } from "@/app/appearance-store";
 
@@ -101,7 +116,8 @@ describe("字体目录（catalog）", () => {
 
   it("内置字体都声明了文件，系统字体都不声明", () => {
     for (const family of FONT_CATALOG) {
-      if (family.bundled) expect(family.files?.length ?? 0, family.id).toBeGreaterThan(0);
+      if (family.bundled)
+        expect(family.files?.length ?? 0, family.id).toBeGreaterThan(0);
       else expect(family.files, family.id).toBeUndefined();
     }
   });
@@ -125,7 +141,9 @@ describe("字体目录（catalog）", () => {
     for (const family of FONT_CATALOG.filter((f) => f.bundled)) {
       const first = family.stack.split(",")[0] ?? "";
       expect(first, family.id).toContain('"');
-      expect(first.replace(/"/g, "").trim().length, family.id).toBeGreaterThan(0);
+      expect(first.replace(/"/g, "").trim().length, family.id).toBeGreaterThan(
+        0,
+      );
     }
   });
 
@@ -177,7 +195,10 @@ describe("FontLoader：按需加载", () => {
     const loader = new FontLoader(host);
     await loader.ensure("yuhua-serif");
     expect(host.added).toHaveLength(2);
-    expect(host.added.map((f) => f.descriptors?.weight)).toEqual(["400", "700"]);
+    expect(host.added.map((f) => f.descriptors?.weight)).toEqual([
+      "400",
+      "700",
+    ]);
   });
 
   it("粗体加载失败不拖垮常规字重", async () => {
@@ -202,7 +223,11 @@ describe("FontLoader：三作用域共享字族实例", () => {
     const host = createHost();
     const loader = new FontLoader(host);
     // 模拟正文 / 标题 / 界面都选了楷体
-    await Promise.all([loader.ensure("yuhua-kai"), loader.ensure("yuhua-kai"), loader.ensure("yuhua-kai")]);
+    await Promise.all([
+      loader.ensure("yuhua-kai"),
+      loader.ensure("yuhua-kai"),
+      loader.ensure("yuhua-kai"),
+    ]);
     // 楷体只有两个字重文件，因此 added 长度应为 2 而不是 6
     expect(host.added).toHaveLength(2);
     expect(loader.size).toBe(1);
@@ -393,7 +418,10 @@ describe("CSS 变量应用（T9.3 / T9.5）", () => {
   });
 
   it("未知字体族 id 回退到宋体的完整回退链", () => {
-    const vars = typographyVariables({ ...typo, body: { ...typo.body, family: "不存在" } });
+    const vars = typographyVariables({
+      ...typo,
+      body: { ...typo.body, family: "不存在" },
+    });
     expect(vars["--font-body"]).toBe(fontFamilyById("yuhua-serif").stack);
   });
 
@@ -467,7 +495,10 @@ describe("默认值与 catalog 的一致性", () => {
   it("默认正文 / 标题 / 界面字体都在 catalog 里", () => {
     for (const scope of ["body", "heading", "ui"] as const) {
       const id = DEFAULT_APPEARANCE.typography[scope].family;
-      expect(FONT_CATALOG.map((f) => f.id), scope).toContain(id);
+      expect(
+        FONT_CATALOG.map((f) => f.id),
+        scope,
+      ).toContain(id);
     }
   });
 

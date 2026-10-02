@@ -21,8 +21,10 @@ export type ButtonVariant = "primary" | "secondary" | "ghost" | "danger";
 export type ButtonSize = "sm" | "md" | "lg";
 
 /** {@link Button} 的 props。 */
-export interface ButtonProps
-  extends Omit<JSX.ButtonHTMLAttributes<HTMLButtonElement>, "onClick" | "type" | "class" | "children"> {
+export interface ButtonProps extends Omit<
+  JSX.ButtonHTMLAttributes<HTMLButtonElement>,
+  "onClick" | "type" | "class" | "children"
+> {
   /** 视觉变体，默认 primary。 */
   variant?: ButtonVariant;
   /** 尺寸，默认 md。 */

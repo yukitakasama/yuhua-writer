@@ -13,23 +13,23 @@
 
 **复核者独立重跑的命令与结果**（不是执行者的自述）：
 
-| 命令 | 结果 |
-| --- | --- |
-| `cargo test --workspace` | **937 passed, 0 failed** |
-| `cargo clippy --workspace --all-targets -- -D warnings` | 通过，零警告 |
-| `cargo fmt --all -- --check` | 通过 |
-| `pnpm typecheck` / `pnpm lint` | 通过 |
-| `pnpm test` | **35 files / 1971 passed** |
-| `node scripts/check-ipc.mjs` | 通过（6 项全跑，含「结构体字段：已比对 12 组」） |
-| `pnpm check:kit` | 通过 |
+| 命令                                                    | 结果                                             |
+| ------------------------------------------------------- | ------------------------------------------------ |
+| `cargo test --workspace`                                | **937 passed, 0 failed**                         |
+| `cargo clippy --workspace --all-targets -- -D warnings` | 通过，零警告                                     |
+| `cargo fmt --all -- --check`                            | 通过                                             |
+| `pnpm typecheck` / `pnpm lint`                          | 通过                                             |
+| `pnpm test`                                             | **35 files / 1971 passed**                       |
+| `node scripts/check-ipc.mjs`                            | 通过（6 项全跑，含「结构体字段：已比对 12 组」） |
+| `pnpm check:kit`                                        | 通过                                             |
 
 **修复有效性已用探针独立实测**（把 `isTauri()` 骗成 true + 拦截 `invoke`）：
 
-| 命令 | 修复前 | 修复后 |
-| --- | --- | --- |
-| `open_workspace` | `{"root":…}` ❌ | `{"path":…}` ✅ |
-| `create_workspace` | `{"root":…,"title":…}` ❌ | `{"path":…,"title":…}` ✅ |
-| `get_word_stats` | `{"chapterId":…}` ❌ | `{"volumeId":…,"chapterId":…}` ✅ |
+| 命令               | 修复前                    | 修复后                            |
+| ------------------ | ------------------------- | --------------------------------- |
+| `open_workspace`   | `{"root":…}` ❌           | `{"path":…}` ✅                   |
+| `create_workspace` | `{"root":…,"title":…}` ❌ | `{"path":…,"title":…}` ✅         |
+| `get_word_stats`   | `{"chapterId":…}` ❌      | `{"volumeId":…,"chapterId":…}` ✅ |
 
 **`check-ipc` 的检查确实有效**：把 `patternLabel` 故意改成 `patternLabelX` →
 `EXIT=1` 并报出双向缺失；恢复后 `EXIT=0`。
@@ -62,14 +62,14 @@
 
 代码修完但文档没跟上，等于把错误信息留给下一个人。本轮同步了：
 
-| 文件 | 改了什么 |
-| --- | --- |
-| `CHANGELOG.md` | 新增「修复」「构建」两节，记录四个 P0 缺陷、CI 守卫接线、`check-ipc` 的两处修正，以及两条已知问题 |
-| `docs/workspace-format.md` | 新增「卷名存在哪里」一节（`volumes` 字段示例、旧格式自动回填、手工改目录名的后果）；数据安全表补「保存前冲突检查」；**修正「防抖 800ms」→ 实际 1500ms / 最长 30s** |
-| `docs/done-list.md` | 总览的**里程碑状态修正**（M4/M5/M6/M7/M8/M9 此前标 `[~]` 或「未开始」，实际已在 `e3b3354` 落地并接进 `App.tsx`）；新增「P0 缺陷修复轮」一节与「本轮新发现的既有问题」 |
-| `docs/更新报告.md` | 顶部加过时提示；末尾新增「后续轮次进展」，补记 `e3b3354`（M0–M4 未竟项）与本轮 P0 修复；并说明「上一轮的 `check:ipc` 为何没拦住本轮漂移」 |
-| `CONTRIBUTING.md` | 提交前命令加 `check:ipc` / `check:kit`；`format:check` 已知坏损的警告与「不要跑 `pnpm format`」；Rust 约定加两条踩坑规则（`dirName` 不得现算、加字段必须 `serde(default)`）；完成定义补两条教训 |
-| `README.md` | 测试命令补两个守卫脚本；工作区格式一节补卷名持久化的说明 |
+| 文件                       | 改了什么                                                                                                                                                                                        |
+| -------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `CHANGELOG.md`             | 新增「修复」「构建」两节，记录四个 P0 缺陷、CI 守卫接线、`check-ipc` 的两处修正，以及两条已知问题                                                                                               |
+| `docs/workspace-format.md` | 新增「卷名存在哪里」一节（`volumes` 字段示例、旧格式自动回填、手工改目录名的后果）；数据安全表补「保存前冲突检查」；**修正「防抖 800ms」→ 实际 1500ms / 最长 30s**                              |
+| `docs/done-list.md`        | 总览的**里程碑状态修正**（M4/M5/M6/M7/M8/M9 此前标 `[~]` 或「未开始」，实际已在 `e3b3354` 落地并接进 `App.tsx`）；新增「P0 缺陷修复轮」一节与「本轮新发现的既有问题」                           |
+| `docs/更新报告.md`         | 顶部加过时提示；末尾新增「后续轮次进展」，补记 `e3b3354`（M0–M4 未竟项）与本轮 P0 修复；并说明「上一轮的 `check:ipc` 为何没拦住本轮漂移」                                                       |
+| `CONTRIBUTING.md`          | 提交前命令加 `check:ipc` / `check:kit`；`format:check` 已知坏损的警告与「不要跑 `pnpm format`」；Rust 约定加两条踩坑规则（`dirName` 不得现算、加字段必须 `serde(default)`）；完成定义补两条教训 |
+| `README.md`                | 测试命令补两个守卫脚本；工作区格式一节补卷名持久化的说明                                                                                                                                        |
 
 **顺带查实的既有文档缺陷**（不是本轮引入）：
 

@@ -17,9 +17,9 @@ export function FullscreenIcon(props: SvgIconProps) {
   return (
     <svg {...iconProps(props)}>
       <path d="M4.5 9V4.5H9" />
-    <path d="M15 4.5h4.5V9" />
-    <path d="M19.5 15v4.5H15" />
-    <path d="M9 19.5H4.5V15" />
+      <path d="M15 4.5h4.5V9" />
+      <path d="M19.5 15v4.5H15" />
+      <path d="M9 19.5H4.5V15" />
     </svg>
   );
 }

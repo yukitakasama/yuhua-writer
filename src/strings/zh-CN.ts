@@ -81,7 +81,8 @@ const zhCN = {
     createWorkspace: "创建工作区",
     /** 书籍网格的空状态。 */
     emptyTitle: "书架还是空的",
-    emptyBody: "新建一个工作区，羽化写作会在你选择的文件夹里生成书稿结构。文稿始终是纯 Markdown 文件，随时可以用别的编辑器打开。",
+    emptyBody:
+      "新建一个工作区，羽化写作会在你选择的文件夹里生成书稿结构。文稿始终是纯 Markdown 文件，随时可以用别的编辑器打开。",
     /** 工作区不可用（被移动或删除）时的标示。 */
     unavailable: "位置已失效",
     chapterCount: "{count} 章",
@@ -95,7 +96,8 @@ const zhCN = {
     title: "卷章",
     /** 树的空状态：整本书一个字都还没写。 */
     emptyTitle: "还没有任何章节",
-    emptyBody: "先建一卷，再往里面放章。卷是长篇小说的骨架，章是每天要写的那一页。",
+    emptyBody:
+      "先建一卷，再往里面放章。卷是长篇小说的骨架，章是每天要写的那一页。",
     emptyAction: "新建第一卷",
     /** 卷下无章时的占位提示。 */
     volumeEmpty: "本卷还没有章节",
@@ -267,7 +269,8 @@ const zhCN = {
     containersNote:
       "对话框、抽屉、浮层、菜单、提示、吐司、标签页、滚动区。逐个打开确认焦点陷阱与 Esc 关闭。",
     motion: "动效",
-    motionNote: "计划书 5.5 节要求逐条核对时长与缓动。点「重放」可反复看同一条曲线。",
+    motionNote:
+      "计划书 5.5 节要求逐条核对时长与缓动。点「重放」可反复看同一条曲线。",
     charts: "图表基座",
     chartsNote: "五档色阶与进度环。M8 的日历与热力图直接复用这里的色阶。",
     footer: "组件预览页 · 仅在开发环境可达",
@@ -351,7 +354,8 @@ const zhCN = {
       previewHeading: "第一章·落羽",
       previewUi: "字数 12,480 · 今日 1,206 · 连续 23 天",
       /** 生僻字回退说明。 */
-      fallbackNote: "预览中的字若显示为系统字体，说明内置字体缺少该字形，这是预期行为。",
+      fallbackNote:
+        "预览中的字若显示为系统字体，说明内置字体缺少该字形，这是预期行为。",
       /** 缺字回退链的展示标题。 */
       fallbackChain: "回退链",
       /** 加载失败提示（多半是没跑 fonts:fetch）。 */
@@ -380,7 +384,8 @@ const zhCN = {
       /** 本项目自身许可。 */
       selfLicense: "羽化写作自身代码",
       fontLicenseTitle: "字体署名",
-      fontLicenseIntro: "随应用分发的字体各自受 SIL Open Font License 1.1 约束，不因本项目采用 MIT 而改变。",
+      fontLicenseIntro:
+        "随应用分发的字体各自受 SIL Open Font License 1.1 约束，不因本项目采用 MIT 而改变。",
       /** 许可文件路径说明。 */
       licenseFile: "许可全文随包分发于",
       acknowledgements: "致谢",
@@ -401,7 +406,8 @@ const zhCN = {
       stepFont: "选择字体",
       stepFontBody: "正文、标题、界面可以分别选择，之后也能单独调整。",
       stepDone: "可以开始了",
-      stepDoneBody: "新建一个工作区，羽化写作会在你选择的文件夹里生成书稿结构。",
+      stepDoneBody:
+        "新建一个工作区，羽化写作会在你选择的文件夹里生成书稿结构。",
       /** 进度朗读文案。 */
       stepIndicator: "第 {current} 步，共 {total} 步",
       next: "下一步",
@@ -549,7 +555,8 @@ const zhCN = {
   /** 编辑器占位（M4 实现，本阶段只放占位）。 */
   editor: {
     placeholderTitle: "编辑区",
-    placeholderBody: "编辑器内核将在 M4 里程碑接入。当前可以先用左侧的卷章树整理结构。",
+    placeholderBody:
+      "编辑器内核将在 M4 里程碑接入。当前可以先用左侧的卷章树整理结构。",
     noChapter: "从左侧选择一章开始写作",
     /** 未打开的章节。 */
     selectHint: "也可以直接新建一章",

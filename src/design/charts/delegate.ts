@@ -29,7 +29,15 @@ export type DelegatedHandler = (hit: DelegatedHit) => void;
 
 /** 需要监听的事件与对应处理器的映射。 */
 export type DelegatedHandlers = Partial<
-  Record<"pointerover" | "pointerout" | "pointermove" | "click" | "focusin" | "keydown", DelegatedHandler>
+  Record<
+    | "pointerover"
+    | "pointerout"
+    | "pointermove"
+    | "click"
+    | "focusin"
+    | "keydown",
+    DelegatedHandler
+  >
 >;
 
 /**
@@ -42,11 +50,15 @@ export type DelegatedHandlers = Partial<
  * @param boundary 查找边界容器，查到它为止
  * @returns 命中的元素，找不到返回 null
  */
-export function findCell(start: EventTarget | null, boundary: Element): Element | null {
+export function findCell(
+  start: EventTarget | null,
+  boundary: Element,
+): Element | null {
   let node: Element | null = start instanceof Element ? start : null;
   while (node) {
     if (node === boundary) return null;
-    if (node instanceof HTMLElement && node.dataset["index"] !== undefined) return node;
+    if (node instanceof HTMLElement && node.dataset["index"] !== undefined)
+      return node;
     node = node.parentElement;
   }
   return null;
@@ -66,7 +78,10 @@ function toNumber(raw: string | undefined): number | null {
  * @param handlers 事件名到处理器的映射
  * @returns 解绑函数，调用后移除全部监听器
  */
-export function delegateEvents(container: Element, handlers: DelegatedHandlers): () => void {
+export function delegateEvents(
+  container: Element,
+  handlers: DelegatedHandlers,
+): () => void {
   const bound: { type: string; listener: EventListener }[] = [];
 
   for (const [type, handler] of Object.entries(handlers)) {
@@ -79,11 +94,16 @@ export function delegateEvents(container: Element, handlers: DelegatedHandlers):
       const pointer = event as MouseEvent;
       handler({
         target: cell,
-        index: el.dataset["index"] === undefined ? null : Number(el.dataset["index"]),
+        index:
+          el.dataset["index"] === undefined
+            ? null
+            : Number(el.dataset["index"]),
         value: toNumber(el.dataset["value"]),
         date: el.dataset["date"] ?? null,
-        offsetX: typeof pointer.clientX === "number" ? pointer.clientX - rect.left : 0,
-        offsetY: typeof pointer.clientY === "number" ? pointer.clientY - rect.top : 0,
+        offsetX:
+          typeof pointer.clientX === "number" ? pointer.clientX - rect.left : 0,
+        offsetY:
+          typeof pointer.clientY === "number" ? pointer.clientY - rect.top : 0,
       });
     };
     container.addEventListener(type, listener);

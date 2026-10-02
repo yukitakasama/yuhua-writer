@@ -81,7 +81,11 @@ export function gridSize(
  * @param opts 网格参数
  * @returns 格子几何信息
  */
-export function cellBox(column: number, row: number, opts: GridOptions): CellBox {
+export function cellBox(
+  column: number,
+  row: number,
+  opts: GridOptions,
+): CellBox {
   const { cellSize, gap, originX = 0, originY = 0 } = opts;
   return {
     column,
@@ -134,7 +138,11 @@ export function buildGrid(
  * @param opts 网格参数
  * @returns 格子几何信息
  */
-export function heatmapCellBox(week: number, weekday: number, opts: GridOptions): CellBox {
+export function heatmapCellBox(
+  week: number,
+  weekday: number,
+  opts: GridOptions,
+): CellBox {
   return cellBox(week, weekday, opts);
 }
 
@@ -212,7 +220,10 @@ export function weekdayIndex(timestamp: number): number {
  * @param month 月，1-12
  * @returns 42 个 UTC 时间戳与「是否属于当月」标记
  */
-export function monthGrid(year: number, month: number): { timestamp: number; inMonth: boolean }[] {
+export function monthGrid(
+  year: number,
+  month: number,
+): { timestamp: number; inMonth: boolean }[] {
   const first = Date.UTC(year, month - 1, 1);
   // 回退到该周周一：weekdayIndex 已经是周一为 0 的口径
   const offset = weekdayIndex(first);
@@ -249,7 +260,12 @@ export function yearHeatmapGrid(
   const offset = weekStartsOnMonday ? (rawWeekday + 6) % 7 : rawWeekday;
   const gridStart = jan1 - offset * MS_PER_DAY;
 
-  const cells: { timestamp: number; week: number; weekday: number; inYear: boolean }[] = [];
+  const cells: {
+    timestamp: number;
+    week: number;
+    weekday: number;
+    inYear: boolean;
+  }[] = [];
   for (let i = 0; i < HEATMAP_CELLS; i += 1) {
     const ts = gridStart + i * MS_PER_DAY;
     const d = new Date(ts);
