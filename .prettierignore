@@ -1,0 +1,19 @@
+# Prettier 不处理的路径。
+#
+# 格式检查的范围由 package.json 的 format:check 决定：
+#   prettier --check "**/*.{ts,tsx,css,json,md}"
+# 这个 glob 会扫到整个仓库，因此本地工具数据、构建产物也需显式排除。
+
+# agent 本地记忆与工作日志（本机数据，非项目源码）
+.workbuddy/
+
+# 构建产物
+dist/
+coverage/
+
+# 依赖
+node_modules/
+
+# 锁文件由包管理器维护，格式化它没有意义且可能引发无谓 diff
+pnpm-lock.yaml
+Cargo.lock
