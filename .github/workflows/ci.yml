@@ -84,9 +84,6 @@ jobs:
           workspaces: ". -> target"
 
       # Tauri 在 Linux 上需要这些系统库才能编译。
-      # librsvg2-bin 提供 rsvg-convert 命令行工具 —— gen-icons.mjs 需要它
-      # 把 SVG 转成 PNG。注意 librsvg2-dev 只是开发库，不含该命令，
-      # 只装 dev 会让图标派生静默跳过。
       - name: 安装系统依赖
         run: |
           sudo apt-get update
@@ -94,7 +91,6 @@ jobs:
             libwebkit2gtk-4.1-dev \
             libappindicator3-dev \
             librsvg2-dev \
-            librsvg2-bin \
             patchelf \
             libgtk-3-dev
 
@@ -113,6 +109,10 @@ jobs:
 
       - name: 安装前端依赖（图标脚本需要 Node 侧工具链）
         run: pnpm install --frozen-lockfile
+
+      # gen-icons.mjs 首选 resvg；纯 Rust、无平台差异、不依赖系统图形栈。
+      - name: 安装 SVG 转换工具（resvg）
+        run: cargo install resvg --locked
 
       - name: 派生图标
         env:
@@ -185,30 +185,18 @@ jobs:
             libwebkit2gtk-4.1-dev \
             libappindicator3-dev \
             librsvg2-dev \
-            librsvg2-bin \
             patchelf \
             libgtk-3-dev
 
-      # gen-icons.mjs 依次探测 resvg / rsvg-convert / magick / convert。
-      # GitHub runner 上前两个并非三个平台都自带：Linux 靠上面的
-      # librsvg2-bin 提供，macOS 用 brew 装 librsvg，Windows 则装
-      # ImageMagick（提供 magick）。少任一平台都会让图标派生静默跳过，
-      # 随后 tauri-build 因缺 32x32.png / icon.ico 而 panic。
-      - name: 安装 SVG 转换工具（macOS）
-        if: matrix.platform == 'macos-latest'
-        run: brew install librsvg
-
-      - name: 安装 SVG 转换工具（Windows）
-        if: matrix.platform == 'windows-latest'
-        shell: pwsh
-        run: |
-          choco install imagemagick --no-progress -y
-          # 让本step 内的 magick 立即可用
-          refreshenv
-          if (-not (Get-Command magick -ErrorAction SilentlyContinue)) {
-            Write-Output "::error::ImageMagick 安装后仍找不到 magick"
-            exit 1
-          }
+      # gen-icons.mjs 依次探测 resvg / rsvg-convert / magick / convert，
+      # 其中 resvg 是首选。三个平台统一装它：纯 Rust、无平台差异、
+      # 不依赖系统图形栈。
+      #
+      # Windows 此前用 choco 的 ImageMagick，工具虽在，但转换 SVG 时因缺
+      # 内部 decode 委托而全部失败（choco 包不带 MSVG/RSVG 委托），
+      # 报出来的是「Command failed」而非可读的原因。
+      - name: 安装 SVG 转换工具（resvg）
+        run: cargo install resvg --locked
 
       - name: 安装依赖
         run: pnpm install --frozen-lockfile

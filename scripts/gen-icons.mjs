@@ -187,15 +187,23 @@ function main() {
   log("使用转换工具：" + converter.cmd);
 
   const master = join(OUT, "icon-512.svg");
+  let failed = 0;
   for (const size of SIZES) {
     const out = join(OUT, size + "x" + size + ".png");
     try {
+      // 保留 stderr：转换器失败时会给出真正的原因（例如 Windows 的
+      // ImageMagick 缺 SVG 委托时报的 "no decode delegate"）。此前用
+      // stdio:"ignore" 把这些信息一并丢掉，日志里只剩一句笼统的失败，
+      // 排查时完全看不出是工具缺失还是输入有问题。
       execFileSync(converter.cmd, converter.args(master, out, size), {
-        stdio: "ignore",
+        stdio: ["ignore", "ignore", "pipe"],
       });
       log("  -> " + out.replace(ROOT, "."));
     } catch (e) {
+      failed++;
       log("  转换 " + size + "px 失败：" + e.message);
+      const stderr = e.stderr && e.stderr.toString().trim();
+      if (stderr) log("    工具输出：" + stderr.split("\n")[0]);
     }
   }
 
@@ -212,6 +220,18 @@ function main() {
   }
 
   buildIco();
+
+  // 工具存在但转换全部失败，与「工具不存在」是同一类问题的两种表现，
+  // 都会让后续 tauri-build 因缺icon 而失败。严格模式下同样要报错。
+  if (failed > 0 && process.env.GEN_ICONS_STRICT === "1") {
+    log(
+      "GEN_ICONS_STRICT=1，" +
+        failed +
+        " 个尺寸转换失败；产物不完整，后续 Tauri 构建会失败。",
+    );
+    process.exitCode = 1;
+    return;
+  }
 
   log("图标派生完成。替换 assets/icon.svg 后重跑本脚本即可整体换肤。");
 }
