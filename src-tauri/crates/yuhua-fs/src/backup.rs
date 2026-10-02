@@ -21,6 +21,20 @@
 //!
 //! 时间戳用 `YYYYMMDD-HHMMSS` 形式：字典序 == 时间序，
 //! 因此按文件名排序即是按时间排序，清理最旧的记录不需要读文件内容。
+//!
+//! ## 时区语义
+//!
+//! 时间戳在**写入前先归一到 UTC**，`snapshot_path` 负责转换；
+//! `parse_timestamp_from_name` 也一律按 UTC 解释。
+//!
+//! 两侧必须用同一个时区，否则时间差会被偏移量污染：例如在 UTC+8 写入
+//! `090000`、改到 UTC 环境后再按 UTC 解析成 09:00Z，与真实的 01:00Z
+//! 相差 8 小时，间隔判断会得出「刚刚才备份过」的错误结论，把该备份的
+//! 快照全部跳过。归一到 UTC 后，快照间隔不再受运行环境的时区影响，
+//! 用户跨时区移动工作区目录也不会看到备份行为异常。
+//!
+//! 文件名里的数字只用于排序与求时间差，不用于向用户展示，因此归一到 UTC
+//! 不影响可读性。
 
 use std::path::{Path, PathBuf};
 
@@ -225,7 +239,11 @@ impl BackupManager {
     /// 生成快照文件路径。
     fn snapshot_path(&self, relative_path: &str, now: DateTime<FixedOffset>) -> PathBuf {
         let stem = file_stem_of(relative_path);
-        let name = format!("{stem}{SEP}{}{SUFFIX}", now.format("%Y%m%d-%H%M%S"));
+        // 时间戳统一归到 UTC 后再格式化，见模块文档「时区语义」。
+        let name = format!(
+            "{stem}{SEP}{}{SUFFIX}",
+            now.with_timezone(&Utc).format("%Y%m%d-%H%M%S")
+        );
         self.snapshot_dir_for(relative_path).join(name)
     }
 }
@@ -240,13 +258,15 @@ fn file_stem_of(relative_path: &str) -> String {
 }
 
 /// 从备份文件名里解析出时间戳。
-fn parse_timestamp_from_name(path: &Path) -> Option<DateTime<FixedOffset>> {
+fn parse_timestamp_from_name(path: &Path) -> Option<DateTime<Utc>> {
     let name = path.file_name()?.to_string_lossy().to_string();
     let without_suffix = name.strip_suffix(SUFFIX)?;
     let idx = without_suffix.rfind(SEP)?;
     let ts = &without_suffix[idx + SEP.len()..];
     let parsed = chrono::NaiveDateTime::parse_from_str(ts, "%Y%m%d-%H%M%S").ok()?;
-    parsed.and_local_timezone(local_offset()).single()
+    // 同样按 UTC 解释：写入侧已归一到 UTC（见 snapshot_path）。
+    // 两侧必须使用同一时区，否则算出的时间差会被偏移量污染。
+    Some(parsed.and_utc())
 }
 
 /// 取本地时区偏移。
@@ -454,15 +474,36 @@ mod tests {
     }
 
     #[test]
-    fn parse_timestamp_roundtrips() {
-        let ts = at(2026, 3, 15, 14, 30, 45);
-        let name = format!("第一章{SEP}20260315-143045{SUFFIX}");
-        let parsed = parse_timestamp_from_name(Path::new(&name)).unwrap();
+    fn snapshot_name_is_timezone_independent() {
+        // 回归测试：同一绝对时刻，用不同时区偏移构造的 DateTime 必须落成
+        // 同一个文件名。此前写入端直接 format 本地时刻、解析端按 UTC 解释，
+        // 在非 UTC 环境里间隔判断会凭空少掉一个时区偏移，把该备份的快照
+        // 误判为「刚刚才备份过」而跳过。
+        let (_d, bm, _src) = setup();
+        let utc = FixedOffset::east_opt(0).unwrap();
+        let plus8 = FixedOffset::east_opt(8 * 3600).unwrap();
+        let instant = at(2026, 5, 1, 12, 0, 0);
+
+        let a = bm.snapshot_path(REL, instant.with_timezone(&utc));
+        let b = bm.snapshot_path(REL, instant.with_timezone(&plus8));
+        assert_eq!(a, b, "同一时刻不应因时区不同而得到不同文件名");
+
+        // 解析回来必须还原成同一绝对时刻
         assert_eq!(
-            parsed.format("%Y-%m-%d %H:%M:%S").to_string(),
-            "2026-03-15 14:30:45"
+            parse_timestamp_from_name(&a).unwrap(),
+            instant.with_timezone(&Utc)
         );
-        let _ = ts;
+    }
+
+    #[test]
+    fn parse_timestamp_roundtrips() {
+        // 走一遍真实的写入路径：snapshot_path 会把时刻归一到 UTC，
+        // 解析侧也按 UTC 解释，两侧必须严丝合缝。
+        let (_d, bm, _src) = setup();
+        let ts = at(2026, 3, 15, 14, 30, 45);
+        let written = bm.snapshot_path(REL, ts);
+        let parsed = parse_timestamp_from_name(&written).unwrap();
+        assert_eq!(parsed, ts.with_timezone(&Utc));
     }
 
     #[test]
