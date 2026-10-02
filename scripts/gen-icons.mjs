@@ -83,10 +83,51 @@ function withSize(svg, size) {
 /** 探测可用的 SVG → PNG 转换工具。 */
 function findConverter() {
   const candidates = [
-    { cmd: "resvg", args: (src, out, size) => [src, out, "--width", String(size), "--height", String(size)] },
-    { cmd: "rsvg-convert", args: (src, out, size) => ["-w", String(size), "-h", String(size), "-o", out, src] },
-    { cmd: "magick", args: (src, out, size) => ["-background", "none", "-resize", size + "x" + size, src, out] },
-    { cmd: "convert", args: (src, out, size) => ["-background", "none", "-resize", size + "x" + size, src, out] },
+    {
+      cmd: "resvg",
+      args: (src, out, size) => [
+        src,
+        out,
+        "--width",
+        String(size),
+        "--height",
+        String(size),
+      ],
+    },
+    {
+      cmd: "rsvg-convert",
+      args: (src, out, size) => [
+        "-w",
+        String(size),
+        "-h",
+        String(size),
+        "-o",
+        out,
+        src,
+      ],
+    },
+    {
+      cmd: "magick",
+      args: (src, out, size) => [
+        "-background",
+        "none",
+        "-resize",
+        size + "x" + size,
+        src,
+        out,
+      ],
+    },
+    {
+      cmd: "convert",
+      args: (src, out, size) => [
+        "-background",
+        "none",
+        "-resize",
+        size + "x" + size,
+        src,
+        out,
+      ],
+    },
   ];
 
   for (const c of candidates) {
@@ -115,7 +156,12 @@ function main() {
     const dest = join(OUT, "mark-" + size + ".svg");
     writeFileSync(dest, withSize(mark, size), "utf8");
   }
-  log("已生成 SVG 尺寸变体：" + SIZES.join(" / ") + " 与标记 " + MARK_SIZES.join(" / "));
+  log(
+    "已生成 SVG 尺寸变体：" +
+      SIZES.join(" / ") +
+      " 与标记 " +
+      MARK_SIZES.join(" / "),
+  );
 
   // ---- 2. 尝试派生出 PNG / ICO ----
   const converter = findConverter();
@@ -125,8 +171,16 @@ function main() {
     log("  · cargo install resvg        （推荐，纯 Rust）");
     log("  · apt install librsvg2-bin   （Linux）");
     log("  · brew install librsvg       （macOS）");
+    log("  · choco install imagemagick  （Windows）");
     log("  · https://imagemagick.org    （通用）");
     log("提示：Tauri 构建会跳过缺失的位图图标，因此这不影响开发调试。");
+    // 本地开发时缺少转换器只是「字形/位图退化」，可以软跳过；
+    // 但在 CI 里这会让后续 tauri-build 因缺 icon而 panic，
+    // 报错出现在离根因很远的地方。用 GEN_ICONS_STRICT=1 切换为硬失败。
+    if (process.env.GEN_ICONS_STRICT === "1") {
+      log("GEN_ICONS_STRICT=1，缺少转换器视为错误。");
+      process.exitCode = 1;
+    }
     return;
   }
 
@@ -136,7 +190,9 @@ function main() {
   for (const size of SIZES) {
     const out = join(OUT, size + "x" + size + ".png");
     try {
-      execFileSync(converter.cmd, converter.args(master, out, size), { stdio: "ignore" });
+      execFileSync(converter.cmd, converter.args(master, out, size), {
+        stdio: "ignore",
+      });
       log("  -> " + out.replace(ROOT, "."));
     } catch (e) {
       log("  转换 " + size + "px 失败：" + e.message);
@@ -237,7 +293,13 @@ function buildIco() {
   const ico = Buffer.concat([header, ...entries, ...images.map((i) => i.data)]);
   const dest = join(OUT, "icon.ico");
   writeFileSync(dest, ico);
-  log("  -> " + dest.replace(ROOT, ".") + "（含 " + images.map((i) => i.size).join("/") + " 三档尺寸）");
+  log(
+    "  -> " +
+      dest.replace(ROOT, ".") +
+      "（含 " +
+      images.map((i) => i.size).join("/") +
+      " 三档尺寸）",
+  );
 }
 
 main();

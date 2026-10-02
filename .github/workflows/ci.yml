@@ -115,6 +115,8 @@ jobs:
         run: pnpm install --frozen-lockfile
 
       - name: 派生图标
+        env:
+          GEN_ICONS_STRICT: "1"
         run: pnpm icons
 
       # gen-icons.mjs 在找不到可用的 SVG→PNG 转换器时只打印日志、不以
@@ -187,6 +189,27 @@ jobs:
             patchelf \
             libgtk-3-dev
 
+      # gen-icons.mjs 依次探测 resvg / rsvg-convert / magick / convert。
+      # GitHub runner 上前两个并非三个平台都自带：Linux 靠上面的
+      # librsvg2-bin 提供，macOS 用 brew 装 librsvg，Windows 则装
+      # ImageMagick（提供 magick）。少任一平台都会让图标派生静默跳过，
+      # 随后 tauri-build 因缺 32x32.png / icon.ico 而 panic。
+      - name: 安装 SVG 转换工具（macOS）
+        if: matrix.platform == 'macos-latest'
+        run: brew install librsvg
+
+      - name: 安装 SVG 转换工具（Windows）
+        if: matrix.platform == 'windows-latest'
+        shell: pwsh
+        run: |
+          choco install imagemagick --no-progress -y
+          # 让本step 内的 magick 立即可用
+          refreshenv
+          if (-not (Get-Command magick -ErrorAction SilentlyContinue)) {
+            Write-Output "::error::ImageMagick 安装后仍找不到 magick"
+            exit 1
+          }
+
       - name: 安装依赖
         run: pnpm install --frozen-lockfile
 
@@ -201,7 +224,12 @@ jobs:
       # 缺失时直接 proc macro panic，构建失败。此前误标为
       # continue-on-error，导致失败被吞掉、错误延后到 tauri build
       # 才以看不懂的形式爆出来。
+      # GEN_ICONS_STRICT=1：让脚本在找不到转换器时以非零码退出。
+      # 默认的软跳过对本地开发友好，但 CI 里会把这个错误推迟到
+      # tauri-build 才爆出来，排查成本高得多。
       - name: 派生图标
+        env:
+          GEN_ICONS_STRICT: "1"
         run: pnpm icons
 
       - name: 校验图标产物
