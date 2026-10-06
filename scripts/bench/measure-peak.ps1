@@ -1,4 +1,4 @@
-param(
+﻿param(
   [Parameter(Mandatory = $true)][string]$Exe,
   [string]$AppArgs = "",
   [int]$IntervalMs = 50,

@@ -124,6 +124,24 @@ P0 缺陷修复轮（详见 [docs/fix-plan-p0.md](./docs/fix-plan-p0.md)）。
   `assert!(opts.contains("FTS5") || true, …)`，无论 FTS5 是否可用都通过。
   改为直接建 FTS5 探针表、写入、再用 `MATCH` 查回 —— 真正的能力验证。
   它能长期存在是因为 CI 用浮动 `@stable`（见下）。
+- **一个装饰动画让空闲状态下的应用持续吃掉 44% 的单个 CPU 核心**（M4）：
+  书架空状态的 `.empty__art` 带 `animation: breathe 9s … infinite`，关键帧
+  改的是 `transform: scale()`。无限循环的 `scale` 强制那张内联 SVG 每帧
+  重新栅格化，WebView2 的 **GPU 进程**因此常年空转 —— 主进程自己是 0.00 s，
+  所以从「应用有没有卡」完全看不出来，只有按进程拆 CPU 才能定位。
+  现在呼吸只在刚看到空状态时播 3 轮、且只改 `opacity`。实测同一口径
+  （静置 180 秒 / 采样 300 秒）：单核 **44.11% → 0.100%**。
+  顺手把这类回归钉死：新增 `src/design/motion/no-perpetual-animation.test.ts`，
+  扫描全部样式源文件，无限循环的动画必须进白名单（判据是「用户闲置时
+  这个元素还在不在页面上」），且无限循环的关键帧不许改几何属性。
+  详见 [docs/benchmarks.md](./docs/benchmarks.md) 偏差 2。
+- **采集脚本自身的两个错误让 M4 数字不可信**：`measure-coldstart.ps1` 把
+  每轮的**标称**间隔累加成窗口长度，而每轮采样实际要花 1～几秒，分母被压短
+  → 同样的 CPU 增量算出几倍百分比（首测因此记成 7.51%，真实值 44.11%）。
+  改用 `Stopwatch` 的真实流逝时间，并新增按进程分解的 `M4_PER_PROCESS` 输出。
+  另外三个 `measure-*.ps1` 之前是**无 BOM 的 UTF-8**，Windows PowerShell 5.1
+  按 GBK 解码中文注释时会把脚本结构改坏，报出与根因无关的错（pwsh 7 看不出），
+  已补 BOM 并把这条坑写进脚本头注释与采集文档。
 
 ### 构建
 

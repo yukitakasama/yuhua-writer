@@ -1,4 +1,4 @@
-param(
+﻿param(
   [Parameter(Mandatory = $true)][string]$Exe,
   [int]$Runs = 3,
   [int]$TimeoutSec = 40

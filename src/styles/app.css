@@ -1013,7 +1013,7 @@ body.is-dragging {
   text-align: center;
   gap: var(--sp-2);
   padding: var(--sp-8) var(--sp-6);
-  /* 插画淡入 + 极低频呼吸（计划书 5.5 节"空状态"一行） */
+  /* 插画淡入（计划书 5.5 节"空状态"一行）；呼吸见 .empty__art —— 它是有界次数 */
   animation: empty-in var(--d-page) var(--e-decelerate);
 }
 
@@ -1042,17 +1042,21 @@ body.is-dragging {
 .empty__art {
   color: var(--c-text-muted);
   opacity: 0.42;
-  animation: breathe 9s var(--e-standard) infinite;
+  /* 呼吸只在「刚看到这个空状态」时呼吸引导视线，跑三轮就停。
+     改成有限次数的原因不是审美，是实测：打包版冷启动书架就是空状态，
+     而无限循环的 transform: scale() 会强制那张内联 SVG 每帧重新栅格化，
+     GPU 进程因此常年占用约 37% 的单个 CPU 核心，永远闲不下来
+     （数据见 docs/benchmarks.md 的偏差记录）。同时去掉 scale ——
+     只动 opacity 不改变几何尺寸，SVG 不需要重画。 */
+  animation: breathe 9s var(--e-standard) 3;
 }
 
 @keyframes breathe {
   0%,
   100% {
-    transform: scale(1);
     opacity: 0.42;
   }
   50% {
-    transform: scale(1.02);
     opacity: 0.52;
   }
 }
