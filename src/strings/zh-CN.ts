@@ -421,7 +421,7 @@ const zhCN = {
       buildChannel: "构建通道",
       /** 运行诊断（P3 / P4 的应用内读数）。 */
       diagnostics: "运行诊断",
-      editorReady: "启动到可输入",
+      editorReady: "编辑器就绪（视图建好）",
       chapterOpen: "上次打开章节",
       chapterOpenMedian: "打开章节中位耗时",
       notMeasured: "本次尚未记录",

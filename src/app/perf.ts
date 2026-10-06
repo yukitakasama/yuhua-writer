@@ -3,9 +3,9 @@
  *
  * ## 为什么必须有这一层
  *
- * P3「冷启动到可输入」与 P4「打开 1 万字章节」这两条指标，
+ * P3「冷启动到编辑器可用」与 P4「打开 1 万字章节」这两条指标，
  * 外部探针是**测不出来**的：`Get-Process` 只知道窗口句柄什么时候出现，
- * 不知道 CodeMirror 什么时候可以打字、正文什么时候渲染完。
+ * 不知道 CodeMirror 的视图什么时候建好、正文什么时候装进去。
  * 之前 `docs/benchmarks.md` 只能把 P3 写成「代理指标」（窗口出现 336 ms），
  * 并把 P4 列为未采集 —— 代理值不是达标值，把它当 P3 报出去就是自欺。
  *
@@ -18,10 +18,13 @@
  * | 段                        | 谁测               | 指标         |
  * | ------------------------- | ------------------ | ------------ |
  * | 进程启动 → 窗口句柄出现   | `measure-startup.ps1` | P3 代理    |
- * | 文档加载 → 编辑器可输入   | 本模块             | P3 应用内    |
+ * | 模块求值 → 编辑器视图建好 | 本模块             | P3 应用内    |
  * | 发起读章 → 正文灌入完成   | 本模块             | **P4 完整**  |
  *
  * P4 的两端都在应用内，同一个时钟，所以它是可以被完整测量的指标。
+ * P3 应用内段刻意记的是「视图建好」而不是「能打字」：编辑器现在一直挂着，
+ * 正文还在读时它已经存在但处于只读，把只读期间也算进去会让这个数
+ * 与 P4 混在一起，看不出各自在测什么。
  *
  * ## 为什么不写进 localStorage
  *
@@ -35,7 +38,7 @@ const RECENT_LIMIT = 20;
 
 /** 当前记录的状态。全部只在本模块内可变，对外只给快照。 */
 interface PerfState {
-  /** 编辑器就绪（可接受输入）的时刻；未发生则为 null。 */
+  /** 编辑器视图建好的时刻；未发生则为 null。 */
   editorReadyMs: number | null;
   /** 正在计时的章节 id（读章开始但还没灌完）。 */
   openStartedFor: string | null;
@@ -51,7 +54,7 @@ interface PerfState {
  * 本模块被求值的时刻，当作「应用内起点」。
  *
  * 刻意不用 `performance.now()` 的绝对值：那是从文档 timeOrigin 算起的，
- * 会把 HTML 解析与首屏资源的耗时也算进「启动到可输入」。
+ * 会把 HTML 解析与首屏资源的耗时也算进「启动到编辑器就绪」。
  * 用 `let` 是为了可测 —— {@link __resetPerfForTests} 会重设它，
  * 否则测试里的假时钟永远对不上一个在导入期就取好的常量。
  */
@@ -70,7 +73,7 @@ function now(): number {
   return typeof performance !== "undefined" ? performance.now() : 0;
 }
 
-/** 记录「编辑器已经可以接受输入」。只认第一次，之后的重挂不算冷启动。 */
+/** 记录「编辑器视图已经建好」。只认第一次，之后的重挂不算冷启动。 */
 export function markEditorReady(): void {
   if (state.editorReadyMs !== null) return;
   state.editorReadyMs = now() - origin;
@@ -102,7 +105,7 @@ export function finishChapterOpen(chapterId: string): void {
 
 /** 一次读取的快照，供界面与基准脚本消费。 */
 export interface PerfSnapshot {
-  /** 文档加载 → 编辑器可输入（ms）；未发生为 null。 */
+  /** 模块求值 → 编辑器视图建好（ms）；未发生为 null。 */
   readonly editorReadyMs: number | null;
   /** 最近一次打开章节的耗时（ms）；没有为 null。 */
   readonly lastChapterOpenMs: number | null;

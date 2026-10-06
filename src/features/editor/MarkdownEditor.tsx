@@ -294,7 +294,7 @@ export function MarkdownEditor(props: MarkdownEditorProps): JSX.Element {
       extensions,
     });
     view = new EditorView({ state, parent: container });
-    // P3 应用内段的终点：视图已经建好、可以接受输入。
+    // P3 应用内段的终点：视图已经建好（正文可能还在读，此刻或许只读）。
     // 放在 onReady 之前，让「谁调了 onReady」不影响计时口径。
     markEditorReady();
     props.onReady?.(handle);
