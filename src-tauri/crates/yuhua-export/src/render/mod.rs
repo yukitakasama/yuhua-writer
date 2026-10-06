@@ -145,14 +145,37 @@ pub trait Renderer<'a> {
     }
 }
 
-/// 按格式分发：渲染成字节。
+/// 按格式分发：渲染成字节（不带图片资源）。
+///
+/// EPUB / DOCX 遇到 `Inline::Image` 时走降级表现。需要把图片真的打进包里
+/// 用 [`render_with_assets`] —— 分成两个入口而不是给一个加 `Option` 参数，
+/// 是为了让「不看磁盘」这条测试路径保持绝对便宜：单测里装配一份 IR
+/// 就能渲染，不需要先造临时工作区。
 pub fn render(format: ExportFormat, document: &Document) -> Result<Vec<u8>> {
+    render_with_assets(format, document, None)
+}
+
+/// 按格式分发：渲染成字节，允许从工作区根读取并内嵌图片。
+///
+/// `assets` 为 `None` 时等价于 [`render`]。为 `Some` 时只有
+/// **容器格式**（EPUB / DOCX）会用它 —— TXT / Markdown / HTML / PDF
+/// 本来就以「保留原始引用」或「纯文本」的方式处理图片，
+/// 内嵌反而会改变它们的既有语义。
+pub fn render_with_assets(
+    format: ExportFormat,
+    document: &Document,
+    assets: Option<&crate::assets::AssetResolver>,
+) -> Result<Vec<u8>> {
     match format {
         ExportFormat::Txt => txt::TxtRenderer::default().render(document),
         ExportFormat::Markdown => markdown::MarkdownRenderer::default().render(document),
         ExportFormat::Html => html::HtmlRenderer::default().render(document),
-        ExportFormat::Docx => docx::DocxRenderer::default().render(document),
-        ExportFormat::Epub => epub::EpubRenderer::default().render(document),
+        ExportFormat::Docx => docx::DocxRenderer::default()
+            .with_assets(assets.cloned())
+            .render(document),
+        ExportFormat::Epub => epub::EpubRenderer::default()
+            .with_assets(assets.cloned())
+            .render(document),
         ExportFormat::Pdf => pdf::render_pdf(document),
     }
 }
@@ -172,7 +195,21 @@ pub fn render_to_path(
     document: &Document,
     target: &Path,
 ) -> Result<PuertoPath> {
-    let bytes = render(format, document)?;
+    render_to_path_with_assets(format, document, target, None)
+}
+
+/// [`render_to_path`] 的图片内嵌版本。
+///
+/// `assets` 给出工作区根时，EPUB / DOCX 会把正文引用的图片读进包内。
+/// 产物字节数因此会明显大于「不内嵌」的结果，`bytes` 报告的是**实际写出的**
+/// 字节数，不是稿子字数。
+pub fn render_to_path_with_assets(
+    format: ExportFormat,
+    document: &Document,
+    target: &Path,
+    assets: Option<&crate::assets::AssetResolver>,
+) -> Result<PuertoPath> {
+    let bytes = render_with_assets(format, document, assets)?;
     write_bytes_atomically(&bytes, target)?;
     Ok(PuertoPath::new(target.to_path_buf(), bytes.len()))
 }

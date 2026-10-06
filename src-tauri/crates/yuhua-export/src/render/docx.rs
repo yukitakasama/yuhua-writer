@@ -12,6 +12,7 @@
 //! word/document.xml            正文
 //! word/_rels/document.xml.rels 主文档的关系：指向 styles
 //! word/styles.xml              样式表（含中文字体声明）
+//! word/media/image-*.png       被内嵌的图片（有图才有）
 //! ```
 //!
 //! ## 两个最容易踩的坑（R18）
@@ -25,12 +26,20 @@
 //!
 //! ## 不做的事（计划书 9.4「不做」清单）
 //!
-//! 复杂表格、文本框、图片环绕、目录域 —— 一律不实现。图片按
-//! 「替代文本段落」降级，宁可少一个排版效果，也不要产出 Word 打不开的文件。
+//! 复杂表格、文本框、图片环绕、目录域 —— 一律不实现。
+//!
+//! ## 图片：内嵌为行首/行内图形，不做环绕
+//!
+//! 给了 [`AssetResolver`] 时，能读到且**嗅探得出像素尺寸**的图会进包
+//! （`word/media/`），正文里以「行内图形」出现，宽度超出版心时按比例缩到
+//! 版心宽。读不到、或尺寸嗅不出（`cx`/`cy` 是必填项，猜一个会让 Word
+//! 里的图变形）时退化为「［图片：alt］」斜体段落 —— 宁可少一个排版效果，
+//! 也不要产出 Word 打不开或打开后图是歪的文件。
 
 use std::fmt::Write as _;
 use std::io::{Cursor, Write};
 
+use crate::assets::{AssetResolver, ImageTable};
 use crate::error::{ExportError, Result};
 use crate::ir::{Block, Document, Inline};
 use crate::render::{ExportFormat, Renderer};
@@ -69,16 +78,40 @@ impl Default for DocxOptions {
 pub struct DocxRenderer {
     /// 选项。
     pub options: DocxOptions,
+    /// 图片资源解析器；`None` 时图片降级为替代文本段落。
+    pub assets: Option<AssetResolver>,
 }
 
 impl DocxRenderer {
     /// 用指定选项构造。
     pub fn new(options: DocxOptions) -> Self {
-        Self { options }
+        Self {
+            options,
+            assets: None,
+        }
+    }
+
+    /// 挂载图片解析器（链式）。
+    pub fn with_assets(mut self, assets: Option<AssetResolver>) -> Self {
+        self.assets = assets;
+        self
+    }
+
+    /// 第一遍：扫全书建图片表。没挂 resolver 时得到空表，
+    /// 后续渲染路径与「不内嵌」完全一致。
+    fn collect_images(&self, document: &Document) -> ImageTable {
+        let mut table = ImageTable::new();
+        let Some(resolver) = &self.assets else {
+            return table;
+        };
+        for chapter in document.iter_chapters() {
+            table.gather(&chapter.blocks, resolver);
+        }
+        table
     }
 
     /// 生成 `word/document.xml`。
-    fn document_xml(&self, document: &Document) -> String {
+    fn document_xml(&self, document: &Document, images: &ImageTable) -> String {
         let mut body = String::new();
 
         // 书名作为文档标题（样式 Title 未定义时退化成普通段落也不难看）
@@ -108,15 +141,20 @@ impl DocxRenderer {
                 body.push_str("<w:p><w:r><w:br w:type=\"page\"/></w:r></w:p>");
             }
             self.push_heading(&mut body, 2, &chapter.title);
-            self.render_blocks(&chapter.blocks, &mut body);
+            self.render_blocks(&chapter.blocks, &mut body, images);
         }
 
         // <w:sectPr> 定义页面：A4 竖排，页边距 2.54cm / 3.17cm
         // （1440 twips = 1 英寸；A4 宽 11906 高 16838 twips）
         let mut out = String::new();
         out.push_str(XML_DECLARATION);
+        // `wp`（行内图形）与 `r`（关系引用）即使本书无图也声明：
+        // 根元素只写一次，按「有没有图」分支加属性会让两种产物的根长得不一样，
+        // 而多余的命名空间声明对 Word 完全无害。
         out.push_str(
-            "<w:document xmlns:w=\"http://schemas.openxmlformats.org/wordprocessingml/2006/main\">",
+            "<w:document xmlns:w=\"http://schemas.openxmlformats.org/wordprocessingml/2006/main\"  \
+             xmlns:wp=\"http://schemas.openxmlformats.org/drawingml/2006/wordprocessingDrawing\"  \
+             xmlns:r=\"http://schemas.openxmlformats.org/officeDocument/2006/relationships\">",
         );
         out.push_str("<w:body>");
         out.push_str(&body);
@@ -138,17 +176,17 @@ impl DocxRenderer {
     }
 
     /// 渲染块序列。
-    fn render_blocks(&self, blocks: &[Block], out: &mut String) {
+    fn render_blocks(&self, blocks: &[Block], out: &mut String, images: &ImageTable) {
         for block in blocks {
-            self.render_block(block, out);
+            self.render_block(block, out, images);
         }
     }
 
     /// 渲染单个块。
-    fn render_block(&self, block: &Block, out: &mut String) {
+    fn render_block(&self, block: &Block, out: &mut String, images: &ImageTable) {
         match block {
             Block::Paragraph(inlines) => {
-                let runs = self.render_inlines(inlines);
+                let runs = self.render_inlines(inlines, images);
                 if runs.trim().is_empty() {
                     return;
                 }
@@ -160,7 +198,7 @@ impl DocxRenderer {
             }
             Block::Quote(children) => {
                 let mut inner = String::new();
-                self.render_blocks(children, &mut inner);
+                self.render_blocks(children, &mut inner, images);
                 // 样式层面上 Quote 已带缩进与斜体；这里再包一层 `w:pStyle`。
                 // inner 里的每个 <w:p> 都要替换，所以用字符串替换而不是拼接。
                 let quoted =
@@ -184,9 +222,9 @@ impl DocxRenderer {
                     let mut first = true;
                     for child in item {
                         match child {
-                            Block::List { .. } => self.render_block(child, out),
+                            Block::List { .. } => self.render_block(child, out, images),
                             other => {
-                                let runs = self.render_block_to_runs(other);
+                                let runs = self.render_block_to_runs(other, images);
                                 if runs.trim().is_empty() {
                                     continue;
                                 }
@@ -232,9 +270,9 @@ impl DocxRenderer {
     }
 
     /// 把一个块渲染成「runs 片段」（没有 `<w:p>` 外壳）。
-    fn render_block_to_runs(&self, block: &Block) -> String {
+    fn render_block_to_runs(&self, block: &Block, images: &ImageTable) -> String {
         match block {
-            Block::Paragraph(inlines) => self.render_inlines(inlines),
+            Block::Paragraph(inlines) => self.render_inlines(inlines, images),
             Block::Heading { text, .. } => format!(
                 "<w:r><w:rPr><w:b/></w:rPr><w:t xml:space=\"preserve\">{}</w:t></w:r>",
                 escape_xml(text)
@@ -248,7 +286,7 @@ impl DocxRenderer {
     }
 
     /// 渲染行内元素成 runs。
-    fn render_inlines(&self, inlines: &[Inline]) -> String {
+    fn render_inlines(&self, inlines: &[Inline], images: &ImageTable) -> String {
         let mut out = String::new();
         for inline in inlines {
             match inline {
@@ -259,36 +297,36 @@ impl DocxRenderer {
                     );
                 }
                 Inline::Strong(children) => {
-                    let inner = self.render_inlines_with_props(children, "<w:b/>");
+                    let inner = self.render_inlines_with_props(children, "<w:b/>", images);
                     out.push_str(&inner);
                 }
                 Inline::Emph(children) => {
-                    out.push_str(&self.render_inlines_with_props(children, "<w:i/>"));
+                    out.push_str(&self.render_inlines_with_props(children, "<w:i/>", images));
                 }
                 Inline::Link { text, .. } => {
                     // 第一阶段不生成超链接关系（那要往 document.xml.rels 里加条目），
                     // 改成「下划线 + 蓝色」的视觉提示并保留文字。
                     // 链接 URL 在纯文本里没有意义，故不加到正文里污染排版。
-                    let inner = self.render_inlines_with_props(text, "<w:u w:val=\"single\"/>");
+                    let inner =
+                        self.render_inlines_with_props(text, "<w:u w:val=\"single\"/>", images);
                     out.push_str(&inner);
                 }
-                Inline::Image { alt, .. } => {
-                    // 计划书 9.4 的「不做」清单里有图片环绕；本阶段图片降级为
-                    // 替代文本段落。不静默丢弃 —— 作者需要知道这里有张图。
-                    let label = if alt.is_empty() {
-                        "［图片］".to_string()
-                    } else {
-                        format!("［图片：{alt}］")
-                    };
-                    out.push_str(&self.run(&label, "<w:i/>"));
-                }
+                Inline::Image { url, alt } => match self.image_run(url, alt, images) {
+                    Some(drawing) => out.push_str(&drawing),
+                    None => out.push_str(&self.alt_text_run(alt, "<w:i/>")),
+                },
             }
         }
         out
     }
 
     /// 带属性地渲染一段行内序列。
-    fn render_inlines_with_props(&self, inlines: &[Inline], props: &str) -> String {
+    fn render_inlines_with_props(
+        &self,
+        inlines: &[Inline],
+        props: &str,
+        images: &ImageTable,
+    ) -> String {
         let mut out = String::new();
         for inline in inlines {
             match inline {
@@ -301,20 +339,75 @@ impl DocxRenderer {
                     );
                 }
                 Inline::Strong(children) => {
-                    out.push_str(&self.render_inlines_with_props(children, "<w:b/>"));
+                    out.push_str(&self.render_inlines_with_props(children, "<w:b/>", images));
                 }
                 Inline::Emph(children) => {
-                    out.push_str(&self.render_inlines_with_props(children, "<w:i/>"));
+                    out.push_str(&self.render_inlines_with_props(children, "<w:i/>", images));
                 }
                 Inline::Link { text, .. } => {
-                    out.push_str(&self.render_inlines_with_props(text, props));
+                    out.push_str(&self.render_inlines_with_props(text, props, images));
                 }
-                Inline::Image { alt, .. } => {
-                    out.push_str(&self.run(&format!("［图片：{alt}］"), props));
+                Inline::Image { url, alt } => {
+                    // 图形不继承字符属性（`<w:rPr>` 对 `<w:drawing>` 没有意义），
+                    // 所以强调里的图片与不强调时长得一样。
+                    match self.image_run(url, alt, images) {
+                        Some(drawing) => out.push_str(&drawing),
+                        None => out.push_str(&self.alt_text_run(alt, props)),
+                    }
                 }
             }
         }
         out
+    }
+
+    /// 图片的替代文本 run（内嵌不成时的降级表现）。
+    fn alt_text_run(&self, alt: &str, props: &str) -> String {
+        let label = if alt.is_empty() {
+            "［图片］".to_string()
+        } else {
+            format!("［图片：{alt}］")
+        };
+        self.run(&label, props)
+    }
+
+    /// 生成一张已内嵌图片的行内图形 run；不可用时返回 `None`。
+    ///
+    /// 三种「不可用」都要退回降级，而不是硬写一个图形：
+    /// 1. 表里没有（没挂 resolver，或磁盘上读不到）；
+    /// 2. 嗅不出像素尺寸 —— `wp:extent` 的 `cx`/`cy` 是必填项，
+    ///    瞎猜一个比例会让 Word 里的图变形，那比少一张图更糟；
+    /// 3. 尺寸算出的 EMU 溢出（超宽图）—— 这里按比例缩放而不是拒绝。
+    fn image_run(&self, url: &str, alt: &str, images: &ImageTable) -> Option<String> {
+        let index = images.index_of(url)?;
+        let entry = images.entries().get(index)?;
+        if !entry.asset.has_size() {
+            return None;
+        }
+        let (cx, cy) = emu_extent(entry.asset.width, entry.asset.height);
+        // rId1 已被 styles 占用，图片关系从 rId2 起
+        let rel_id = index + 2;
+        let doc_pr_id = index + 1;
+        let name = escape_xml(if alt.is_empty() {
+            entry.file_name.as_str()
+        } else {
+            alt
+        });
+        let mut out = String::new();
+        let _ = write!(
+            out,
+            "<w:r><w:drawing><wp:inline distT=\"0\" distB=\"0\" distL=\"0\" distR=\"0\">\
+<wp:extent cx=\"{cx}\" cy=\"{cy}\"/><wp:effectExtent l=\"0\" t=\"0\" r=\"0\" b=\"0\"/>\
+<wp:docPr id=\"{doc_pr_id}\" name=\"{name}\"/>\
+<a:graphic xmlns:a=\"http://schemas.openxmlformats.org/drawingml/2006/main\">\
+<a:graphicData uri=\"http://schemas.openxmlformats.org/drawingml/2006/picture\">\
+<pic:pic xmlns:pic=\"http://schemas.openxmlformats.org/drawingml/2006/picture\">\
+<pic:nvPicPr><pic:cNvPr id=\"{doc_pr_id}\" name=\"{name}\"/><pic:cNvPicPr/></pic:nvPicPr>\
+<pic:blipFill><a:blip r:embed=\"rId{rel_id}\"/><a:stretch><a:fillRect/></a:stretch></pic:blipFill>\
+<pic:spPr><a:xfrm><a:off x=\"0\" y=\"0\"/><a:ext cx=\"{cx}\" cy=\"{cy}\"/></a:xfrm>\
+<a:prstGeom prst=\"rect\"><a:avLst/></a:prstGeom></pic:spPr></pic:pic></a:graphicData></a:graphic>\
+</wp:inline></w:drawing></w:r>"
+        );
+        Some(out)
     }
 
     /// 生成一个 run。
@@ -333,13 +426,31 @@ impl DocxRenderer {
     }
 
     /// 生成 `[Content_Types].xml`。
-    fn content_types_xml(&self) -> String {
+    ///
+    /// 每种被内嵌图片的**扩展名**都要有一条 `Default`：OOXML 是按扩展名而不是
+    /// 按部件名匹配图片类型的，缺了这条 Word 会直接报「包内容有问题」。
+    /// 扩展名取自嗅探结果（`extension_for(mime)`），与 `word/media/` 里
+    /// 实际写出的文件名同源，所以不会出现「声明了 png，包里却是 .jpg」。
+    fn content_types_xml(&self, images: &ImageTable) -> String {
         let mut out = String::from(XML_DECLARATION);
         out.push_str(
             "<Types xmlns=\"http://schemas.openxmlformats.org/package/2006/content-types\">",
         );
         out.push_str("<Default Extension=\"rels\" ContentType=\"application/vnd.openxmlformats-package.relationships+xml\"/>");
         out.push_str("<Default Extension=\"xml\" ContentType=\"application/xml\"/>");
+        let mut declared: Vec<&str> = Vec::new();
+        for entry in images.entries() {
+            let ext = crate::assets::extension_for(entry.asset.mime);
+            if declared.contains(&ext) {
+                continue;
+            }
+            declared.push(ext);
+            let _ = write!(
+                out,
+                "<Default Extension=\"{ext}\" ContentType=\"{}\"/>",
+                entry.asset.mime
+            );
+        }
         out.push_str("<Override PartName=\"/word/document.xml\" ContentType=\"application/vnd.openxmlformats-officedocument.wordprocessingml.document.main+xml\"/>");
         out.push_str("<Override PartName=\"/word/styles.xml\" ContentType=\"application/vnd.openxmlformats-officedocument.wordprocessingml.styles+xml\"/>");
         out.push_str("<Override PartName=\"/docProps/core.xml\" ContentType=\"application/vnd.openxmlformats-package.core-properties+xml\"/>");
@@ -461,10 +572,22 @@ impl DocxRenderer {
     }
 
     /// 生成 `word/_rels/document.xml.rels`。
-    fn document_rels_xml(&self) -> String {
+    ///
+    /// 图片关系的 `Target` 是**相对 `word/`** 的 `media/xxx`，而 zip 条目名是
+    /// `word/media/xxx` —— OOXML 的关系路径以「所在部件的目录」为基准，
+    /// 这一点写错的表现是 Word 打开后图片位置一片空白且不报错。
+    fn document_rels_xml(&self, images: &ImageTable) -> String {
         let mut out = String::from(XML_DECLARATION);
         out.push_str("<Relationships xmlns=\"http://schemas.openxmlformats.org/package/2006/relationships\">");
         out.push_str("<Relationship Id=\"rId1\" Type=\"http://schemas.openxmlformats.org/officeDocument/2006/relationships/styles\" Target=\"styles.xml\"/>");
+        for (index, entry) in images.entries().iter().enumerate() {
+            let _ = write!(
+                out,
+                "<Relationship Id=\"rId{next}\" Type=\"{IMAGE_REL}\" Target=\"{MEDIA_DIR}/{file}\"/>",
+                next = index + 2,
+                file = entry.file_name,
+            );
+        }
         out.push_str("</Relationships>");
         out
     }
@@ -501,6 +624,10 @@ impl<'a> Renderer<'a> for DocxRenderer {
     }
 
     fn render(&self, document: &'a Document) -> Result<Vec<u8>> {
+        // 两遍流程的第一遍：图片表决定 media 部件、内容类型声明与关系表，
+        // 这三处必须与正文里引用的编号完全一致。
+        let images = self.collect_images(document);
+
         let mut buffer = Cursor::new(Vec::new());
         {
             let mut zip = zip::ZipWriter::new(&mut buffer);
@@ -509,18 +636,30 @@ impl<'a> Renderer<'a> for DocxRenderer {
                 .compression_method(zip::CompressionMethod::Deflated);
 
             let created = chrono::Utc::now().format("%Y-%m-%dT%H:%M:%SZ").to_string();
-            let parts: [(&str, String); 6] = [
-                ("[Content_Types].xml", self.content_types_xml()),
-                ("_rels/.rels", self.root_rels_xml()),
-                ("word/document.xml", self.document_xml(document)),
-                ("word/_rels/document.xml.rels", self.document_rels_xml()),
-                ("word/styles.xml", self.styles_xml()),
-                ("docProps/core.xml", self.core_xml(document, &created)),
+            let parts: [(&str, Vec<u8>); 6] = [
+                (
+                    "[Content_Types].xml",
+                    self.content_types_xml(&images).into_bytes(),
+                ),
+                ("_rels/.rels", self.root_rels_xml().into_bytes()),
+                (
+                    "word/document.xml",
+                    self.document_xml(document, &images).into_bytes(),
+                ),
+                (
+                    "word/_rels/document.xml.rels",
+                    self.document_rels_xml(&images).into_bytes(),
+                ),
+                ("word/styles.xml", self.styles_xml().into_bytes()),
+                (
+                    "docProps/core.xml",
+                    self.core_xml(document, &created).into_bytes(),
+                ),
             ];
             for (name, content) in parts {
                 zip.start_file(name, options)
                     .map_err(|e| ExportError::Package(format!("写入 {name} 失败：{e}")))?;
-                zip.write_all(content.as_bytes())
+                zip.write_all(&content)
                     .map_err(|e| ExportError::Package(format!("写入 {name} 失败：{e}")))?;
             }
             // app.xml 与 core.xml 分开写，便于上面用固定长度数组
@@ -528,12 +667,51 @@ impl<'a> Renderer<'a> for DocxRenderer {
                 .map_err(|e| ExportError::Package(format!("写入 app.xml 失败：{e}")))?;
             zip.write_all(self.app_xml(document).as_bytes())
                 .map_err(|e| ExportError::Package(format!("写入 app.xml 失败：{e}")))?;
+            // 图片本体。位图已经各自压缩过，deflate 只是白耗 CPU，
+            // 但为保持「包内除 mimetype 类特殊条目外都压缩」的既有约定，
+            // 这里同样用 deflate —— 体积差别对一本书而言可以忽略。
+            for entry in images.entries() {
+                let name = format!("word/{MEDIA_DIR}/{}", entry.file_name);
+                zip.start_file(&name, options)
+                    .map_err(|e| ExportError::Package(format!("写入 {name} 失败：{e}")))?;
+                zip.write_all(&entry.asset.bytes)
+                    .map_err(|e| ExportError::Package(format!("写入 {name} 失败：{e}")))?;
+            }
 
             zip.finish()
                 .map_err(|e| ExportError::Package(format!("收尾 zip 失败：{e}")))?;
         }
         Ok(buffer.into_inner())
     }
+}
+
+/// `word/` 下的图片目录。
+const MEDIA_DIR: &str = "media";
+
+/// 图片关系的类型 URI。
+const IMAGE_REL: &str = "http://schemas.openxmlformats.org/officeDocument/2006/relationships/image";
+
+/// 版心宽度上限（EMU）。
+///
+/// `sectPr` 定义 A4 宽 11906 twips，左右边距各 1800，故版心宽 8306 twips；
+/// 1 twip = 1/1440 英寸，1 英寸 = 914400 EMU，于是 8306/1440*914400 ≈ 5274240。
+/// 超过这个宽度的图会被等比缩小 —— Word 允许超宽图，但那样会顶破页边距，
+/// 交稿时属于「得手动调」的硬伤。
+const MAX_WIDTH_EMU: u64 = 5_274_240;
+
+/// 每像素的 EMU 数（按 96 DPI，Office 的屏幕基准）。
+const EMU_PER_PIXEL: u64 = 9_525;
+
+/// 由像素尺寸算 `wp:extent` 的 cx/cy，必要时等比缩到版心宽。
+fn emu_extent(width: u32, height: u32) -> (u64, u64) {
+    let cx = u64::from(width) * EMU_PER_PIXEL;
+    let cy = u64::from(height) * EMU_PER_PIXEL;
+    if cx <= MAX_WIDTH_EMU {
+        return (cx, cy);
+    }
+    // 整数运算保比例：新宽/旧宽 = 新高/旧高 → 新高 = 旧高 * 新宽 / 旧宽
+    let scaled = (cy * MAX_WIDTH_EMU / cx).max(1);
+    (MAX_WIDTH_EMU, scaled)
 }
 
 /// XML 声明。每个部件开头都要有 —— 少写会让部分解析器猜错编码。
@@ -581,6 +759,9 @@ mod tests {
     }
 
     /// 把产物解压成「条目名 → 文本」。
+    ///
+    /// 图片部件（`word/media/`）内容留空：PNG 不是 UTF-8，`read_to_string`
+    /// 会 panic。字节级的断言用 [`unzip_bytes`]。
     fn unzip(bytes: &[u8]) -> HashMap<String, String> {
         let mut archive =
             zip::ZipArchive::new(Cursor::new(bytes.to_vec())).expect("产物必须是合法 zip");
@@ -588,9 +769,27 @@ mod tests {
         for index in 0..archive.len() {
             let mut entry = archive.by_index(index).unwrap();
             let name = entry.name().to_string();
+            if name.starts_with("word/media/") {
+                map.insert(name, String::new());
+                continue;
+            }
             let mut content = String::new();
             std::io::Read::read_to_string(&mut entry, &mut content).unwrap();
             map.insert(name, content);
+        }
+        map
+    }
+
+    /// 解压成「条目名 → 原始字节」。
+    fn unzip_bytes(bytes: &[u8]) -> HashMap<String, Vec<u8>> {
+        let mut archive = zip::ZipArchive::new(Cursor::new(bytes.to_vec())).unwrap();
+        let mut map = HashMap::new();
+        for index in 0..archive.len() {
+            let mut entry = archive.by_index(index).unwrap();
+            let name = entry.name().to_string();
+            let mut buf = Vec::new();
+            std::io::Read::read_to_end(&mut entry, &mut buf).unwrap();
+            map.insert(name, buf);
         }
         map
     }
@@ -927,5 +1126,180 @@ mod tests {
     #[test]
     fn escape_xml_keeps_tabs_and_newlines() {
         assert_eq!(escape_xml("a\tb\nc\r"), "a\tb\nc\r");
+    }
+
+    // ------------------------------------------------------------------
+    //  图片内嵌（P2-3）
+    // ------------------------------------------------------------------
+
+    use crate::assets::testing::{png, url, workspace};
+    use crate::assets::AssetResolver;
+
+    /// 一段只含一张图的正文。
+    fn doc_image(src: &str, alt: &str) -> Document {
+        doc_with(vec![Block::Paragraph(vec![Inline::Image {
+            url: src.into(),
+            alt: alt.into(),
+        }])])
+    }
+
+    fn renderer_for(root: &std::path::Path) -> DocxRenderer {
+        DocxRenderer::default().with_assets(Some(AssetResolver::new(root.to_path_buf())))
+    }
+
+    #[test]
+    fn embedded_image_is_a_part_with_the_original_bytes() {
+        let ws = workspace(&[("a.png", 3, 2)]);
+        let doc = doc_image(&url("a.png"), "插图");
+        let parts = unzip_bytes(&renderer_for(ws.path()).render(&doc).unwrap());
+        let written = parts
+            .get("word/media/image-1.png")
+            .unwrap_or_else(|| panic!("没有内嵌图片，实际有 {:?}", parts.keys()));
+        assert_eq!(written, &png(3, 2));
+    }
+
+    #[test]
+    fn drawing_references_relationship_and_extent() {
+        let ws = workspace(&[("a.png", 3, 2)]);
+        let parts = render_to_strings_with(ws.path(), &doc_image(&url("a.png"), "插图"));
+        let document = &parts["word/document.xml"];
+        assert!(document.contains("<w:drawing>"), "{document}");
+        assert!(document.contains("r:embed=\"rId2\""), "{document}");
+        // 3x2 像素 @96dpi = 28575 x 19050 EMU
+        assert!(document.contains("cx=\"28575\" cy=\"19050\""), "{document}");
+        assert!(document.contains("name=\"插图\""), "{document}");
+        let rels = &parts["word/_rels/document.xml.rels"];
+        assert!(
+            rels.contains("Id=\"rId2\"") && rels.contains("Target=\"media/image-1.png\""),
+            "{rels}"
+        );
+        let types = &parts["[Content_Types].xml"];
+        assert!(
+            types.contains("Default Extension=\"png\" ContentType=\"image/png\""),
+            "{types}"
+        );
+    }
+
+    fn render_to_strings_with(root: &std::path::Path, doc: &Document) -> HashMap<String, String> {
+        let bytes = renderer_for(root).render(doc).unwrap();
+        unzip(&bytes)
+    }
+
+    #[test]
+    fn two_images_get_consecutive_relationship_ids() {
+        let ws = workspace(&[("a.png", 3, 2), ("b.png", 4, 4)]);
+        let doc = doc_with(vec![
+            Block::Paragraph(vec![Inline::Image {
+                url: url("a.png"),
+                alt: "甲".into(),
+            }]),
+            Block::Paragraph(vec![Inline::Image {
+                url: url("b.png"),
+                alt: "乙".into(),
+            }]),
+        ]);
+        let parts = render_to_strings_with(ws.path(), &doc);
+        let rels = &parts["word/_rels/document.xml.rels"];
+        assert!(rels.contains("Id=\"rId2\""), "{rels}");
+        assert!(rels.contains("Id=\"rId3\""), "{rels}");
+        let document = &parts["word/document.xml"];
+        assert!(document.contains("r:embed=\"rId2\""), "{document}");
+        assert!(document.contains("r:embed=\"rId3\""), "{document}");
+        // 样式关系仍占 rId1
+        assert!(rels.contains("Id=\"rId1\""), "{rels}");
+        assert!(rels.contains("Target=\"styles.xml\""), "{rels}");
+    }
+
+    #[test]
+    fn same_extension_is_declared_only_once() {
+        let ws = workspace(&[("a.png", 3, 2), ("b.png", 4, 4)]);
+        let doc = doc_with(vec![Block::Paragraph(vec![
+            Inline::Image {
+                url: url("a.png"),
+                alt: "甲".into(),
+            },
+            Inline::Image {
+                url: url("b.png"),
+                alt: "乙".into(),
+            },
+        ])]);
+        let parts = render_to_strings_with(ws.path(), &doc);
+        let types = &parts["[Content_Types].xml"];
+        assert_eq!(
+            types.matches("Default Extension=\"png\"").count(),
+            1,
+            "{types}"
+        );
+    }
+
+    #[test]
+    fn oversized_image_is_scaled_to_the_text_width() {
+        let ws = workspace(&[("wide.png", 2000, 1000)]);
+        let doc = doc_image(&url("wide.png"), "横幅");
+        let parts = render_to_strings_with(ws.path(), &doc);
+        let document = &parts["word/document.xml"];
+        // 2000px 的原始宽远超版心，必须顶到上限且保持 2:1 比例
+        assert!(
+            document.contains(&format!(
+                "cx=\"{MAX_WIDTH_EMU}\" cy=\"{}\"",
+                MAX_WIDTH_EMU / 2
+            )),
+            "{document}"
+        );
+    }
+
+    #[test]
+    fn image_without_a_sniffable_size_degrades_to_alt_text() {
+        // 头合法但宽高都是 0 —— 猜一个尺寸会让 Word 里的图变形，宁可降级
+        let ws = workspace(&[("zero.png", 0, 0)]);
+        let doc = doc_image(&url("zero.png"), "没尺寸");
+        let parts = render_to_strings_with(ws.path(), &doc);
+        let document = &parts["word/document.xml"];
+        assert!(document.contains("［图片：没尺寸］"), "{document}");
+        assert!(!document.contains("<w:drawing>"), "{document}");
+    }
+
+    #[test]
+    fn unreadable_image_degrades_to_alt_text_and_adds_no_part() {
+        let ws = workspace(&[("a.png", 3, 2)]);
+        let doc = doc_image("manuscript/ch.assets/gone.png", "丢了的图");
+        let bytes = renderer_for(ws.path()).render(&doc).unwrap();
+        let parts = unzip_bytes(&bytes);
+        assert!(
+            !parts.keys().any(|n| n.starts_with("word/media/")),
+            "缺图不该产出 media 条目：{:?}",
+            parts.keys()
+        );
+        let document = &unzip(&bytes)["word/document.xml"];
+        assert!(document.contains("［图片：丢了的图］"), "{document}");
+        // 关系表与内容类型里也不该留下悬空引用
+        let rels = String::from_utf8(parts["word/_rels/document.xml.rels"].clone()).unwrap();
+        assert!(!rels.contains("image"), "{rels}");
+        let types = String::from_utf8(parts["[Content_Types].xml"].clone()).unwrap();
+        assert!(!types.contains("Extension=\"png\""), "{types}");
+    }
+
+    #[test]
+    fn no_resolver_means_no_disk_access() {
+        let doc = doc_image(&url("a.png"), "图");
+        let parts = unzip(&DocxRenderer::default().render(&doc).unwrap());
+        assert!(
+            parts.keys().all(|n| !n.starts_with("word/media/")),
+            "{:?}",
+            parts.keys()
+        );
+        assert!(parts["word/document.xml"].contains("［图片：图］"));
+    }
+
+    #[test]
+    fn relationship_target_is_relative_to_word_dir() {
+        // 关系路径以「所在部件的目录」为基准：写 media/xxx 而不是 word/media/xxx，
+        // 写错的表现为 Word 打开后图片位置空白且不报错，极难排查
+        let ws = workspace(&[("a.png", 3, 2)]);
+        let doc = doc_image(&url("a.png"), "插图");
+        let parts = render_to_strings_with(ws.path(), &doc);
+        let rels = &parts["word/_rels/document.xml.rels"];
+        assert!(rels.contains("Target=\"media/image-1.png\""), "{rels}");
+        assert!(!rels.contains("word/media"), "{rels}");
     }
 }

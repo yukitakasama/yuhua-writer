@@ -8,6 +8,7 @@
 //! OEBPS/content.opf        包文档：元数据 + 清单 + 阅读顺序
 //! OEBPS/nav.xhtml          EPUB 3 的导航文档（目录）
 //! OEBPS/chapter-*.xhtml    每章一个文件
+//! OEBPS/images/image-*.png 被内嵌的图片（有图才有）
 //! ```
 //!
 //! ## 为什么 mimetype 这么讲究
@@ -28,10 +29,21 @@
 //! 这不是过度拆分：EPUB 阅读器按「文档」分页与缓存，单章一文件才能让
 //! 十万字的书在低端阅读器上翻页不卡。同时每章一文件也天然对应
 //! 「一章一个 page-break」的语义。
+//!
+//! ## 图片：能读进来就内嵌，读不到就保留原样
+//!
+//! 电子书必须自包含 —— 外链图片在离线的阅读器上永远是裂图。所以给了
+//! [`AssetResolver`] 时，正文里的 `![](相对路径)` 会被读进包内的
+//! `OEBPS/images/`，`<img src>` 改写成包内相对路径，并在 manifest 里
+//! 登记 `media-type`（未登记的文件 epubcheck 直接报错）。
+//!
+//! 没给 resolver、图不在磁盘上、或路径本来就是 `https://`，一律退回原样：
+//! 保留原始 src。这是降级而不是失败 —— 导出照样成功，比整个导出报错好。
 
 use std::fmt::Write as _;
 use std::io::{Cursor, Write};
 
+use crate::assets::{AssetResolver, ImageTable};
 use crate::error::{ExportError, Result};
 use crate::ir::{Block, Document, Inline};
 use crate::render::html::escape_html;
@@ -72,12 +84,23 @@ impl Default for EpubOptions {
 pub struct EpubRenderer {
     /// 选项。
     pub options: EpubOptions,
+    /// 图片资源解析器；`None` 时图片保留原始 src，不进包。
+    pub assets: Option<AssetResolver>,
 }
 
 impl EpubRenderer {
     /// 用指定选项构造。
     pub fn new(options: EpubOptions) -> Self {
-        Self { options }
+        Self {
+            options,
+            assets: None,
+        }
+    }
+
+    /// 挂载图片解析器（链式）。
+    pub fn with_assets(mut self, assets: Option<AssetResolver>) -> Self {
+        self.assets = assets;
+        self
     }
 
     /// 解析书籍标识符。
@@ -120,6 +143,22 @@ impl EpubRenderer {
         )
     }
 
+    /// 扫一遍全书，把能读到的图片登记进表。
+    ///
+    /// 必须是**两遍**里的第一遍：manifest 要列出所有被引用的图，
+    /// 而引用散落在各章正文里；先建好表，正文与清单才能引用同一份包内名。
+    /// 没有挂 resolver 时返回空表，渲染路径与「不内嵌」完全一致。
+    fn collect_images(&self, document: &Document) -> ImageTable {
+        let mut table = ImageTable::new();
+        let Some(resolver) = &self.assets else {
+            return table;
+        };
+        for chapter in document.iter_chapters() {
+            table.gather(&chapter.blocks, resolver);
+        }
+        table
+    }
+
     /// 生成 `META-INF/container.xml`。
     fn container_xml(&self) -> String {
         let mut out = String::from(XML_DECLARATION);
@@ -132,7 +171,7 @@ impl EpubRenderer {
     }
 
     /// 生成 `OEBPS/content.opf`。
-    fn content_opf(&self, document: &Document, modified: &str) -> String {
+    fn content_opf(&self, document: &Document, modified: &str, images: &ImageTable) -> String {
         let mut out = String::from(XML_DECLARATION);
         out.push_str("<package xmlns=\"http://www.idpf.org/2007/opf\" version=\"3.0\" unique-identifier=\"pub-id\" xml:lang=\"");
         out.push_str(&escape_html(&self.options.language));
@@ -195,6 +234,19 @@ impl EpubRenderer {
         }
         out.push_str("</manifest>");
 
+        // 图片：已内嵌的走包内相对路径（`images/…`），未内嵌的保持原样。
+        // manifest 里的 href 必须与实际写出的条目名一致，所以两处都用
+        // `images/` + `file_name` 这同一个拼接式。
+        if !images.is_empty() {
+            for (index, entry) in images.entries().iter().enumerate() {
+                let _ = write!(
+                    out,
+                    "<item id=\"img{index}\" href=\"{IMAGE_DIR}/{}\" media-type=\"{}\"/>",
+                    entry.file_name, entry.asset.mime
+                );
+            }
+        }
+
         // ---- 阅读顺序 ----
         out.push_str("<spine>");
         for index in 0..document.chapter_count() {
@@ -250,7 +302,12 @@ impl EpubRenderer {
     }
 
     /// 生成一页 XHTML。
-    fn chapter_xhtml(&self, chapter: &crate::ir::ChapterContent, index: usize) -> String {
+    fn chapter_xhtml(
+        &self,
+        chapter: &crate::ir::ChapterContent,
+        index: usize,
+        images: &ImageTable,
+    ) -> String {
         let mut body = String::new();
         if self.options.page_break_per_chapter && index > 0 {
             let _ = write!(
@@ -265,7 +322,7 @@ impl EpubRenderer {
             "<h1 class=\"chapter-title\">{}</h1>",
             escape_html(&chapter.title)
         );
-        self.render_blocks(&chapter.blocks, &mut body, 0);
+        self.render_blocks(&chapter.blocks, &mut body, 0, images);
         body.push_str("</section>");
 
         let mut out = String::from(XML_DECLARATION);
@@ -318,17 +375,17 @@ a { color: inherit; text-decoration: none; }
     }
 
     /// 渲染块序列。
-    fn render_blocks(&self, blocks: &[Block], out: &mut String, depth: usize) {
+    fn render_blocks(&self, blocks: &[Block], out: &mut String, depth: usize, images: &ImageTable) {
         for block in blocks {
-            self.render_block(block, out, depth);
+            self.render_block(block, out, depth, images);
         }
     }
 
     /// 渲染单个块。
-    fn render_block(&self, block: &Block, out: &mut String, depth: usize) {
+    fn render_block(&self, block: &Block, out: &mut String, depth: usize, images: &ImageTable) {
         match block {
             Block::Paragraph(inlines) => {
-                let text = self.render_inlines(inlines);
+                let text = self.render_inlines(inlines, images);
                 if text.trim().is_empty() {
                     return;
                 }
@@ -342,7 +399,7 @@ a { color: inherit; text-decoration: none; }
             Block::Quote(children) => {
                 out.push_str("<blockquote>");
                 let mut inner = String::new();
-                self.render_blocks(children, &mut inner, depth);
+                self.render_blocks(children, &mut inner, depth, images);
                 out.push_str(&inner);
                 out.push_str("</blockquote>");
             }
@@ -361,15 +418,15 @@ a { color: inherit; text-decoration: none; }
                     out.push_str("<li>");
                     if item.len() == 1 {
                         if let Block::Paragraph(inlines) = &item[0] {
-                            out.push_str(&self.render_inlines(inlines));
+                            out.push_str(&self.render_inlines(inlines, images));
                         } else {
                             let mut inner = String::new();
-                            self.render_blocks(item, &mut inner, depth + 1);
+                            self.render_blocks(item, &mut inner, depth + 1, images);
                             out.push_str(&inner);
                         }
                     } else {
                         let mut inner = String::new();
-                        self.render_blocks(item, &mut inner, depth + 1);
+                        self.render_blocks(item, &mut inner, depth + 1, images);
                         out.push_str(&inner);
                     }
                     out.push_str("</li>");
@@ -391,7 +448,7 @@ a { color: inherit; text-decoration: none; }
     }
 
     /// 渲染行内元素。
-    fn render_inlines(&self, inlines: &[Inline]) -> String {
+    fn render_inlines(&self, inlines: &[Inline], images: &ImageTable) -> String {
         let mut out = String::new();
         for inline in inlines {
             match inline {
@@ -400,13 +457,17 @@ a { color: inherit; text-decoration: none; }
                     let _ = write!(out, "<code>{}</code>", escape_html(t));
                 }
                 Inline::Emph(children) => {
-                    let _ = write!(out, "<em>{}</em>", self.render_inlines(children));
+                    let _ = write!(out, "<em>{}</em>", self.render_inlines(children, images));
                 }
                 Inline::Strong(children) => {
-                    let _ = write!(out, "<strong>{}</strong>", self.render_inlines(children));
+                    let _ = write!(
+                        out,
+                        "<strong>{}</strong>",
+                        self.render_inlines(children, images)
+                    );
                 }
                 Inline::Link { url, text } => {
-                    let label = self.render_inlines(text);
+                    let label = self.render_inlines(text, images);
                     if is_safe_url(url) {
                         let _ = write!(out, "<a href=\"{}\">{label}</a>", escape_html(url));
                     } else {
@@ -414,11 +475,17 @@ a { color: inherit; text-decoration: none; }
                     }
                 }
                 Inline::Image { url, alt } => {
-                    if is_safe_url(url) {
+                    // 已内嵌的图：src 换成包内相对路径（表里的 key 是原 URL，
+                    // 所以 lookup 与 collect 用的是同一套归一化规则）
+                    let src = images
+                        .lookup(url)
+                        .map(|entry| format!("{IMAGE_DIR}/{}", entry.file_name));
+                    let src = src.as_deref().unwrap_or(url);
+                    if is_safe_url(src) {
                         let _ = write!(
                             out,
                             "<img src=\"{}\" alt=\"{}\"/>",
-                            escape_html(url),
+                            escape_html(src),
                             escape_html(alt)
                         );
                     } else {
@@ -441,6 +508,9 @@ impl<'a> Renderer<'a> for EpubRenderer {
     }
 
     fn render(&self, document: &'a Document) -> Result<Vec<u8>> {
+        // 第一遍：建图片表。清单与正文都要引用它，所以必须在写任何条目之前完成。
+        let images = self.collect_images(document);
+
         let mut buffer = Cursor::new(Vec::new());
         {
             let mut zip = zip::ZipWriter::new(&mut buffer);
@@ -460,26 +530,42 @@ impl<'a> Renderer<'a> for EpubRenderer {
 
             let write_part = |zip: &mut zip::ZipWriter<&mut Cursor<Vec<u8>>>,
                               name: &str,
-                              content: String|
+                              content: &[u8]|
              -> Result<()> {
                 zip.start_file(name, deflated)
                     .map_err(|e| ExportError::Package(format!("写入 {name} 失败：{e}")))?;
-                zip.write_all(content.as_bytes())
+                zip.write_all(content)
                     .map_err(|e| ExportError::Package(format!("写入 {name} 失败：{e}")))?;
                 Ok(())
             };
 
-            write_part(&mut zip, "META-INF/container.xml", self.container_xml())?;
+            write_part(
+                &mut zip,
+                "META-INF/container.xml",
+                self.container_xml().as_bytes(),
+            )?;
             write_part(
                 &mut zip,
                 "OEBPS/content.opf",
-                self.content_opf(document, &modified),
+                self.content_opf(document, &modified, &images).as_bytes(),
             )?;
-            write_part(&mut zip, "OEBPS/nav.xhtml", self.nav_xhtml(document))?;
-            write_part(&mut zip, "OEBPS/style.css", self.style_css())?;
+            write_part(
+                &mut zip,
+                "OEBPS/nav.xhtml",
+                self.nav_xhtml(document).as_bytes(),
+            )?;
+            write_part(&mut zip, "OEBPS/style.css", self.style_css().as_bytes())?;
             for (index, chapter) in document.iter_chapters().enumerate() {
                 let name = format!("OEBPS/{}", chapter_file_name(index, &chapter.title));
-                write_part(&mut zip, &name, self.chapter_xhtml(chapter, index))?;
+                let xhtml = self.chapter_xhtml(chapter, index, &images);
+                write_part(&mut zip, &name, xhtml.as_bytes())?;
+            }
+            // ---- 图片本体 ----
+            // 条目名的前缀必须与 manifest 的 href、正文的 src 三处一致，
+            // 所以三处都写 `OEBPS/` + IMAGE_DIR + file_name 这同一个式子。
+            for entry in images.entries() {
+                let name = format!("OEBPS/{IMAGE_DIR}/{}", entry.file_name);
+                write_part(&mut zip, &name, &entry.asset.bytes)?;
             }
 
             zip.finish()
@@ -488,6 +574,9 @@ impl<'a> Renderer<'a> for EpubRenderer {
         Ok(buffer.into_inner())
     }
 }
+
+/// 包内图片目录（相对 `OEBPS/`）。
+const IMAGE_DIR: &str = "images";
 
 /// XML 声明。
 const XML_DECLARATION: &str = "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n";
@@ -528,6 +617,8 @@ fn blake3_like(seed: &str) -> String {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::assets::testing::{png, url, workspace};
+    use crate::assets::AssetResolver;
     use crate::ir::{BookMeta, ChapterContent, VolumeMeta};
     use std::collections::HashMap;
     use std::io::Read;
@@ -547,6 +638,11 @@ mod tests {
     }
 
     /// 解压成「条目名 → (是否无压缩, 文本)」。
+    ///
+    /// 图片部件（`OEBPS/images/`）**只登记名字与压缩方式，内容留空**：
+    /// PNG 字节不是 UTF-8，`read_to_string` 会 panic。这样既让文本断言能继续
+    /// 用这个最顺手的 helper，也让 `mimetype_is_the_only_stored_entry`
+    /// 依然看得见图片条目（否则跳过整条会削弱它的覆盖面）。
     fn unzip(bytes: &[u8]) -> Vec<(String, bool, String)> {
         let mut archive =
             zip::ZipArchive::new(Cursor::new(bytes.to_vec())).expect("EPUB 必须是合法 zip");
@@ -555,8 +651,13 @@ mod tests {
             let mut entry = archive.by_index(index).unwrap();
             let name = entry.name().to_string();
             let stored = entry.compression() == zip::CompressionMethod::Stored;
-            let mut content = String::new();
-            entry.read_to_string(&mut content).unwrap();
+            let content = if name.starts_with("OEBPS/images/") {
+                String::new()
+            } else {
+                let mut content = String::new();
+                entry.read_to_string(&mut content).unwrap();
+                content
+            };
             entries.push((name, stored, content));
         }
         entries
@@ -901,5 +1002,163 @@ mod tests {
         let name = chapter_file_name(0, "带/斜杠与\"引号\"的标题");
         assert!(!name.contains('/'), "{name}");
         assert!(!name.contains('"'), "{name}");
+    }
+
+    // ------------------------------------------------------------------
+    //  图片内嵌（P2-3）
+    // ------------------------------------------------------------------
+
+    /// 解压成「条目名 → 原始字节」。图片是二进制的，[`unzip`] 的
+    /// `read_to_string` 会直接 panic，所以内嵌相关的测试用这个。
+    fn unzip_bytes(bytes: &[u8]) -> HashMap<String, Vec<u8>> {
+        let mut archive = zip::ZipArchive::new(Cursor::new(bytes.to_vec())).unwrap();
+        let mut map = HashMap::new();
+        for index in 0..archive.len() {
+            let mut entry = archive.by_index(index).unwrap();
+            let name = entry.name().to_string();
+            let mut buf = Vec::new();
+            entry.read_to_end(&mut buf).unwrap();
+            map.insert(name, buf);
+        }
+        map
+    }
+
+    /// 一段只含一张图的正文。
+    fn doc_image(src: &str, alt: &str) -> Document {
+        doc_with(vec![Block::Paragraph(vec![Inline::Image {
+            url: src.into(),
+            alt: alt.into(),
+        }])])
+    }
+
+    fn renderer_for(root: &std::path::Path) -> EpubRenderer {
+        EpubRenderer::default().with_assets(Some(AssetResolver::new(root.to_path_buf())))
+    }
+
+    #[test]
+    fn embedded_image_is_a_package_part_with_the_original_bytes() {
+        let ws = workspace(&[("a.png", 3, 2)]);
+        let doc = doc_image(&url("a.png"), "插图");
+        let parts = unzip_bytes(&renderer_for(ws.path()).render(&doc).unwrap());
+        let written = parts
+            .get("OEBPS/images/image-1.png")
+            .unwrap_or_else(|| panic!("没有内嵌图片条目，实际有 {:?}", parts.keys()));
+        assert_eq!(written, &png(3, 2), "包内字节必须与原图逐字节一致");
+    }
+
+    #[test]
+    fn img_src_is_rewritten_to_the_package_path() {
+        let ws = workspace(&[("a.png", 3, 2)]);
+        let doc = doc_image(&url("a.png"), "插图");
+        let parts = parts_map(&renderer_for(ws.path()).render(&doc).unwrap());
+        let chapter = &parts["OEBPS/chapter-0001.xhtml"];
+        assert!(
+            chapter.contains("<img src=\"images/image-1.png\" alt=\"插图\"/>"),
+            "{chapter}"
+        );
+        // 原始的工作区相对路径不该留在产物里
+        assert!(!chapter.contains("manuscript/"), "{chapter}");
+    }
+
+    #[test]
+    fn manifest_declares_the_embedded_image() {
+        let ws = workspace(&[("a.png", 3, 2)]);
+        let doc = doc_image(&url("a.png"), "插图");
+        let parts = parts_map(&renderer_for(ws.path()).render(&doc).unwrap());
+        let opf = &parts["OEBPS/content.opf"];
+        assert!(
+            opf.contains("href=\"images/image-1.png\" media-type=\"image/png\""),
+            "{opf}"
+        );
+    }
+
+    #[test]
+    fn unreadable_image_keeps_the_original_src_and_adds_no_part() {
+        let ws = workspace(&[("a.png", 3, 2)]);
+        let doc = doc_image("manuscript/ch.assets/gone.png", "丢了的图");
+        let bytes = renderer_for(ws.path()).render(&doc).unwrap();
+        let parts = unzip_bytes(&bytes);
+        // 读不到不是错误：正文保留原 src，包里不多一个空条目，清单里不登记
+        let text = parts_map(&bytes);
+        assert!(
+            text["OEBPS/chapter-0001.xhtml"].contains("src=\"manuscript/ch.assets/gone.png\""),
+            "缺图应保留原始引用"
+        );
+        assert!(
+            !parts.keys().any(|n| n.contains("images/")),
+            "不该有图片条目：{:?}",
+            parts.keys()
+        );
+        assert!(!text["OEBPS/content.opf"].contains("media-type=\"image"));
+    }
+
+    #[test]
+    fn same_image_used_by_two_chapters_is_packaged_once() {
+        let ws = workspace(&[("a.png", 3, 2)]);
+        let vid = VolumeId::new();
+        let mut doc = Document::new(BookMeta::new("书", "作者"));
+        doc.volumes.push(VolumeMeta {
+            id: vid.clone(),
+            title: "卷".into(),
+        });
+        for title in ["第一章", "第二章"] {
+            doc.chapters.push(ChapterContent::new(
+                ChapterId::new(),
+                vid.clone(),
+                title,
+                vec![Block::Paragraph(vec![Inline::Image {
+                    url: url("a.png"),
+                    alt: "同一张".into(),
+                }])],
+            ));
+        }
+        let bytes = renderer_for(ws.path()).render(&doc).unwrap();
+        let parts = unzip_bytes(&bytes);
+        let image_entries: Vec<&String> = parts
+            .keys()
+            .filter(|n| n.starts_with("OEBPS/images/"))
+            .collect();
+        assert_eq!(image_entries.len(), 1, "重复引用不该复制图片字节");
+        let text = parts_map(&bytes);
+        for index in [1, 2] {
+            let chapter = &text[&format!("OEBPS/chapter-000{index}.xhtml")];
+            assert!(chapter.contains("images/image-1.png"), "{chapter}");
+        }
+    }
+
+    #[test]
+    fn escaping_path_is_not_packaged() {
+        // Zip Slip 的读取侧：正文写 `../../` 想把工作区外的文件塞进包里
+        let outside = tempfile::tempdir().unwrap();
+        std::fs::write(outside.path().join("steal.png"), png(1, 1)).unwrap();
+        let ws = workspace(&[("a.png", 3, 2)]);
+        let doc = doc_image("../../steal.png", "越界");
+        let parts = unzip_bytes(&renderer_for(ws.path()).render(&doc).unwrap());
+        assert!(
+            !parts.keys().any(|n| n.contains("images/")),
+            "越界路径不该产出图片条目：{:?}",
+            parts.keys()
+        );
+    }
+
+    #[test]
+    fn without_a_resolver_nothing_is_read_from_disk() {
+        // 默认渲染器（无 resolver）必须与「路径不存在」时行为一致：
+        // 不碰磁盘。这条是 render() 与 render_with_assets(.., None) 等价的基础。
+        let doc = doc_image("manuscript/ch.assets/a.png", "图");
+        let plain = EpubRenderer::default().render(&doc).unwrap();
+        let parts = unzip_bytes(&plain);
+        assert!(!parts.keys().any(|n| n.contains("images/")));
+    }
+
+    #[test]
+    fn remote_image_url_is_left_untouched_even_with_a_resolver() {
+        let ws = workspace(&[("a.png", 3, 2)]);
+        let doc = doc_image("https://cdn.example.com/a.png", "外链");
+        let parts = parts_map(&renderer_for(ws.path()).render(&doc).unwrap());
+        assert!(
+            parts["OEBPS/chapter-0001.xhtml"].contains("src=\"https://cdn.example.com/a.png\""),
+            "外链本就该保留"
+        );
     }
 }

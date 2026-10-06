@@ -26,6 +26,7 @@
 //! | [`ir`]       | Document IR：Block / Inline 与嵌套表达能力 | T7.1 |
 //! | [`markdown`] | Markdown → IR，冻结子集 + 降级记录 | T7.2 |
 //! | [`scope`]    | 单章 / 选中 / 整卷 / 整书 四种范围 | T7.3 |
+//! | [`assets`]   | 图片相对路径 → 字节，供容器格式内嵌 | 9.4 |
 //! | [`render`]   | 渲染器统一接口、格式枚举、原子产出 | T7.5–T7.14 |
 //!
 //! ## 内存不变量（计划书不变量 5）
@@ -59,6 +60,7 @@
 #![forbid(unsafe_code)]
 #![warn(missing_docs)]
 
+pub mod assets;
 pub mod error;
 pub mod ir;
 pub mod markdown;
@@ -69,7 +71,8 @@ pub use error::{ExportError, Result};
 pub use ir::{Block, BookMeta, ChapterContent, Document, Inline, VolumeMeta};
 pub use markdown::{Degradation, DegradationKind, ParsedChapter};
 pub use render::{
-    render, render_to_path, write_bytes_atomically, ExportFormat, PuertoPath, Renderer, TEMP_MARKER,
+    render, render_to_path, render_to_path_with_assets, render_with_assets, write_bytes_atomically,
+    ExportFormat, PuertoPath, Renderer, TEMP_MARKER,
 };
 pub use scope::{ChapterSource, ExportScope, InMemorySource};
 
