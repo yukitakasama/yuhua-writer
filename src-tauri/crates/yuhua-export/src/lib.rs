@@ -72,7 +72,7 @@ pub use ir::{Block, BookMeta, ChapterContent, Document, Inline, VolumeMeta};
 pub use markdown::{Degradation, DegradationKind, ParsedChapter};
 pub use render::{
     render, render_to_path, render_to_path_with_assets, render_with_assets, write_bytes_atomically,
-    ExportFormat, PuertoPath, Renderer, TEMP_MARKER,
+    ExportArtifact, ExportFormat, Renderer, TEMP_MARKER,
 };
 pub use scope::{ChapterSource, ExportScope, InMemorySource};
 

@@ -157,7 +157,7 @@ export function insertChapter(
   // 先给被插入项一个「半整数锚点」，再统一收敛回整数。
   // 直接写 sort = index 是不够的：后面的兄弟项序号并不会自动让位，
   // 于是 renumber 会按旧的 sort 顺序把它们排回去，插入位置就失效了。
-  // 这与 moveChapter 用的是同一套手法，两处行为必须一致。
+  // 插入与拖拽移动共用 provisionalSort 这一份演算，两处不会分叉。
   const anchor = siblings[index];
   const previous = index > 0 ? siblings[index - 1] : undefined;
   const provisional = provisionalSort(anchor?.sort, previous?.sort);
@@ -319,16 +319,7 @@ export function moveChapter(
   // 直接写整数会在向下拖动时与旧序号冲突，导致排序不稳定。
   const anchor = targetSiblings[index];
   const previous = index > 0 ? targetSiblings[index - 1] : undefined;
-  let provisional: number;
-  if (anchor !== undefined && previous !== undefined) {
-    provisional = (anchor.sort + previous.sort) / 2;
-  } else if (anchor !== undefined) {
-    provisional = anchor.sort - 0.5;
-  } else if (previous !== undefined) {
-    provisional = previous.sort + 0.5;
-  } else {
-    provisional = 0;
-  }
+  const provisional = provisionalSort(anchor?.sort, previous?.sort);
 
   const moved: ChapterSummary = {
     ...moving,

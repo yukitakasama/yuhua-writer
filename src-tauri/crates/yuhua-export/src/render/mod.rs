@@ -194,7 +194,7 @@ pub fn render_to_path(
     format: ExportFormat,
     document: &Document,
     target: &Path,
-) -> Result<PuertoPath> {
+) -> Result<ExportArtifact> {
     render_to_path_with_assets(format, document, target, None)
 }
 
@@ -208,22 +208,22 @@ pub fn render_to_path_with_assets(
     document: &Document,
     target: &Path,
     assets: Option<&crate::assets::AssetResolver>,
-) -> Result<PuertoPath> {
+) -> Result<ExportArtifact> {
     let bytes = render_with_assets(format, document, assets)?;
     write_bytes_atomically(&bytes, target)?;
-    Ok(PuertoPath::new(target.to_path_buf(), bytes.len()))
+    Ok(ExportArtifact::new(target.to_path_buf(), bytes.len()))
 }
 
 /// 写出结果。
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub struct PuertoPath {
+pub struct ExportArtifact {
     /// 实际写入的路径。
     pub path: PathBuf,
     /// 产物字节数。
     pub bytes: usize,
 }
 
-impl PuertoPath {
+impl ExportArtifact {
     /// 构造写出结果。
     pub fn new(path: PathBuf, bytes: usize) -> Self {
         Self { path, bytes }

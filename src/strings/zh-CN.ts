@@ -39,8 +39,12 @@ const zhCN = {
     library: "书架",
     stats: "写作统计",
     commands: "命令面板",
-    toggleLeft: "折叠左侧栏",
-    toggleRight: "折叠右侧栏",
+    // 折叠态与展开态是两个动作，文案必须分开 —— 合并成一个键会让
+    // 面板已经收起时按钮仍然写着「折叠左侧栏」。
+    collapseLeft: "折叠左侧栏",
+    expandLeft: "展开左侧栏",
+    collapseRight: "折叠右侧栏",
+    expandRight: "展开右侧栏",
     /** 工具栏按钮的 title 后缀，用于无障碍朗读。 */
     moreActions: "更多操作",
   },

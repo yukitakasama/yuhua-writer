@@ -269,16 +269,6 @@ fn parse_timestamp_from_name(path: &Path) -> Option<DateTime<Utc>> {
     Some(parsed.and_utc())
 }
 
-/// 取本地时区偏移。
-fn local_offset() -> FixedOffset {
-    *chrono::Local::now().offset()
-}
-
-/// 当前时间（带本地时区）。
-pub fn now_local() -> DateTime<FixedOffset> {
-    Utc::now().with_timezone(&local_offset())
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;

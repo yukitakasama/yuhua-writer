@@ -74,8 +74,8 @@ export function Toolbar(props: ToolbarProps): JSX.Element {
         <IconButton
           label={
             layout.leftCollapsed
-              ? t("toolbar.toggleLeft")
-              : t("toolbar.toggleLeft")
+              ? t("toolbar.expandLeft")
+              : t("toolbar.collapseLeft")
           }
           active={!layout.leftCollapsed}
           onClick={toggleLeft}
@@ -132,8 +132,8 @@ export function Toolbar(props: ToolbarProps): JSX.Element {
         <IconButton
           label={
             layout.rightCollapsed
-              ? t("toolbar.toggleRight")
-              : t("toolbar.toggleRight")
+              ? t("toolbar.expandRight")
+              : t("toolbar.collapseRight")
           }
           active={!layout.rightCollapsed}
           onClick={toggleRight}

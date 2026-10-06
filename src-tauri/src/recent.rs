@@ -17,12 +17,9 @@
 
 use std::path::PathBuf;
 
-use chrono::{FixedOffset, Utc};
 use serde::{Deserialize, Serialize};
-use yuhua_core::Result;
+use yuhua_core::{now_local, Result};
 use yuhua_fs::workspace::RecentWorkspace;
-
-use crate::error::CommandError;
 
 /// 最多保留的最近记录条数。
 pub const MAX_RECENT: usize = 20;
@@ -97,7 +94,7 @@ pub fn record(root: &std::path::Path, title: &str) -> Result<()> {
         RecentWorkspace {
             root: canonical,
             title: title.to_string(),
-            last_opened: Utc::now().with_timezone(&local_offset()),
+            last_opened: now_local(),
         },
     );
     items.truncate(MAX_RECENT);
@@ -142,11 +139,6 @@ pub fn clear() {
     }
 }
 
-/// 取本地时区偏移。
-fn local_offset() -> FixedOffset {
-    *chrono::Local::now().offset()
-}
-
 /// 供测试与诊断：把列表写到指定路径。
 #[doc(hidden)]
 pub fn record_to(path: &std::path::Path, items: &[RecentWorkspace]) -> Result<()> {
@@ -166,20 +158,10 @@ pub fn load_from(path: &std::path::Path) -> Vec<RecentWorkspace> {
     load_raw(path)
 }
 
-/// 把命令层错误转成领域错误（本模块内部用）。
-#[allow(dead_code)]
-fn to_domain(e: CommandError) -> yuhua_core::YuhuaError {
-    match e {
-        CommandError::Domain(d) => d,
-        CommandError::NoWorkspace => yuhua_core::YuhuaError::InvalidInput("未打开工作区".into()),
-        CommandError::Internal(m) => yuhua_core::YuhuaError::InvalidInput(m),
-    }
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
-    use chrono::{DateTime, TimeZone};
+    use chrono::{DateTime, FixedOffset, TimeZone};
 
     fn ts(n: i64) -> DateTime<FixedOffset> {
         FixedOffset::east_opt(8 * 3600)

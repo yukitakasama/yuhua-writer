@@ -142,6 +142,13 @@ P0 缺陷修复轮（详见 [docs/fix-plan-p0.md](./docs/fix-plan-p0.md)）。
   另外三个 `measure-*.ps1` 之前是**无 BOM 的 UTF-8**，Windows PowerShell 5.1
   按 GBK 解码中文注释时会把脚本结构改坏，报出与根因无关的错（pwsh 7 看不出），
   已补 BOM 并把这条坑写进脚本头注释与采集文档。
+- **工具栏折叠按钮的提示语在两个状态下是同一句**：左右两个按钮写成
+  `label={collapsed ? t(k) : t(k)}`，两个分支返回同一个键 —— 面板已经收起了，
+  悬停提示仍然写「折叠左侧栏」。改成 `collapseLeft` / `expandLeft`（右栏同理）
+  四个键，并新增 `src/app/no-dead-ternary.test.ts`：扫 `src/` 下所有源码，
+  不许再出现 `cond ? t(k) : t(k)`，同时把这两个按钮的标签与状态钉住。
+  恒真三元是门禁盲区 —— 类型检查、lint、渲染全都正常，只有鼠标停在恰好的
+  那个状态下才看得出来，所以必须变成可执行的规则。
 
 ### 构建
 
@@ -192,6 +199,25 @@ P0 缺陷修复轮（详见 [docs/fix-plan-p0.md](./docs/fix-plan-p0.md)）。
   顺带修掉采集脚本一个长期误报：Windows 上 pnpm 是 `#!/bin/sh` 垫片，
   `execFileSync` 不做 PATHEXT 解析，于是环境记录里 pnpm 永远写「未安装」，
   而那份记录本身就是用 pnpm 跑出来的。
+- **「当前时间」从 9 处收成 1 处**：新增 `yuhua-core::clock`
+  （`local_offset` / `now_local`），fs 层 5 个文件、索引层 1 个、命令层 3 个
+  里逐字重复的实现全部改为引用它。这类复制的风险不是行数而是**口径**：
+  改一处忘一处不会报错，只会让不同文件写出的时间戳差出一个时区。
+  同时把唯一的 UTC 例外写进模块文档 —— `.yuhua/backup/` 的快照文件名
+  刻意归一到 UTC（写入与解析两侧必须同时区，否则工作区跨时区复制后
+  间隔判断被偏移量污染、该备份的快照被整批跳过），看见它「没跟本地时区
+  一致」不是 bug。`yuhua-fs::backup::now_local`（`pub` 但零调用方）与
+  `recent.rs` 里被 `#[allow(dead_code)]` 掩盖的 `to_domain` 一并删除。
+- **删掉 `src/app/placeholders.ts`**：它唯一的导出 `SETTINGS_HINT`
+  写着「设置将在 M9 里程碑提供」，而 M9 早就落地（主题、字体、排版、
+  首次运行向导全在）—— 文件零引用，且这句话会误导人以为功能没做。
+  这个文件自己的文档就写着「留着已实现功能的占位说明比缺少说明更糟」，
+  它却没按自己说的清理。同类的还有导出层公开类型 `PuertoPath`
+  （与本项目无关的错名），它装的是「产物路径 + 实际写出的字节数」，
+  已改名 `ExportArtifact`。
+- **`tree-ops.ts` 的 `moveChapter` 不再内联重算插入锚点**：它自己复制了一份
+  与 `provisionalSort` 等价的四分支「半整数」逻辑，而被复用函数自己的注释
+  就写着「两处行为必须一致」。改成直接调用，让一致性由代码结构保证。
 
 - 内置字体（思源宋体、霞鹜文楷）流水线已就绪，字体二进制不入 git
 - **导出对话框已上线**：`src/features/export/ExportDialog.tsx`，

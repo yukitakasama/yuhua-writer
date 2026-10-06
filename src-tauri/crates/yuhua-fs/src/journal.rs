@@ -26,9 +26,9 @@
 
 use std::path::{Path, PathBuf};
 
-use chrono::{DateTime, FixedOffset, Utc};
+use chrono::{DateTime, FixedOffset};
 use serde::{Deserialize, Serialize};
-use yuhua_core::{Result, YuhuaError};
+use yuhua_core::{now_local, Result, YuhuaError};
 
 /// 一次待提交操作的类型。
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
@@ -111,7 +111,7 @@ impl Journal {
             id: uuid::Uuid::new_v4().simple().to_string(),
             kind,
             paths,
-            started_at: Utc::now().with_timezone(&local_offset()),
+            started_at: now_local(),
             description: description.into(),
         };
 
@@ -181,11 +181,6 @@ impl Journal {
     fn entry_path(&self, id: &str) -> PathBuf {
         self.dir.join(format!("{id}.json"))
     }
-}
-
-/// 取本地时区偏移（与 chapter_io 保持一致的口径）。
-fn local_offset() -> FixedOffset {
-    *chrono::Local::now().offset()
 }
 
 #[cfg(test)]

@@ -38,9 +38,9 @@
 
 use std::path::Path;
 
-use chrono::{DateTime, FixedOffset, Utc};
+use chrono::{DateTime, FixedOffset};
 use yuhua_core::meta::{ChapterMeta, ChapterStatus};
-use yuhua_core::{ChapterId, Result, YuhuaError};
+use yuhua_core::{now_local, ChapterId, Result, YuhuaError};
 
 use crate::atomic::atomic_write;
 
@@ -427,7 +427,7 @@ pub fn read_chapter(path: &Path) -> Result<ChapterFile> {
         })
         .unwrap_or_else(|| "未命名章节".to_string());
 
-    let now = Utc::now().with_timezone(&local_offset());
+    let now = now_local();
     let (meta_text, body, had_front_matter) = split_front_matter(&text);
     let meta = match meta_text {
         Some(t) => parse_meta(&t, &fallback_title, now),
@@ -450,16 +450,6 @@ pub fn read_chapter(path: &Path) -> Result<ChapterFile> {
 /// 会先更新 `updated` 时间戳，再序列化写盘。
 pub fn write_chapter(path: &Path, chapter: &ChapterFile) -> Result<()> {
     atomic_write(path, &chapter.to_text())
-}
-
-/// 取本地时区偏移。
-///
-/// 用固定时区而不是 UTC：Front Matter 里的时间戳带 `+08:00` 这类偏移，
-/// 用户用记事本打开时看到的才是自己所在时区的合理时间。
-fn local_offset() -> FixedOffset {
-    // 不引入 chrono-tz 这类重型依赖；用当前时刻反推系统偏移
-    let now = chrono::Local::now();
-    *now.offset()
 }
 
 #[cfg(test)]
