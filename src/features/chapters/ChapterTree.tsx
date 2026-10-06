@@ -94,6 +94,33 @@ export function ChapterTree(): JSX.Element {
     void moveChapterTo(draggedId, containerId, index);
   });
 
+  /**
+   * 键盘重排一章：在同卷内上移 / 下移一位。
+   *
+   * 与拖拽落位共用 `moveChapterOp` + `moveChapterTo` 这一条路径，
+   * 因此两种交互的落位结果、FLIP 让位动效都一致，不会分叉。
+   * 已在卷首 / 卷尾时什么也不做 —— 键盘重排不跨卷，
+   * 跨卷移动仍走拖拽或右键菜单（那是另一个语义，不该由 ↑↓ 顺手触发）。
+   */
+  const moveChapterByKeyboard = (chapterId: string, delta: number): void => {
+    const current = snapshot();
+    const chapter = current.chapters.find((c) => c.id === chapterId);
+    if (chapter === undefined) return;
+    const siblings = chaptersOf(current, chapter.volumeId);
+    const from = siblings.findIndex((c) => c.id === chapterId);
+    const to = from + delta;
+    if (from < 0 || to < 0 || to >= siblings.length) return;
+
+    const before = capturePositions();
+    const result = moveChapterOp(current, chapterId, {
+      volumeId: chapter.volumeId,
+      index: to,
+    });
+    if (!result.changed) return;
+    queueMicrotask(() => playFlip(before));
+    void moveChapterTo(chapterId, chapter.volumeId, to);
+  };
+
   /** 把拖拽状态整理成每个卷需要的落点提示。 */
   const dropHintFor = (
     volumeId: string,
@@ -204,6 +231,7 @@ export function ChapterTree(): JSX.Element {
                 onAddChapter={() => handleAddChapter(volume)}
                 onRenameChapter={handleRenameChapter}
                 onDeleteChapter={handleDeleteChapter}
+                onMoveChapter={moveChapterByKeyboard}
                 onChapterDragStart={(event, chapter, element) => {
                   drag.registerRow(chapter.id, volume.id, element);
                   drag.begin(event, {

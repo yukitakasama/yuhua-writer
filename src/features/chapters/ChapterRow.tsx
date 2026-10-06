@@ -40,6 +40,13 @@ export interface ChapterRowProps {
   onDelete: () => void;
   /** 指针在抓取手柄上按下。 */
   onDragStart: (event: PointerEvent, element: HTMLElement) => void;
+  /**
+   * 键盘重排：`-1` 上移一位、`1` 下移一位。
+   *
+   * 拖拽排序必须也能不用鼠标完成（T9.6）。走的是与拖拽落位同一条
+   * 演算 + 落盘路径，因此两种交互的落位结果不会分叉。
+   */
+  onMove: (delta: number) => void;
   /** 行元素注册回调，供拖拽几何计算使用。 */
   registerRef: (element: HTMLElement | undefined) => void;
 }
@@ -81,6 +88,24 @@ export function ChapterRow(props: ChapterRowProps): JSX.Element {
         props.onSelect();
       }}
       onDblClick={() => setEditing(true)}
+      onKeyDown={(event) => {
+        // 改名框或按钮里的方向键属于文本光标 / 控件自身，不能被排序抢走
+        if (
+          event.target instanceof HTMLElement &&
+          event.target.closest("input, textarea, button")
+        )
+          return;
+        // 必须带 Alt：裸方向键在 tree 模式里是「在项之间移动焦点」，
+        // 被重排占用就会让人没法用键盘浏览章节树（WAI-ARIA tree pattern）。
+        if (!event.altKey) return;
+        if (event.key === "ArrowUp") {
+          event.preventDefault();
+          props.onMove(-1);
+        } else if (event.key === "ArrowDown") {
+          event.preventDefault();
+          props.onMove(1);
+        }
+      }}
     >
       <span
         class="tree-row__grip"

@@ -83,8 +83,60 @@ describe("ChapterRow", () => {
     onRename: () => undefined,
     onDelete: () => undefined,
     onDragStart: () => undefined,
+    onMove: () => undefined,
     registerRef: () => undefined,
   };
+
+  /** 造一个键盘事件（jsdom 的 KeyboardEvent 支持 altKey）。 */
+  const key = (k: string, altKey = false): KeyboardEvent =>
+    new KeyboardEvent("keydown", {
+      key: k,
+      altKey,
+      bubbles: true,
+      cancelable: true,
+    });
+
+  // 回归：拖拽排序从前只有指针路径，键盘用户完全无法重排章节（T9.6）。
+  it("Alt+↓ 请求下移一位，Alt+↑ 请求上移一位", () => {
+    const onMove = vi.fn();
+    const { root, dispose } = mount(() => (
+      <ChapterRow {...baseProps} onMove={onMove} />
+    ));
+    const row = root.querySelector("[role='treeitem']");
+    expect(row).not.toBeNull();
+    row?.dispatchEvent(key("ArrowDown", true));
+    expect(onMove).toHaveBeenCalledWith(1);
+    row?.dispatchEvent(key("ArrowUp", true));
+    expect(onMove).toHaveBeenCalledWith(-1);
+    dispose();
+  });
+
+  it("裸方向键不触发重排，留给树内焦点导航", () => {
+    const onMove = vi.fn();
+    const { root, dispose } = mount(() => (
+      <ChapterRow {...baseProps} onMove={onMove} />
+    ));
+    const row = root.querySelector("[role='treeitem']");
+    row?.dispatchEvent(key("ArrowDown"));
+    row?.dispatchEvent(key("ArrowUp"));
+    expect(onMove).not.toHaveBeenCalled();
+    dispose();
+  });
+
+  it("改名框里的方向键属于文本光标，不触发重排", () => {
+    const onMove = vi.fn();
+    const { root, dispose } = mount(() => (
+      <ChapterRow {...baseProps} onMove={onMove} />
+    ));
+    const row = root.querySelector("[role='treeitem']");
+    // 双击进入改名态
+    row?.dispatchEvent(new MouseEvent("dblclick", { bubbles: true }));
+    const input = root.querySelector("input");
+    expect(input).not.toBeNull();
+    input?.dispatchEvent(key("ArrowDown", true));
+    expect(onMove).not.toHaveBeenCalled();
+    dispose();
+  });
 
   it("渲染标题与字数", () => {
     const { root, dispose } = mount(() => <ChapterRow {...baseProps} />);
@@ -208,6 +260,7 @@ describe("VolumeGroup", () => {
     onAddChapter: () => undefined,
     onRenameChapter: () => undefined,
     onDeleteChapter: () => undefined,
+    onMoveChapter: () => undefined,
     onChapterDragStart: () => undefined,
     onVolumeDragStart: () => undefined,
     registerContainer: () => undefined,

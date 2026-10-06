@@ -12,7 +12,7 @@
  * 布局完全由 CSS 变量驱动，中间过程不经过 JS 响应式系统。
  */
 
-import { type JSX } from "solid-js";
+import { onCleanup, type JSX } from "solid-js";
 
 import { t } from "@/strings";
 
@@ -49,12 +49,28 @@ export function Resizer(props: ResizerProps): JSX.Element {
     );
   };
 
-  const onUp = (): void => {
+  /**
+   * 摘掉全局监听与拖动样式。
+   *
+   * 抽出来是因为有两个调用点：正常松手，以及**拖到一半组件被卸载**
+   * （切到书架、关工作区都会走到）。后者从前没人管 —— 监听器会留在
+   * window 上继续响应指针，而 `is-resizing` 会一直挂在 body 上，
+   * 把全局的文本选择永久禁掉。对一个写作软件来说，选中不了正文
+   * 等于废掉一半操作。
+   *
+   * 没在拖拽时直接返回，让 `onCleanup` 可以无条件调用（幂等）。
+   */
+  const detach = (): void => {
     if (!active) return;
     active = false;
     document.body.classList.remove("is-resizing");
     window.removeEventListener("pointermove", onMove);
     window.removeEventListener("pointerup", onUp);
+  };
+
+  const onUp = (): void => {
+    if (!active) return;
+    detach();
 
     const raw = document.documentElement.style.getPropertyValue(
       props.side === "left" ? "--left-w" : "--right-w",
@@ -62,6 +78,8 @@ export function Resizer(props: ResizerProps): JSX.Element {
     const value = Number.parseInt(raw, 10);
     if (Number.isFinite(value)) props.setWidth(value);
   };
+
+  onCleanup(detach);
 
   return (
     <div

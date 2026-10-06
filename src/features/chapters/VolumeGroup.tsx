@@ -57,6 +57,8 @@ export interface VolumeGroupProps {
   onRenameChapter: (chapterId: string, title: string) => void;
   /** 删除章。 */
   onDeleteChapter: (chapterId: string) => void;
+  /** 键盘重排章：`-1` 上移一位、`1` 下移一位。 */
+  onMoveChapter: (chapterId: string, delta: number) => void;
   /** 章行的拖拽开始。 */
   onChapterDragStart: (
     event: PointerEvent,
@@ -267,6 +269,7 @@ export function VolumeGroup(props: VolumeGroupProps): JSX.Element {
                       props.onRenameChapter(chapter.id, title)
                     }
                     onDelete={() => props.onDeleteChapter(chapter.id)}
+                    onMove={(delta) => props.onMoveChapter(chapter.id, delta)}
                     onDragStart={(event, element) =>
                       props.onChapterDragStart(event, chapter, element)
                     }
