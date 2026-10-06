@@ -49,6 +49,8 @@ import {
 import { search, searchKeymap, openSearchPanel } from "@codemirror/search";
 import { onCleanup, onMount, type JSX } from "solid-js";
 
+import { markEditorReady } from "@/app/perf";
+
 import { editorThemeExtensions } from "./theme";
 import { markdownHighlighting } from "./highlight";
 import { instantRender } from "./instant-render";
@@ -263,6 +265,9 @@ export function MarkdownEditor(props: MarkdownEditorProps): JSX.Element {
       }),
     });
     view = new EditorView({ state, parent: container });
+    // P3 应用内段的终点：视图已经建好、可以接受输入。
+    // 放在 onReady 之前，让「谁调了 onReady」不影响计时口径。
+    markEditorReady();
     props.onReady?.(handle);
   });
 

@@ -40,6 +40,7 @@ vi.mock("@/lib/ipc", () => ({
 
 import {
   __resetWorkspaceState,
+  editingChapter,
   loadChapterBody,
   saveChapterBody,
   setWorkspaceState,
@@ -179,5 +180,43 @@ describe("保存的乐观并发基线", () => {
       "重试稿",
       "hash-1",
     );
+  });
+});
+
+/**
+ * 连点两章时，两个读章请求会同时在途，而**返回顺序没有保证** ——
+ * 快慢由文件大小与磁盘状态决定。若照单全收，后到的旧结果会把上一章的
+ * 正文写成「当前正在编辑的正文」，界面就对着第 7 章显示第 6 章的内容。
+ */
+describe("读章响应的顺序", () => {
+  beforeEach(() => {
+    readChapterMock.mockReset();
+    saveChapterMock.mockReset();
+    __resetWorkspaceState();
+    seedDocument(["ch_a", "ch_b"]);
+  });
+
+  it("上一章的请求后返回时，不会覆盖最新一次选中", async () => {
+    /** 手动了结的 A 请求：`settle` 由 Promise 执行器填上。 */
+    const pendingA: { settle?: (value: ChapterContent) => void } = {};
+    readChapterMock.mockImplementationOnce(
+      () =>
+        new Promise<ChapterContent>((resolve) => {
+          pendingA.settle = resolve;
+        }),
+    );
+    readChapterMock.mockImplementationOnce(() =>
+      Promise.resolve(content("ch_b", "乙章", "hash-b")),
+    );
+
+    void loadChapterBody("ch_a");
+    await loadChapterBody("ch_b");
+    expect(editingChapter()?.body).toBe("乙章");
+
+    pendingA.settle?.(content("ch_a", "甲章", "hash-a"));
+    await Promise.resolve();
+    await Promise.resolve();
+
+    expect(editingChapter()?.body).toBe("乙章");
   });
 });

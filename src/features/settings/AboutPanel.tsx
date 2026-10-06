@@ -24,6 +24,7 @@
 
 import { For, Show, createMemo, type JSX } from "solid-js";
 
+import { perfSnapshot } from "@/app/perf";
 import { t } from "@/strings";
 import { buildChannel, loadAboutInfo } from "./about-info";
 import { IconInfo } from "./icons";
@@ -37,6 +38,8 @@ import { IconInfo } from "./icons";
 export function AboutPanel(): JSX.Element {
   // 只读一次：数据全部来自构建期内联的常量，没有重新读取的理由
   const info = createMemo(() => loadAboutInfo());
+  // 本次挂载时的性能快照（编辑器就绪 / 最近一次打开章节的耗时）
+  const perf = perfSnapshot();
 
   return (
     <div class="settings-panel about-panel">
@@ -64,6 +67,55 @@ export function AboutPanel(): JSX.Element {
           <dd>{t("settings.aboutPage.stackBody")}</dd>
         </div>
       </dl>
+
+      {/* ---------------- 运行诊断（P3 / P4 的应用内读数） ----------------
+          为什么放在「关于」而不是单独的设置项：这一页的读者本来就是
+          「在报 bug / 在核对版本」的人，性能读数与版本号是同一类信息。
+          快照在挂载时取一次就够 —— Match 在切走分区时会卸载本组件，
+          再回来就是新数字；而开着设置面板时本来也切不了章。 */}
+      <section class="about-section" aria-labelledby="yh-about-perf">
+        <h4 class="about-section__title" id="yh-about-perf">
+          {t("settings.aboutPage.diagnostics")}
+        </h4>
+        <dl class="about-panel__meta">
+          <div class="about-panel__meta-row">
+            <dt>{t("settings.aboutPage.editorReady")}</dt>
+            <dd class="yh-num">
+              {perf.editorReadyMs === null
+                ? t("settings.aboutPage.notMeasured")
+                : t("settings.aboutPage.milliseconds", {
+                    value: Math.round(perf.editorReadyMs),
+                  })}
+            </dd>
+          </div>
+          <div class="about-panel__meta-row">
+            <dt>{t("settings.aboutPage.chapterOpen")}</dt>
+            <dd class="yh-num">
+              {perf.lastChapterOpenMs === null
+                ? t("settings.aboutPage.notMeasured")
+                : t("settings.aboutPage.milliseconds", {
+                    value: Math.round(perf.lastChapterOpenMs),
+                  })}
+            </dd>
+          </div>
+          <Show when={perf.medianChapterOpenMs !== null}>
+            <div class="about-panel__meta-row">
+              <dt>{t("settings.aboutPage.chapterOpenMedian")}</dt>
+              <dd class="yh-num">
+                {t("settings.aboutPage.milliseconds", {
+                  value: Math.round(perf.medianChapterOpenMs as number),
+                })}
+                <span class="about-panel__meta-note">
+                  {t("settings.aboutPage.sampleCount", {
+                    count: perf.chapterOpens.length,
+                  })}
+                </span>
+              </dd>
+            </div>
+          </Show>
+        </dl>
+        <p class="about-section__note">{t("settings.aboutPage.perfNote")}</p>
+      </section>
 
       {/* ---------------- 开源许可 ---------------- */}
       <section class="about-section" aria-labelledby="yh-about-license">

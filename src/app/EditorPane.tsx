@@ -55,6 +55,7 @@ import {
   type EditorHandle,
 } from "@/features/editor/MarkdownEditor";
 import { focusModeClass } from "@/features/editor/focus";
+import { finishChapterOpen } from "./perf";
 import { consumeJump, pendingJump } from "@/features/search/search-store";
 import {
   selectedChapter,
@@ -188,6 +189,33 @@ export function EditorPane(props: EditorPaneProps = {}): JSX.Element {
     });
   };
 
+  /**
+   * 选中哪一章，就读哪一章的正文。
+   *
+   * ## 为什么必须是 effect 而不是 onMount
+   *
+   * 读章曾经只在 `onMount` 里发起一次。而 EditorPane 本身不随换章重建
+   * （只有里面那个 `<Show when={chapter()}>` 会挂载编辑器），于是
+   * 「工作区已经开着、再点某一章」这条**最主要的路径**根本不会发起读章：
+   * 编辑器继续显示上一章的文档，作者以为自己在写第 7 章，
+   * 敲下去的字却进了第 6 章的草稿。
+   *
+   * effect 在首帧之后运行，因此既保住了原来那句注释想要的
+   * 「不阻塞首次渲染」，又能跟着选中状态走。
+   *
+   * ## 为什么用 `editing()` 的 ID 做幂等判断
+   *
+   * `loadChapterBody` 一进来就把 `editing` 置成 `{ id, loading: true }`，
+   * 所以同一个章不会因 effect 重跑而被读两次；换章时 ID 不同，正好发起新的读。
+   */
+  createEffect(() => {
+    const current = chapter();
+    if (current === null) return;
+    if (editingChapter()?.id === current.id) return;
+    setLoading(true);
+    void loadChapterBody(current.id).finally(() => setLoading(false));
+  });
+
   /** 把 loader 读回来的正文灌进编辑器。 */
   createEffect(() => {
     const current = chapter();
@@ -215,6 +243,8 @@ export function EditorPane(props: EditorPaneProps = {}): JSX.Element {
     setDirty(false);
     handle?.setValue(next);
     restorePosition(current.id, next);
+    // P4 的终点：正文已经在编辑器视图里了（见 workspace-store 的起点注释）
+    finishChapterOpen(current.id);
   });
 
   /**
@@ -258,12 +288,6 @@ export function EditorPane(props: EditorPaneProps = {}): JSX.Element {
       canSave: () => !(handle?.isComposing() ?? false),
     });
     props.onSaveReady?.(saveNow);
-
-    const first = selectedChapter();
-    if (first && editingChapter()?.id !== first.id) {
-      setLoading(true);
-      void loadChapterBody(first.id).finally(() => setLoading(false));
-    }
   });
 
   onCleanup(() => {

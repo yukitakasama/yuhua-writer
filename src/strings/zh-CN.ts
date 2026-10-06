@@ -419,6 +419,17 @@ const zhCN = {
     aboutPage: {
       version: "版本",
       buildChannel: "构建通道",
+      /** 运行诊断（P3 / P4 的应用内读数）。 */
+      diagnostics: "运行诊断",
+      editorReady: "启动到可输入",
+      chapterOpen: "上次打开章节",
+      chapterOpenMedian: "打开章节中位耗时",
+      notMeasured: "本次尚未记录",
+      milliseconds: "{value} ms",
+      sampleCount: "（{count} 个样本）",
+      /** 说清楚这段读数的边界，免得被当成完整的冷启动时间。 */
+      perfNote:
+        "以上数字从应用自己的前端时钟算起，不含进程启动与 WebView 初始化，因此不等于「冷启动总时间」。",
       licenseTitle: "开源许可",
       /** 本项目自身许可。 */
       selfLicense: "羽化写作自身代码",

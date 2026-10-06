@@ -36,6 +36,7 @@ import {
   moveVolume as moveVolumeInTree,
   volumeOrderOf,
 } from "@/features/chapters/tree-ops";
+import { startChapterOpen } from "./perf";
 
 /** 工作区加载状态。 */
 export type WorkspaceStatus = "idle" | "loading" | "ready" | "error";
@@ -607,11 +608,27 @@ function resetEditingState(): void {
   setEditing(null);
 }
 
+/**
+ * 读章请求的序号。
+ *
+ * 快速连点两章时两个请求会同时在途，而后端的返回顺序不保证与发起顺序
+ * 一致：先发的可能后到。若照单全收，后到的那份会把**上一章**的正文写进
+ * `editing`，界面就对着第 7 章显示第 6 章的内容。只认最新一次请求，
+ * 过期的结果直接丢弃。
+ */
+let readSequence = 0;
+
 /** 读取一章正文并放进编辑器状态。 */
 export async function loadChapterBody(chapterId: string): Promise<void> {
+  const seq = (readSequence += 1);
+  // P4 埋点的起点：读章请求发出之前。终点在 EditorPane 把正文灌进
+  // 编辑器视图的那一刻 —— 只有 CodeMirror 拿到文档才算「打开完成」，
+  // 在 IPC 返回处收工会把渲染耗时漏掉，而那一半才是用户感到的卡。
+  startChapterOpen(chapterId);
   setEditing({ id: chapterId, body: "", hash: "", loading: true });
   try {
     const content: ChapterContent = await ipc.readChapter(chapterId);
+    if (seq !== readSequence) return;
     knownHashes.set(chapterId, content.contentHash);
     setEditing({
       id: chapterId,
@@ -620,6 +637,7 @@ export async function loadChapterBody(chapterId: string): Promise<void> {
       loading: false,
     });
   } catch (err) {
+    if (seq !== readSequence) return;
     setEditing(null);
     setState("error", ipc.toFailure(err).error);
   }

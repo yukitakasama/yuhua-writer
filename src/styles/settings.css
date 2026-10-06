@@ -484,6 +484,13 @@
   color: var(--c-text);
 }
 
+/* 诊断数字后面的样本数：附属信息，压到与 dt 同级 */
+.about-panel__meta-note {
+  margin-left: var(--sp-1);
+  font-size: var(--fs-xs);
+  color: var(--c-text-muted);
+}
+
 .about-section {
   display: flex;
   flex-direction: column;

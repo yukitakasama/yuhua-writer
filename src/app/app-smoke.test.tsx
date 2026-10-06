@@ -16,8 +16,14 @@ import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { render } from "solid-js/web";
 
 import { App } from "@/App";
-import { __resetMockBackend } from "@/lib/ipc";
-import { __resetWorkspaceState, refreshRecents } from "@/app/workspace-store";
+import { __resetMockBackend, saveChapter } from "@/lib/ipc";
+import {
+  __resetWorkspaceState,
+  refreshRecents,
+  selectChapter,
+  workspaceState,
+} from "@/app/workspace-store";
+import { __resetPerfForTests, perfSnapshot } from "@/app/perf";
 import { resetLayout } from "@/app/layout-store";
 
 let root: HTMLElement | null = null;
@@ -41,6 +47,8 @@ beforeEach(() => {
   __resetMockBackend();
   __resetWorkspaceState();
   resetLayout();
+  // 埋点也是全局状态：不重置的话「首次就绪」会被前一个用例用掉
+  __resetPerfForTests();
 });
 
 afterEach(() => {
@@ -124,6 +132,81 @@ describe("进入写作台", () => {
     expect(host.querySelector(".tree")).not.toBeNull();
     expect(host.querySelector(".editor")).not.toBeNull();
     expect(host.querySelector(".meta")).not.toBeNull();
+  });
+
+  /**
+   * 切章的**组装**证明：点另一章，编辑器里得是那章的正文。
+   *
+   * ## 为什么这条必须存在
+   *
+   * 读章一度只在 EditorPane 的 `onMount` 里发起，而 EditorPane 不随换章
+   * 重建 —— 于是「先开工作区、再点某一章」这条最主要的路径压根不会去读
+   * 文件，编辑器停在上一章的内容上。作者以为在写第 7 章，敲的字却进了
+   * 第 6 章的草稿。组件测试各守一隅（树只管选中、编辑器只管渲染），
+   * 这种「谁都没接住」的缝隙只有把整棵树挂起来才照得出来。
+   */
+  it("切到另一章后，编辑器显示的是那章的正文", async () => {
+    const host = await mountApp();
+    (
+      host.querySelector(".shelf__card-btn") as HTMLButtonElement | null
+    )?.dispatchEvent(new MouseEvent("click", { bubbles: true }));
+    for (let i = 0; i < 8; i += 1) await Promise.resolve();
+
+    const [first, second] = workspaceState.document?.chapters ?? [];
+    expect(first).toBeDefined();
+    expect(second).toBeDefined();
+    // 示例工作区的正文都是空的，空章之间互相看不出来，先写两份可区分的内容
+    await saveChapter(first!.id, "甲章的正文");
+    await saveChapter(second!.id, "乙章的正文");
+
+    const editorText = (): string =>
+      host.querySelector(".cm-content")?.textContent ?? "";
+
+    selectChapter(first!.id);
+    for (let i = 0; i < 8; i += 1) await Promise.resolve();
+    expect(editorText()).toContain("甲章的正文");
+
+    selectChapter(second!.id);
+    for (let i = 0; i < 8; i += 1) await Promise.resolve();
+    const text = editorText();
+    expect(text).toContain("乙章的正文");
+    expect(text).not.toContain("甲章的正文");
+  });
+
+  /**
+   * P3 / P4 埋点的**接线**证明。
+   *
+   * `perf.test.ts` 只证明这个模块自己的算术对 —— 它完全可以在一个
+   * 从来没人调用的文件里全绿。本项目有过先例：`docs/benchmarks.md`
+   * 曾声称 P5 有测试覆盖，而那个测试文件从未被写进仓库。
+   * 所以这一条走完整挂载链路（App → EditorPane → MarkdownEditor → store 读章），
+   * 断言两个数真的产生了。
+   */
+  it("进入写作台后，P3 与 P4 的埋点都产生了样本", async () => {
+    expect(perfSnapshot().editorReadyMs).toBeNull();
+    expect(perfSnapshot().lastChapterOpenMs).toBeNull();
+
+    const host = await mountApp();
+    (
+      host.querySelector(".shelf__card-btn") as HTMLButtonElement | null
+    )?.dispatchEvent(new MouseEvent("click", { bubbles: true }));
+    for (let i = 0; i < 8; i += 1) await Promise.resolve();
+
+    // 打开工作区不会自动选章（EditorPane 会停在「未选中章节」的空态，
+    // 编辑器根本不挂载），所以这里显式选一章。
+    // 走 store 而不是点树里的行：卷默认折叠时 DOM 里可能没有章行，
+    // 而本条要验的是「三个埋点调用点连得通」，点行已由 chapters 的测试覆盖。
+    const first = workspaceState.document?.chapters[0];
+    expect(first).toBeDefined();
+    selectChapter((first as { id: string }).id);
+    for (let i = 0; i < 8; i += 1) await Promise.resolve();
+
+    const snap = perfSnapshot();
+    // 起点在 workspace-store、终点在 EditorPane、就绪点在 MarkdownEditor：
+    // 三个调用点分布在三个文件里，只有整棵树挂载起来才连得通
+    expect(snap.editorReadyMs).not.toBeNull();
+    expect(snap.lastChapterOpenMs).not.toBeNull();
+    expect(snap.chapterOpens.length).toBeGreaterThanOrEqual(1);
   });
 
   it("卷章树里出现示例卷名", async () => {
