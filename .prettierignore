@@ -17,3 +17,8 @@ node_modules/
 # 锁文件由包管理器维护，格式化它没有意义且可能引发无谓 diff
 pnpm-lock.yaml
 Cargo.lock
+
+# `pnpm bench` 生成的采集记录：表格宽度由脚本决定，格式化它只会造成
+# 「跑一次采集 → format:check 变红」的自相矛盾（生成器不产出对齐表格，
+# 而 CI 要求所有 md 都对齐）。生成物不该被人工格式器管。
+docs/benchmarks-generated.md

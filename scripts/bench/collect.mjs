@@ -21,8 +21,12 @@
  * ## 为什么不在这里测真实内存
  *
  * 真实内存占用需要启动窗口并读取进程 RSS 与 WebView2 子进程之和。
- * 这要求应用已构建且能运行，不适合放进常规脚本。本脚本提供
- * 一个「手动采集指引」段落，说明该用什么工具测哪些数字。
+ * 这要求应用已构建且能运行，不适合放进常规脚本。
+ * 采集工具在同目录下分开提供，各自负责一件事：
+ *   - `measure-coldstart.ps1` —— M1 / M1b / M4（进程树 + 空闲 CPU 增量）
+ *   - `measure-peak.ps1`      —— M7 / P8 / P9 / P10（配合 `export_peak` 夹具）
+ *   - `measure-startup.ps1`   —— P3 的代理值（到主窗口出现）
+ * 用法与理由见 `docs/benchmarks.md` 的「如何采集」。
  */
 
 import { execFileSync } from "node:child_process";
@@ -45,6 +49,22 @@ function tryExec(cmd, args, opts = {}) {
   } catch {
     return null;
   }
+}
+
+/**
+ * 探测一个 CLI 的版本。
+ *
+ * Windows 上 `execFileSync` **不做 PATHEXT 解析**：本机的 pnpm 在 PATH 上有
+ * 两种形态 —— Git Bash 用的 `#!/bin/sh` 垫片（无扩展名，CreateProcess 跑不了）
+ * 与 `pnpm.cmd`。只试 `pnpm` 会 ENOENT，于是这份记录里 pnpm 永远写「未安装」，
+ * 而采集脚本本身就是用 pnpm 跑的。这类「工具自己报错却没人注意」的字段
+ * 必须显式兜住，否则基准记录带着假信息被长期引用。
+ *
+ * 走 shell 而不是自己拼扩展名：shell 会按平台规则解析命令，
+ * 且这些命令都是常量、不含任何外部输入。
+ */
+function tryVersion(command) {
+  return tryExec(command, [], { shell: true });
 }
 
 /** 递归统计目录体积。 */
@@ -89,8 +109,8 @@ function main() {
   lines.push("| CPU 核心数 | " + cpus().length + " |");
   lines.push("| 内存总量 | " + fmtMB(totalmem()) + " |");
   lines.push("| Node | " + (process.version) + " |");
-  lines.push("| pnpm | " + (tryExec("pnpm", ["--version"]) ?? "未安装") + " |");
-  lines.push("| Rust | " + (tryExec("cargo", ["--version"]) ?? "未安装") + " |");
+  lines.push("| pnpm | " + (tryVersion("pnpm --version") ?? "未安装") + " |");
+  lines.push("| Rust | " + (tryVersion("cargo --version") ?? "未安装") + " |");
   lines.push("");
 
   // ---- 前端产物 ----
