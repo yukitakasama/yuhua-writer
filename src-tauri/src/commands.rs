@@ -1279,6 +1279,14 @@ pub struct DegradationDto {
 /// 返回实际写入的路径、字节数与降级记录。降级记录非空时前端应当提示用户
 /// （例如「表格已转换为纯文本」），确保不静默丢弃内容。
 ///
+/// ## 图片
+///
+/// EPUB 与 DOCX 会把正文引用的图片**内嵌进包里**，路径按工作区根解析
+/// （`![](images/a.png)` → `<工作区根>/images/a.png`）。读不到、越界
+/// （`../..`）、或本来就是 `https://` 外链的图不报错：EPUB 保留原始 src，
+/// DOCX 降级为「［图片：alt］」段落。
+/// 其余四种格式（TXT / Markdown / HTML / PDF）不涉及磁盘，行为不变。
+///
 /// ## 错误
 ///
 /// - `FONT_UNAVAILABLE`：PDF 导出时找不到可用的中文字体
@@ -1291,6 +1299,7 @@ pub fn export_document(
     scope: ExportScopeDto,
     output_path: String,
 ) -> CmdResult<ExportResultDto> {
+    let s = session(&state)?;
     let doc = state.document()?;
 
     // 1. 翻译 IPC 范围到领域范围
@@ -1319,9 +1328,23 @@ pub fn export_document(
         .map_err(|e| CommandError::Domain(yuhua_core::YuhuaError::export_failed(e.to_string())))?;
 
     // 3. 渲染并原子写盘
+    //    图片按「工作区根」解析：正文里写 `![](images/a.png)` 时，
+    //    EPUB / DOCX 会把图读进包内（电子书与交稿件必须自包含）。
+    //    根路径在锁内取、锁外用 —— 渲染整本书可能耗时数秒，
+    //    拿着会话锁渲染会把切章与保存一起卡住。
+    let root = {
+        let guard = lock_session(&s)?;
+        guard.root().to_path_buf()
+    };
+    let assets = yuhua_export::assets::AssetResolver::new(root);
     let target = std::path::PathBuf::from(output_path);
-    let result = yuhua_export::render_to_path(format.to_domain(), &ir, &target)
-        .map_err(|e| CommandError::Domain(yuhua_core::YuhuaError::export_failed(e.to_string())))?;
+    let result = yuhua_export::render_to_path_with_assets(
+        format.to_domain(),
+        &ir,
+        &target,
+        Some(&assets),
+    )
+    .map_err(|e| CommandError::Domain(yuhua_core::YuhuaError::export_failed(e.to_string())))?;
 
     // 4. 翻译降级记录
     let degradations = ir
@@ -1403,22 +1426,32 @@ fn persist_volumes(state: &AppState) -> CmdResult<()> {
 /// （用户不会每秒建一章），而重新扫描能保证内存、索引、磁盘三者
 /// **在任何时候都强一致** —— 这是数据安全场景下值得的开销。
 ///
-/// 扫描本身要读全部章节文件，是这里唯一的慢操作；因此把它放在
-/// **锁外**执行（先克隆出布局，扫完再加锁写索引）。
+/// 扫描本身要读全部章节文件，是这里唯一的慢操作（1GB 工作区可达数秒），
+/// 因此**不能抱着锁做** —— 会话锁被所有命令共用，持锁扫描会让整个界面
+/// 在那几秒里点什么都没反应。
+///
+/// 但也不能裸扫：扫的必须是「当前会话的那个工作区」。做法是持锁克隆出
+/// 布局（廉价），放锁扫描，再重新加锁写回，并在写回前比对根路径 ——
+/// 若扫描期间用户切了工作区，这份结果就属于上一本，直接丢弃，
+/// 否则会把旧书的章节写进新书的索引。
 fn reload_and_sync(state: &AppState) -> CmdResult<()> {
     let s = session(state)?;
-    let fresh = {
+
+    let (workspace, root_before) = {
         let guard = lock_session(&s)?;
-        // 扫描全程持锁：scan_workspace 只读工作区与磁盘，不回调命令层，
-        // 不会自我加锁；而它读的正是当前会话的工作区，
-        // 中途换工作区会让扫描结果张冠李戴。
-        let fresh = crate::scan::scan_workspace(guard.workspace())?;
-        fresh
+        (guard.workspace().clone(), guard.root_str())
     };
+
+    let fresh = crate::scan::scan_workspace(&workspace)?;
     fresh.validate()?;
 
     {
         let guard = lock_session(&s)?;
+        if guard.root_str() != root_before {
+            // 扫描期间换了工作区，这份结果已无处可去。不报错：
+            // 触发它的那次磁盘写入早已成功，而用户此刻看的是新工作区。
+            return Ok(());
+        }
         let root = guard.root_str();
         guard.index().upsert_book(&fresh.book, &root)?;
         guard.index().sync_volumes(&fresh.volumes)?;
