@@ -86,11 +86,8 @@ fn median(mut values: Vec<u128>) -> u128 {
 /// 基准数字既没有可比性，也无法在将来退化时被发现（1 ms 和 0 ms 都显示 0）。
 fn query_us(idx: &Index, keyword: &str) -> u128 {
     let start = Instant::now();
-    let hits = search(
-        idx.connection(),
-        &SearchQuery::new(keyword.to_string()),
-    )
-    .unwrap_or_else(|e| panic!("检索 {keyword} 失败：{e}"));
+    let hits = search(idx.connection(), &SearchQuery::new(keyword.to_string()))
+        .unwrap_or_else(|e| panic!("检索 {keyword} 失败：{e}"));
     let us = start.elapsed().as_micros();
     println!("P5 query {keyword:?} => {} 条, {us} µs", hits.total);
     us
@@ -134,11 +131,7 @@ fn million_char_corpus_actually_has_the_expected_volume() {
     // 语料规模是这条基准的前提：如果造数据的路径哪天退化成一章，
     // 「检索很快」就毫无意义。用命中数反证规模。
     let idx = seeded_million();
-    let hits = search(
-        idx.connection(),
-        &SearchQuery::new("落羽".to_string()),
-    )
-    .unwrap();
+    let hits = search(idx.connection(), &SearchQuery::new("落羽".to_string())).unwrap();
     assert!(
         hits.total as usize >= CHAPTERS,
         "{CHAPTERS} 章都含关键词，召回数不该低于章数：实际 {}",

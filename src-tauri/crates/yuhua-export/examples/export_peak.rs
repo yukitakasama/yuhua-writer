@@ -42,7 +42,10 @@ impl ChapterSource for GeneratedSource {
         let mut counter = 0usize;
         while body.chars().count() < CHARS_PER_CHAPTER {
             counter += 1;
-            let _ = writeln!(body, "第 {counter} 段：落羽风起，长夜将尽，此句用于填满一章应有的字数与语义。");
+            let _ = writeln!(
+                body,
+                "第 {counter} 段：落羽风起，长夜将尽，此句用于填满一章应有的字数与语义。"
+            );
             // 每 40 段插一组富结构，保证解析器走完整降级路径而不是短路
             if counter % 40 == 0 {
                 let _ = write!(
