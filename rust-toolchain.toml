@@ -1,0 +1,15 @@
+# 锁定 Rust 工具链版本。
+#
+# 从前 CI 用 `dtolnay/rust-toolchain@stable`（浮动版本），后果已经实测到：
+# 同一次 CI 运行里两个 job 分别拿到 rustc 1.98.1 与 1.99.0，而开发机是
+# 1.95.0 —— 于是出现「本地 clippy 报 error、CI 却放行」。
+# `yuhua-store/src/schema.rs` 里那条恒真断言（`assert!(… || true)`）
+# 就是这样在 CI 里长期隐身的：1.95 的 clippy 抓得到，1.99 不报。
+# 前端侧已经吃过同类亏（pnpm 版本漂移导致安装失败），这里同样钉死。
+#
+# 升级流程：改本文件的 channel → 本地跑全套门禁
+# （cargo fmt --check / cargo clippy --workspace --all-targets -- -D warnings /
+# cargo test --workspace）→ 同步改 ci.yml 里的两处版本号 → 确认 CI 三平台全绿。
+[toolchain]
+channel = "1.95.0"
+components = ["rustfmt", "clippy"]

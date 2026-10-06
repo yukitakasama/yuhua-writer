@@ -75,7 +75,9 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - uses: dtolnay/rust-toolchain@stable
+      # 版本与根目录 rust-toolchain.toml 保持一致：浮动 @stable 会让
+      # CI 与开发机的 clippy 判定不一致（同一份代码本地报 error、CI 放行）。
+      - uses: dtolnay/rust-toolchain@1.95.0
         with:
           components: rustfmt, clippy
 
@@ -171,7 +173,8 @@ jobs:
           node-version: 22
           cache: pnpm
 
-      - uses: dtolnay/rust-toolchain@stable
+      # 同上：与 rust-toolchain.toml 一致，不用浮动 @stable
+      - uses: dtolnay/rust-toolchain@1.95.0
 
       - uses: Swatinem/rust-cache@v2
         with:
