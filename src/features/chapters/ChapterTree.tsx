@@ -40,6 +40,7 @@ import {
   workspaceState,
 } from "@/app/workspace-store";
 import { VolumeGroup } from "./VolumeGroup";
+import { setVolumeExpanded } from "./tree-ui-store";
 import { createDragController } from "./use-drag";
 import {
   chaptersOf,
@@ -314,7 +315,11 @@ export async function createFirstChapter(): Promise<void> {
   };
   const count = chaptersOf(snapshot, first.id).length;
   const created = await addChapterRemote(first.id, defaultChapterTitle(count));
-  if (created) selectChapter(created.id);
+  if (created) {
+    // 新建的章可能在树最末尾：目标卷若被折叠着，作者会以为按钮没反应
+    setVolumeExpanded(first.id, true);
+    selectChapter(created.id);
+  }
 }
 
 /**

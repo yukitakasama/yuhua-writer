@@ -247,6 +247,14 @@ P0 缺陷修复轮（详见 [docs/fix-plan-p0.md](./docs/fix-plan-p0.md)）。
   自动保存 1500 ms 防抖窗口内的字每次必丢。同时清掉未消费的检索跳转
   （`search-store` 的注释早就写了「关闭工作区时清」，但生产代码里没人清），
   并不再留下陈旧的 `saveEditor` 闭卡与卡在 `saving` 的保存状态。
+- **重读文稿会把卷章树打回原形**：`reloadDocument()` 每次增删卷章后都用后端
+  大纲整体替换 document，`<For>` 按引用比对项，于是每个 `VolumeGroup` 被销毁
+  重建 —— 而卷的展开态当时是组件本地的 `createSignal(true)`，作者刚加完一章，
+  五个卷全部收起。展开选择外提成按卷 ID 索引的 `tree-ui-store`（换书时随
+  编辑基线一起清掉），新建章节时顺带展开目标卷，免得章建在折叠的卷里看不见。
+  **重命名的输入草稿仍会丢**：`InlineEdit` 刻意是非受控输入（受控输入在
+  WebView 里会吃掉中文拼音的 composing 过程），草稿存在 DOM 里；要连草稿一起
+  保住，得让重读文稿按 ID 复用已有对象而不是整体替换，这一条记在待办里。
 - 新增两条护栏测试：`src/app/editor-pane.test.tsx`（真实 CodeMirror 视图 +
   公开 API `EditorView.findFromDOM`，钉「正文没到位时打不进字、落不进文件」）
   与 `src/features/editor/writing-surface-settings.test.ts`（扫样式源文件，

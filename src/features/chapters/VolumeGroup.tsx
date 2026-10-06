@@ -32,6 +32,11 @@ import { Button } from "@/app/ui/Button";
 import { t } from "@/strings";
 import { ChapterRow } from "./ChapterRow";
 import { InlineEdit, titleErrorMessage } from "./InlineEdit";
+import {
+  isVolumeExpanded,
+  setVolumeExpanded,
+  toggleVolumeExpanded,
+} from "./tree-ui-store";
 
 /** 卷分组属性。 */
 export interface VolumeGroupProps {
@@ -93,7 +98,15 @@ export interface VolumeGroupProps {
 
 /** 一个卷及其章节。 */
 export function VolumeGroup(props: VolumeGroupProps): JSX.Element {
-  const [open, setOpen] = createSignal(true);
+  /**
+   * 展开态存在树外（`tree-ui-store`），不是本地 signal。
+   *
+   * 本地 signal 会在每次「重读文稿」后归零：`reloadDocument()` 用后端大纲
+   * 整体替换 document，`<For>` 按引用比对，于是每个卷组都被销毁重建，
+   * 作者刚加完一章就看到全部卷收起。重命名的输入草稿仍会丢
+   * （`InlineEdit` 刻意是非受控的，理由见该文件），那条已记入待办。
+   */
+  const open = () => isVolumeExpanded(props.volume.id);
   const [editing, setEditing] = createSignal(false);
   const [error, setError] = createSignal<string | null>(null);
   let headerRef: HTMLLIElement | undefined;
@@ -123,7 +136,7 @@ export function VolumeGroup(props: VolumeGroupProps): JSX.Element {
           class="tree-group__toggle"
           aria-label={open() ? t("action.collapse") : t("action.expand")}
           aria-expanded={open()}
-          onClick={() => setOpen((v) => !v)}
+          onClick={() => toggleVolumeExpanded(props.volume.id)}
         >
           <IconChevron size={14} open={open()} />
         </button>
@@ -189,7 +202,7 @@ export function VolumeGroup(props: VolumeGroupProps): JSX.Element {
             label={t("chapters.addChapter")}
             onClick={(event) => {
               event.stopPropagation();
-              setOpen(true);
+              setVolumeExpanded(props.volume.id, true);
               props.onAddChapter();
             }}
           >

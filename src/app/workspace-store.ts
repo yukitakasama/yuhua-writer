@@ -37,6 +37,7 @@ import {
   volumeOrderOf,
 } from "@/features/chapters/tree-ops";
 import { startChapterOpen } from "./perf";
+import { __resetTreeUi } from "@/features/chapters/tree-ui-store";
 
 /** 工作区加载状态。 */
 export type WorkspaceStatus = "idle" | "loading" | "ready" | "error";
@@ -606,6 +607,9 @@ function pruneKnownHashes(): void {
 function resetEditingState(): void {
   knownHashes.clear();
   setEditing(null);
+  // 卷的展开选择同样是**按工作区**有效的：卷 ID 是这本书专属的 ULID，
+  // 留着上一本的选择只会让这张表无限增长，并在新书里凭空命中同名旧键。
+  __resetTreeUi();
 }
 
 /**

@@ -13,12 +13,34 @@
  * 只有渲染出来点一下才能发现。
  */
 
-import { describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { render } from "solid-js/web";
 
 import type { ChapterSummary, Volume } from "@/lib/ipc";
 import { ChapterRow } from "./ChapterRow";
 import { VolumeGroup } from "./VolumeGroup";
+import { __resetTreeUi } from "./tree-ui-store";
+
+/**
+ * 卷的展开态在模块级 store 里（那正是它能活过视图重建的原因），
+ * 所以它同样会活过单个用例。每个用例结束后挂着的卷组必须销毁，
+ * 否则「折叠 v1」的副作用会串到后面的用例上。
+ */
+const mounted: Array<() => void> = [];
+
+function mount(component: () => unknown): {
+  root: HTMLElement;
+  dispose: () => void;
+} {
+  const result = mountOnce(component);
+  mounted.push(result.dispose);
+  return result;
+}
+
+afterEach(() => {
+  for (const dispose of mounted.splice(0)) dispose();
+  __resetTreeUi();
+});
 import { BookCover } from "@/features/library/BookCover";
 import { EmptyState } from "@/app/ui/EmptyState";
 import { IllustrationEmptyTree } from "@/app/ui/illustrations";
@@ -57,7 +79,7 @@ function ch(
 }
 
 /** 把组件渲染到一个临时的 DOM 节点里，返回清理函数。 */
-function mount(component: () => unknown): {
+function mountOnce(component: () => unknown): {
   root: HTMLElement;
   dispose: () => void;
 } {
@@ -247,6 +269,15 @@ describe("VolumeGroup", () => {
     ch("c1", "v1", 0, "第一章", 1000),
     ch("c2", "v1", 1, "第二章", 2000),
   ];
+
+  /**
+   * 展开态存在模块级的 `tree-ui-store` 里（那正是它能活过视图重建的原因），
+   * 所以它也会活过单个用例；顶层 `afterEach` 已经统一销毁挂载并重置，
+   * 这里再重置一次是防「同一个用例里连挂两个卷组」的自串。
+   */
+  beforeEach(() => {
+    __resetTreeUi();
+  });
 
   const baseProps = {
     volume,
