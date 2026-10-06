@@ -46,6 +46,21 @@
   等比缩小。**读不到 / 越界 / `https:` / `data:` 一律退回降级**（EPUB 保留
   原始 src、DOCX 输出「［图片：alt］」），导出绝不因缺图而失败。
   TXT / Markdown / HTML / PDF 不受影响，传了解析器也逐字节一致。
+- **设置页新增「数据安全」分区**（`DataSafetyPanel` + `TrashSection`）：
+  崩溃恢复报告、云盘冲突副本、重建全文索引、**回收站**。此前
+  `list_trash` / `restore_trash` / `purge_trash` / `empty_trash` /
+  `rebuild_index` 五个命令后端、绑定与 mock 全齐，界面上却一个入口都没有，
+  于是 README 里「回收站」这条零丢失承诺实际要求用户自己去翻 `.trash/`。
+  命令面板加「打开回收站」一步直达（`SettingsPanel` 的 `initialTab` 深链，
+  关闭时清掉，避免上一次深链劫持下一次普通打开）。
+  三个刻意的取舍：① 破坏性动作用**两步内联确认**而不是再套一层模态
+  （设置页本身就是 Dialog，嵌套模态会让 Esc 与读屏层次变含混），
+  且同一时刻只允许一行处于确认态；② **读列表失败显示错误，不显示空态**
+  —— 把「我没读到」画成「没有备份」，会让人去做真正毁数据的操作；
+  ③ 冲突副本只报告、界面上**不给删除按钮**（程序没有判断哪份该留的依据）。
+  恢复报告读 store 里已存的那份，**不调用** `getRecoveryReport()`：
+  那个函数的实现是重新 `openWorkspace`，在设置页点一次「检查」就会把
+  用户未保存的稿子丢掉。`pnpm check:ipc` 的 `KNOWN_UNREACHABLE` 由 7 条降到 2 条。
 - 构建期脚本：图标派生、字体获取流水线
 - 开源工程文件：MIT 许可证、README、贡献指南、行为准则、Issue / PR 模板
 
@@ -218,6 +233,12 @@ P0 缺陷修复轮（详见 [docs/fix-plan-p0.md](./docs/fix-plan-p0.md)）。
 - **`tree-ops.ts` 的 `moveChapter` 不再内联重算插入锚点**：它自己复制了一份
   与 `provisionalSort` 等价的四分支「半整数」逻辑，而被复用函数自己的注释
   就写着「两处行为必须一致」。改成直接调用，让一致性由代码结构保证。
+- **动效守卫改为递归发现样式文件**：`no-perpetual-animation.test.ts` 原先点名
+  三个 CSS 路径，意味着**新增一个样式表就能悄无声息地绕开守卫**，而那时候的
+  失败方式是「全绿」。现在递归扫 `src/` 下全部 `.css`，并断言三个已知文件
+  确实在扫描清单里（否则清单空掉时规则会静默失效）。
+- 删掉文案字典里的 `settings.placeholder`（「设置将在后续里程碑中提供」）：
+  零引用，且 M9 早已落地 —— 与上面那个 `SETTINGS_HINT` 是同一句话的第二份。
 
 - 内置字体（思源宋体、霞鹜文楷）流水线已就绪，字体二进制不入 git
 - **导出对话框已上线**：`src/features/export/ExportDialog.tsx`，

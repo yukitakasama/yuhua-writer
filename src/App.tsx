@@ -107,6 +107,25 @@ export function App(): JSX.Element {
   const [searchOpen, setSearchOpen] = createSignal(false);
   const [commandOpen, setCommandOpen] = createSignal(false);
   const [settingsOpen, setSettingsOpen] = createSignal(false);
+  /**
+   * 设置面板的深链目标分区。
+   *
+   * 只服务于「从命令面板直接跳到回收站」这类入口；关闭面板时清掉，
+   * 否则下一次点普通「设置」会被上一次的深链劫持。
+   */
+  const [settingsTab, setSettingsTab] = createSignal<string | undefined>();
+  function openSettings(): void {
+    setSettingsTab(undefined);
+    setSettingsOpen(true);
+  }
+  function openSettingsAt(tab: string): void {
+    setSettingsTab(tab);
+    setSettingsOpen(true);
+  }
+  function closeSettings(): void {
+    setSettingsOpen(false);
+    setSettingsTab(undefined);
+  }
   const [creatingWorkspace, setCreatingWorkspace] = createSignal(false);
   const [shortcutsOpen, setShortcutsOpen] = createSignal(false);
   const [exportOpen, setExportOpen] = createSignal(false);
@@ -307,7 +326,16 @@ export function App(): JSX.Element {
       id: "settings",
       label: t("settings.title"),
       group: t("command.groupView"),
-      run: () => setSettingsOpen(true),
+      run: openSettings,
+    },
+    {
+      // 回收站不是一个「视图」而是一次事故处理，所以不进左栏，
+      // 但必须能从命令面板一步到达 —— 刚误删章节的人不知道去哪找。
+      id: "trash",
+      label: t("command.openTrash"),
+      group: t("command.groupView"),
+      run: () => openSettingsAt("data"),
+      enabled: () => hasOpenWorkspace(),
     },
   ];
 
@@ -438,10 +466,11 @@ export function App(): JSX.Element {
         commands={commands()}
       />
 
-      {/* 设置面板（M9）：外观 / 字体 / 排版 / 关于四个分区，全部即时生效 */}
+      {/* 设置面板（M9）：外观 / 字体 / 排版 / 数据安全 / 关于五个分区，全部即时生效 */}
       <SettingsPanel
         open={settingsOpen()}
-        onClose={() => setSettingsOpen(false)}
+        onClose={closeSettings}
+        initialTab={settingsTab()}
       />
 
       {/* 导出对话框（M7）：格式 / 范围 / 保存位置，并展示降级记录 */}

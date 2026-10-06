@@ -248,6 +248,7 @@ const zhCN = {
     toggleRight: "折叠 / 展开右栏",
     closeWorkspace: "关闭当前工作区",
     openExport: "导出文稿",
+    openTrash: "打开回收站",
   },
 
   /** 快捷键面板（T4.9）。 */
@@ -298,14 +299,47 @@ const zhCN = {
   /** 设置（M9）。 */
   settings: {
     title: "设置",
-    placeholder: "外观、字号、保存间隔等设置将在后续里程碑中提供。",
     about: "关于羽化写作",
     /** 分区标签。 */
     tabs: {
       appearance: "外观",
       fonts: "字体",
       typography: "排版",
+      data: "数据安全",
       about: "关于",
+    },
+    /** 数据安全分区（崩溃恢复 / 冲突 / 索引 / 回收站）。 */
+    data: {
+      recovery: "崩溃恢复",
+      /** 说明报告的时间语义：它是打开工作区时那次扫描的结果。 */
+      recoveryNote: "以下为本次打开工作区时检查到的情况。",
+      noInterruption: "上次没有未完成的操作。",
+      sweptTemp: "清理临时文件 {count} 个",
+      purgedTrash: "清理过期回收站条目 {count} 个",
+      conflicts: "云盘冲突副本",
+      conflictNote:
+        "这些文件由网盘同步产生。羽化写作只报告，绝不自动删除或覆盖 —— 保留哪一份由你判断。",
+      noConflicts: "没有发现冲突副本。",
+      index: "全文索引",
+      indexNote:
+        "索引完全由正文派生，重建不会改动任何稿件文件。检索结果异常时可以先试这个。",
+      rebuild: "重建索引",
+      rebuilding: "正在重建……",
+      rebuildDone: "索引已重建。",
+    },
+    /** 回收站分区。 */
+    trash: {
+      title: "回收站",
+      retentionNote:
+        "删除的卷与章节先进这里保存一段时间，到期后会在下次打开工作区时自动清理。",
+      loading: "正在读取回收站……",
+      empty: "回收站是空的。",
+      deletedAt: "删除于 {when}",
+      restore: "恢复",
+      purge: "彻底删除",
+      purgeConfirm: "「{title}」将无法找回。",
+      emptyAll: "清空回收站",
+      emptyAllConfirm: "回收站里的 {count} 项将无法找回。",
     },
     /** 设置面板的整体说明，挂在 tablist 上供读屏朗读。 */
     panelLabel: "设置分区",

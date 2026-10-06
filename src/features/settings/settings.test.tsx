@@ -98,14 +98,15 @@ function buttonByText(container: HTMLElement, text: string): HTMLButtonElement {
 }
 
 describe("设置面板结构", () => {
-  it("打开时渲染四个分区标签", () => {
+  it("打开时渲染五个分区标签", () => {
     render(() => <SettingsPanel open onClose={() => {}} />);
     const tabs = screen.getAllByRole("tab");
-    expect(tabs).toHaveLength(4);
+    expect(tabs).toHaveLength(5);
     expect(tabs.map((tab) => tab.textContent)).toEqual([
       "外观",
       "字体",
       "排版",
+      "数据安全",
       "关于",
     ]);
   });

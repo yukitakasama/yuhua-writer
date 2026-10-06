@@ -719,6 +719,152 @@
 }
 
 /* --------------------------------------------------------------------------
+   数据安全分区：崩溃恢复 / 冲突 / 索引 / 回收站
+   这一页是「面向事故」的，所以排版取向是**可读与可核对**而不是紧凑：
+   路径单独一行、允许换行截断（title 里有全路径），动作按钮与条目同行但不
+   挤占标题空间。
+   -------------------------------------------------------------------------- */
+
+.data-safety,
+.trash-section {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-2);
+}
+
+.data-safety__block {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-2);
+  padding: var(--sp-3);
+  background: var(--c-bg-subtle);
+  border-radius: var(--r-md);
+}
+
+.data-safety__title {
+  margin: 0;
+  font-size: var(--fs-sm);
+  font-weight: 600;
+  color: var(--c-text);
+}
+
+.data-safety__hint,
+.trash-section__hint {
+  margin: 0;
+  font-size: var(--fs-xs);
+  line-height: 1.5;
+  color: var(--c-text-muted);
+}
+
+.data-safety__empty,
+.trash-section__empty {
+  margin: 0;
+  font-size: var(--fs-sm);
+  color: var(--c-text-muted);
+}
+
+.data-safety__list,
+.trash-section__list {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-1);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.data-safety__list-item {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: var(--sp-2);
+  font-size: var(--fs-sm);
+  color: var(--c-text);
+}
+
+/* 路径与规则说明是次级信息：更小、更淡，且允许在任意位置断行 */
+.data-safety__path,
+.data-safety__pattern,
+.trash-section__path {
+  flex: 1 1 100%;
+  font-size: var(--fs-xs);
+  color: var(--c-text-muted);
+  overflow-wrap: anywhere;
+}
+
+.data-safety__counts {
+  margin: 0;
+  font-size: var(--fs-xs);
+  color: var(--c-text-muted);
+}
+
+.data-safety__error,
+.trash-section__error {
+  margin: 0;
+  font-size: var(--fs-xs);
+  color: var(--c-danger);
+}
+
+.data-safety__actions,
+.trash-section__footer {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--sp-2);
+}
+
+.data-safety__status {
+  font-size: var(--fs-xs);
+  color: var(--c-text-muted);
+}
+
+.trash-section__head {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-1);
+}
+
+.trash-section__item {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--sp-2);
+  padding: var(--sp-1) 0;
+  border-top: 1px solid var(--c-border);
+}
+
+.trash-section__meta {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  gap: 2px;
+}
+
+.trash-section__title {
+  font-size: var(--fs-sm);
+  color: var(--c-text);
+}
+
+.trash-section__when {
+  font-size: var(--fs-xs);
+  color: var(--c-text-muted);
+}
+
+.trash-section__actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--sp-2);
+}
+
+/* 二次确认文案：让它比按钮更显眼，用户点的是「彻底删除」而不是「下一行」 */
+.trash-section__confirm-text {
+  font-size: var(--fs-xs);
+  color: var(--c-danger);
+}
+
+/* --------------------------------------------------------------------------
    无障碍降级（计划书 5.6）
    本文件里所有过渡都是颜色类；减弱动效时统一压到 ≤100ms。
    -------------------------------------------------------------------------- */

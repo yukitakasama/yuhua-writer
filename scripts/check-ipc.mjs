@@ -346,17 +346,6 @@ function collectUiSources() {
  */
 const KNOWN_UNREACHABLE = new Map([
   [
-    "list_trash",
-    "回收站面板未实现：Toolbar 注释承诺的「命令面板与右键菜单」两处入口都没有",
-  ],
-  ["restore_trash", "同上，依赖回收站面板"],
-  ["purge_trash", "同上，依赖回收站面板"],
-  ["empty_trash", "同上，依赖回收站面板"],
-  [
-    "rebuild_index",
-    "设置页缺「数据安全」区域（docs/done-list.md 里描述过，但界面未落地）",
-  ],
-  [
     "get_word_stats",
     "字数统计走的是 stats 相关命令，这一条是否仍需要待确认（可能是冗余命令）",
   ],

@@ -25,18 +25,37 @@
  */
 
 import { describe, expect, it } from "vitest";
-import { readFileSync } from "node:fs";
+import { readdirSync, readFileSync, statSync } from "node:fs";
 import { fileURLToPath } from "node:url";
-import { dirname, resolve } from "node:path";
+import { dirname, relative, resolve, sep } from "node:path";
 
 const here = dirname(fileURLToPath(import.meta.url));
 const root = resolve(here, "..", "..", "..");
 
-/** 被扫描的样式来源：CSS 文件 + 内联样式的 TS（组件原语走的是后者）。 */
+/**
+ * 被扫描的样式来源。
+ *
+ * CSS 用**递归枚举**而不是写死文件名：`src/styles/` 下已经有 app.css /
+ * settings.css / devkit.css 三个文件，写死清单意味着新增一个样式表就能
+ * 悄无声息地绕开这条守卫 —— 而绕开守卫的人根本不会想到是清单的问题。
+ * 带 `animation:` 的内联样式 TS 仍需点名（解析器是按 CSS 语法写的，
+ * 直接套在 TS 上会误判）。
+ */
+function listCss(dir: string): string[] {
+  const out: string[] = [];
+  for (const name of readdirSync(dir)) {
+    const full = resolve(dir, name);
+    if (statSync(full).isDirectory()) {
+      out.push(...listCss(full));
+    } else if (name.endsWith(".css")) {
+      out.push(relative(root, full).split(sep).join("/"));
+    }
+  }
+  return out.sort();
+}
+
 const SOURCES = [
-  "src/styles/app.css",
-  "src/styles/devkit.css",
-  "src/design/tokens.css",
+  ...listCss(resolve(root, "src")),
   "src/design/primitives/styles.ts",
 ];
 
@@ -113,6 +132,15 @@ describe("闲置期不得存在无限运行的动画", () => {
 
   it("样式源文件都能读到", () => {
     expect(texts.length).toBeGreaterThan(0);
+    // 递归清单本身也要被钉住：只要新增的样式表没进来，上面的规则就形同虚设，
+    // 而那时候的失败方式是「全绿」，没有任何东西会报红。
+    for (const expected of [
+      "src/styles/app.css",
+      "src/styles/settings.css",
+      "src/styles/devkit.css",
+    ]) {
+      expect(SOURCES, `递归扫描漏掉了 ${expected}`).toContain(expected);
+    }
   });
 
   it("无限循环的动画名全部在白名单内", () => {

@@ -23,6 +23,8 @@ export type { FirstRunWizardProps, WizardStep } from "./FirstRunWizard";
 
 export { AboutPanel } from "./AboutPanel";
 export { AppearancePanel } from "./AppearancePanel";
+export { DataSafetyPanel } from "./DataSafetyPanel";
+export { TrashSection } from "./TrashSection";
 export { FontsPanel } from "./FontsPanel";
 export { TypographyPanel } from "./TypographyPanel";
 export { FontPreview } from "./FontPreview";

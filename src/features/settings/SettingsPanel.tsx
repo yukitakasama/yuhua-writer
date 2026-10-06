@@ -20,15 +20,15 @@
  * 「不点保存就没事」，而实际改动早就生效了。
  */
 
-import { Match, Switch, createSignal, type JSX } from "solid-js";
+import { Match, Switch, createEffect, createSignal, type JSX } from "solid-js";
 
 import { Dialog, Tabs } from "@/design/primitives";
 import { t } from "@/strings";
 import { AboutPanel } from "./AboutPanel";
 import { AppearancePanel } from "./AppearancePanel";
+import { DataSafetyPanel } from "./DataSafetyPanel";
 import { FontsPanel } from "./FontsPanel";
 import { TypographyPanel } from "./TypographyPanel";
-import { IconAlignLeft, IconInfo, IconSun, IconType } from "./icons";
 import type { SettingsLevel } from "./LevelToggle";
 
 /** {@link SettingsPanel} 的 props。 */
@@ -37,7 +37,12 @@ export interface SettingsPanelProps {
   open: boolean;
   /** 关闭请求。 */
   onClose: () => void;
-  /** 打开时默认选中的分区。 */
+  /**
+   * 打开时要定位到的分区（深链，例如命令面板里的「打开回收站」）。
+   *
+   * 只在每次打开的那一刻生效；之后由用户自己的点击驱动 ——
+   * 否则用户在本页内切到别的分区后，任何一次父组件重渲染都会把他弹回来。
+   */
   initialTab?: string;
 }
 
@@ -46,6 +51,7 @@ const TAB_ITEMS = [
   { value: "appearance", key: "settings.tabs.appearance" },
   { value: "fonts", key: "settings.tabs.fonts" },
   { value: "typography", key: "settings.tabs.typography" },
+  { value: "data", key: "settings.tabs.data" },
   { value: "about", key: "settings.tabs.about" },
 ] as const;
 
@@ -56,10 +62,16 @@ const TAB_ITEMS = [
  * <SettingsPanel open={open()} onClose={() => setOpen(false)} />
  */
 export function SettingsPanel(props: SettingsPanelProps): JSX.Element {
-  // 初始值只在首次挂载时取一次：之后由用户操作驱动
   const [tab, setTab] = createSignal<string>(props.initialTab ?? "appearance");
   // 层级的持有者是面板本身，跨分区保持（见文件头注释）
   const [level, setLevel] = createSignal<SettingsLevel>("global");
+
+  // 深链：每次「打开」时定位到请求的分区。不传 initialTab 时什么都不做，
+  // 因此「关不掉用户自己选的分区」这条既有行为不变。
+  createEffect(() => {
+    const target = props.initialTab;
+    if (props.open && target) setTab(target);
+  });
 
   const items = (): { value: string; label: JSX.Element }[] =>
     TAB_ITEMS.map((entry) => ({ value: entry.value, label: t(entry.key) }));
@@ -101,6 +113,9 @@ export function SettingsPanel(props: SettingsPanelProps): JSX.Element {
             <Match when={value === "typography"}>
               <TypographyPanel level={level()} onLevelChange={setLevel} />
             </Match>
+            <Match when={value === "data"}>
+              <DataSafetyPanel />
+            </Match>
             <Match when={value === "about"}>
               <AboutPanel />
             </Match>
@@ -110,14 +125,6 @@ export function SettingsPanel(props: SettingsPanelProps): JSX.Element {
     </Dialog>
   );
 }
-
-/** 分区图标映射：给将来在标签上放图标留出位置（当前 Tabs 只接受文本标签）。 */
-export const TAB_ICONS = {
-  appearance: IconSun,
-  fonts: IconType,
-  typography: IconAlignLeft,
-  about: IconInfo,
-} as const;
 
 /** 分区数量，供测试断言。 */
 export const SETTINGS_TAB_COUNT = TAB_ITEMS.length;
