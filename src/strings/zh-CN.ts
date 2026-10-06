@@ -243,6 +243,7 @@ const zhCN = {
     toggleLeft: "折叠 / 展开左栏",
     toggleRight: "折叠 / 展开右栏",
     closeWorkspace: "关闭当前工作区",
+    openExport: "导出文稿",
   },
 
   /** 快捷键面板（T4.9）。 */
@@ -571,6 +572,52 @@ const zhCN = {
     resizer: "拖动调整面板宽度",
     dragged: "正在拖动 {name}",
     dropped: "已把 {name} 移到第 {position} 位",
+  },
+
+  /** 导出对话框（M7）。 */
+  export: {
+    title: "导出文稿",
+    description:
+      "选择格式与范围，导出成本地文件。正文仍以工作区里的 Markdown 为真源。",
+    /** 格式选择区。 */
+    formatLabel: "格式",
+    /** 后端把该格式标为不可用（`available: false`）时的说明。 */
+    formatUnavailable: "当前构建不支持",
+    /** 范围选择区。 */
+    scopeLabel: "范围",
+    scopeWhole: "整本书",
+    scopeVolume: "当前卷",
+    scopeSingle: "当前章",
+    /** 保存位置。 */
+    pathLabel: "保存到",
+    pickPath: "选择位置…",
+    pathPlaceholder: "尚未选择保存位置",
+    /** 默认文件名，{name} 为书名或章标题。 */
+    defaultFileName: "{name}",
+    submit: "导出",
+    exporting: "正在导出…",
+    /** 校验提示。 */
+    needWorkspace: "请先打开一个工作区",
+    needPath: "请先选择保存位置",
+    needChapter: "当前没有可导出的章节",
+    needVolume: "当前没有可导出的卷",
+    /** 结果。 */
+    successTitle: "导出完成",
+    successBody: "已写入 {path}",
+    successSize: "文件大小 {size}",
+    openFolder: "打开所在文件夹",
+    done: "完成",
+    /** 降级记录：目标格式装不下的内容。 */
+    degradationsTitle: "有 {count} 处内容被降级",
+    degradationsHint:
+      "下列内容在目标格式里无法原样表示，已按说明处理。导出仍然成功，但请核对这些位置。",
+    degradationItem: "{chapter}：{detail}",
+    noDegradation: "全部内容原样导出，没有降级。",
+    failed: "导出失败",
+    /** 单位。 */
+    sizeBytes: "{count} B",
+    sizeKb: "{count} KB",
+    sizeMb: "{count} MB",
   },
 
   /** 时间显示。 */

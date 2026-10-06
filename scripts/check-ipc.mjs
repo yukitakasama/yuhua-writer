@@ -47,7 +47,7 @@
  * 取不到时**报错而不是跳过** —— 一条沉默的检查等于没有检查。
  */
 
-import { readFileSync, existsSync } from "node:fs";
+import { readFileSync, existsSync, readdirSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 
@@ -60,17 +60,66 @@ const LIB_RS = join(ROOT, "src-tauri", "src", "lib.rs");
 // 只看其中一个会得到"前端定义了一堆永远不会出现的码"这种**假警报** ——
 // 而假警报比没有检查更糟，它会让作者学会忽略这个脚本
 const ERROR_RS = join(ROOT, "src-tauri", "src", "error.rs");
-const CORE_ERROR_RS = join(ROOT, "src-tauri", "crates", "yuhua-core", "src", "error.rs");
+const CORE_ERROR_RS = join(
+  ROOT,
+  "src-tauri",
+  "crates",
+  "yuhua-core",
+  "src",
+  "error.rs",
+);
 // 枚举按定义位置分开：ChapterStatus 在 meta.rs，CountMode 在 count.rs
-const META_RS = join(ROOT, "src-tauri", "crates", "yuhua-core", "src", "meta.rs");
-const COUNT_RS = join(ROOT, "src-tauri", "crates", "yuhua-core", "src", "count.rs");
+const META_RS = join(
+  ROOT,
+  "src-tauri",
+  "crates",
+  "yuhua-core",
+  "src",
+  "meta.rs",
+);
+const COUNT_RS = join(
+  ROOT,
+  "src-tauri",
+  "crates",
+  "yuhua-core",
+  "src",
+  "count.rs",
+);
 // 结构体字段比对要跨 crate 收集：IPC 载荷并非全在 commands.rs 定义，
 // `ChapterSummary` / `OutlineNode` 等在 core，`WordStats` 在 store，
 // `WorkspaceSummary` 在 fs。少读一个文件就会把那条契约漏检。
-const CORE_MODEL_RS = join(ROOT, "src-tauri", "crates", "yuhua-core", "src", "model.rs");
-const CORE_TRASH_RS = join(ROOT, "src-tauri", "crates", "yuhua-core", "src", "trash.rs");
-const STORE_STATS_RS = join(ROOT, "src-tauri", "crates", "yuhua-store", "src", "stats.rs");
-const FS_WORKSPACE_RS = join(ROOT, "src-tauri", "crates", "yuhua-fs", "src", "workspace.rs");
+const CORE_MODEL_RS = join(
+  ROOT,
+  "src-tauri",
+  "crates",
+  "yuhua-core",
+  "src",
+  "model.rs",
+);
+const CORE_TRASH_RS = join(
+  ROOT,
+  "src-tauri",
+  "crates",
+  "yuhua-core",
+  "src",
+  "trash.rs",
+);
+const STORE_STATS_RS = join(
+  ROOT,
+  "src-tauri",
+  "crates",
+  "yuhua-store",
+  "src",
+  "stats.rs",
+);
+const FS_WORKSPACE_RS = join(
+  ROOT,
+  "src-tauri",
+  "crates",
+  "yuhua-fs",
+  "src",
+  "workspace.rs",
+);
 const IPC_TS = join(ROOT, "src", "lib", "ipc", "types.ts");
 const IPC_INDEX_TS = join(ROOT, "src", "lib", "ipc", "index.ts");
 const MOCK_TS = join(ROOT, "src", "lib", "mock-backend", "index.ts");
@@ -222,6 +271,98 @@ function tsCallSites(source) {
   return sites;
 }
 
+/**
+ * 取「后端命令名 → 前端绑定函数名」映射。
+ *
+ * 绑定层的形状是固定的：
+ * `export function exportDocument(…) { return call("export_document", …) }`
+ * 因此对每个 `export function`，取它到下一个 `export function` 之间
+ * 那段文本里的第一个 `call("…")` 即可。
+ */
+function tsCommandBindings(source) {
+  const marks = [];
+  for (const m of source.matchAll(
+    /export (?:async )?function ([A-Za-z0-9_]+)\s*\(/g,
+  )) {
+    marks.push({ name: m[1], at: m.index });
+  }
+  const bindings = new Map();
+  for (let i = 0; i < marks.length; i += 1) {
+    const end = i + 1 < marks.length ? marks[i + 1].at : source.length;
+    const body = source.slice(marks[i].at, end);
+    const hit = body.match(/call(?:<[^>]*>)?\(\s*"([a-z0-9_]+)"/);
+    if (hit === null) continue;
+    if (!bindings.has(hit[1])) bindings.set(hit[1], new Set());
+    bindings.get(hit[1]).add(marks[i].name);
+  }
+  return bindings;
+}
+
+/**
+ * 收集「界面层」的源文件：`src/` 下除 `src/lib/` 与测试文件以外的
+ * 全部 `.ts` / `.tsx`。
+ *
+ * 排除 `src/lib/` 是因为那里正是绑定层自身 —— 绑定函数在自己的
+ * 定义处当然"出现"，但那只证明它被定义了，不证明有人用。
+ * 排除测试是因为测试里的调用不构成用户可达的入口。
+ */
+function collectUiSources() {
+  const out = [];
+  const libDir = join("src", "lib");
+  const walk = (dir) => {
+    for (const entry of readdirSync(dir, { withFileTypes: true })) {
+      const full = join(dir, entry.name);
+      if (entry.isDirectory()) {
+        if (full.endsWith(libDir)) continue;
+        walk(full);
+        continue;
+      }
+      if (!/\.(ts|tsx)$/.test(entry.name)) continue;
+      if (/\.test\.(ts|tsx)$/.test(entry.name)) continue;
+      out.push(full);
+    }
+  };
+  walk(join(ROOT, "src"));
+  return out;
+}
+
+/**
+ * 已知但尚未修掉的界面缺口（显式豁免清单）。
+ *
+ * 这些命令的后端实现、IPC 注册、前端绑定与 mock **全都齐备**，
+ * 缺的只是界面入口 —— 用户在应用里点不到它们。
+ *
+ * ## 为什么不直接把检查关掉
+ *
+ * 因为「导出功能不可达」就是这么漏过去的：六项契约检查全绿，
+ * 而作者根本点不到导出。守卫必须能拦住**新增**的零调用点，
+ * 否则下一个同类缺口还是会被放过。
+ *
+ * ## 为什么允许豁免
+ *
+ * 一次修完七个功能面板不现实，而让 CI 长期红着会让人学会忽略它。
+ * 折中是：豁免必须**写在这里、带上原因**，且每修好一项就删一行 ——
+ * 清单变短就是进度，变长则需要解释。
+ */
+const KNOWN_UNREACHABLE = new Map([
+  [
+    "list_trash",
+    "回收站面板未实现：Toolbar 注释承诺的「命令面板与右键菜单」两处入口都没有",
+  ],
+  ["restore_trash", "同上，依赖回收站面板"],
+  ["purge_trash", "同上，依赖回收站面板"],
+  ["empty_trash", "同上，依赖回收站面板"],
+  [
+    "rebuild_index",
+    "设置页缺「数据安全」区域（docs/done-list.md 里描述过，但界面未落地）",
+  ],
+  [
+    "get_word_stats",
+    "字数统计走的是 stats 相关命令，这一条是否仍需要待确认（可能是冗余命令）",
+  ],
+  ["has_workspace", "前端用 store 的 hasOpenWorkspace() 判断，未走这条 IPC"],
+]);
+
 /** 取 Rust 里 `code()` 返回的错误码字符串。 */
 function rustErrorCodes(source) {
   const codes = new Set();
@@ -245,13 +386,21 @@ function tsErrorCodes(source) {
 
 /** 取 Rust 枚举的变体名（`rename_all` 之后的形态由调用方决定）。 */
 function rustEnumVariants(source, enumName) {
-  const re = new RegExp("pub enum " + enumName + "\\s*\\{([\\s\\S]*?)\\n\\}", "m");
+  const re = new RegExp(
+    "pub enum " + enumName + "\\s*\\{([\\s\\S]*?)\\n\\}",
+    "m",
+  );
   const m = re.exec(source);
   if (!m) return null;
   const variants = [];
   for (const line of m[1].split(/\r?\n/)) {
     const trimmed = line.trim();
-    if (trimmed.startsWith("//") || trimmed.startsWith("#") || trimmed.length === 0) continue;
+    if (
+      trimmed.startsWith("//") ||
+      trimmed.startsWith("#") ||
+      trimmed.length === 0
+    )
+      continue;
     const vm = /^([A-Z][A-Za-z0-9]*)\s*(?:\(|\{|,|$)/.exec(trimmed);
     if (vm) variants.push(vm[1]);
   }
@@ -299,14 +448,22 @@ function rustStructFields(source, structName) {
   const lookback = source.slice(Math.max(0, decl.index - 300), decl.index);
   if (!/rename_all\s*=\s*"camelCase"/.test(lookback)) return null;
 
-  const re = new RegExp("pub struct " + structName + "\\s*\\{([\\s\\S]*?)\\n\\}", "m");
+  const re = new RegExp(
+    "pub struct " + structName + "\\s*\\{([\\s\\S]*?)\\n\\}",
+    "m",
+  );
   const m = re.exec(source);
   if (!m) return null;
   const fields = [];
   for (const line of m[1].split(/\r?\n/)) {
     const trimmed = line.trim();
     // 文档注释、属性、空行都不是字段
-    if (trimmed.startsWith("//") || trimmed.startsWith("#") || trimmed.length === 0) continue;
+    if (
+      trimmed.startsWith("//") ||
+      trimmed.startsWith("#") ||
+      trimmed.length === 0
+    )
+      continue;
     const fm = /^pub\s+([a-z_][a-z0-9_]*)\s*:/.exec(trimmed);
     if (fm) fields.push(toCamelCase(fm[1]));
   }
@@ -363,7 +520,9 @@ function tsUnionValues(source, typeName) {
 function main() {
   const commandsRs = read(COMMANDS_RS);
   // 两个错误枚举**合并**后与前端比对：命令层包装了内核层
-  const errorSources = [read(ERROR_RS), read(CORE_ERROR_RS)].filter((s) => s !== null);
+  const errorSources = [read(ERROR_RS), read(CORE_ERROR_RS)].filter(
+    (s) => s !== null,
+  );
   const metaRs = read(META_RS);
   const countRs = read(COUNT_RS);
   // 结构体字段比对要跨 crate 收集定义，理由见 STRUCT_CONTRACTS 的说明
@@ -380,12 +539,18 @@ function main() {
     const registered = rustRegisteredCommands(libRs);
     const ts = tsInvokedCommands(indexTs);
     if (registered.size === 0) {
-      fail("命令名", "在 lib.rs 的 generate_handler! 里一个命令都没解析到，解析规则可能失效了");
+      fail(
+        "命令名",
+        "在 lib.rs 的 generate_handler! 里一个命令都没解析到，解析规则可能失效了",
+      );
     }
     // 前端调用了但后端没注册：**必然运行时失败**，最高优先级
     for (const name of ts) {
       if (!registered.has(name)) {
-        fail("命令名", `前端调用了未注册的命令 "${name}"（只定义了 #[tauri::command] 但没写进 generate_handler!）`);
+        fail(
+          "命令名",
+          `前端调用了未注册的命令 "${name}"（只定义了 #[tauri::command] 但没写进 generate_handler!）`,
+        );
       }
     }
     log(`命令数：Rust 注册 ${registered.size} 个，前端调用 ${ts.size} 个`);
@@ -395,11 +560,19 @@ function main() {
       const defined = rustCommandNames(commandsRs);
       const unregistered = [...defined].filter((n) => !registered.has(n));
       if (unregistered.length > 0) {
-        log("提示：以下命令已定义但未注册（前端无法调用）：" + unregistered.join(", "));
+        log(
+          "提示：以下命令已定义但未注册（前端无法调用）：" +
+            unregistered.join(", "),
+        );
       }
-      const undefinedButRegistered = [...registered].filter((n) => !defined.has(n));
+      const undefinedButRegistered = [...registered].filter(
+        (n) => !defined.has(n),
+      );
       if (undefinedButRegistered.length > 0) {
-        fail("命令名", `以下命令被注册了但 commands.rs 里没有定义：${undefinedButRegistered.join(", ")}`);
+        fail(
+          "命令名",
+          `以下命令被注册了但 commands.rs 里没有定义：${undefinedButRegistered.join(", ")}`,
+        );
       }
     }
   } else {
@@ -429,7 +602,10 @@ function main() {
       // 这是"能忍但应该知道"的缺口，因此降级为提示
       const missing = [...rust].filter((c) => !ts.has(c));
       if (missing.length > 0) {
-        log("提示：以下错误码 Rust 会返回但前端未显式建模（会走 default 分支）：" + missing.join(", "));
+        log(
+          "提示：以下错误码 Rust 会返回但前端未显式建模（会走 default 分支）：" +
+            missing.join(", "),
+        );
       }
       log(`错误码：Rust ${rust.size} 个，前端 ${ts.size} 个`);
     }
@@ -451,12 +627,16 @@ function main() {
       const rustSet = new Set(rustValues);
       const tsSet = new Set(tsValues);
       for (const v of rustValues) {
-        if (!tsSet.has(v)) fail("枚举", `ChapterStatus：Rust 有 "${v}" 但前端没有`);
+        if (!tsSet.has(v))
+          fail("枚举", `ChapterStatus：Rust 有 "${v}" 但前端没有`);
       }
       for (const v of tsValues) {
-        if (!rustSet.has(v)) fail("枚举", `ChapterStatus：前端有 "${v}" 但 Rust 没有`);
+        if (!rustSet.has(v))
+          fail("枚举", `ChapterStatus：前端有 "${v}" 但 Rust 没有`);
       }
-      log(`ChapterStatus：Rust ${rustValues.join("/")} ｜ 前端 ${tsValues.join("/")}`);
+      log(
+        `ChapterStatus：Rust ${rustValues.join("/")} ｜ 前端 ${tsValues.join("/")}`,
+      );
     }
   } else {
     skipped.push("枚举（缺少 model.rs 或 types.ts）");
@@ -480,9 +660,12 @@ function main() {
         if (!tsSet.has(v)) fail("枚举", `CountMode：Rust 有 "${v}" 但前端没有`);
       }
       for (const v of tsValues) {
-        if (!rustSet.has(v)) fail("枚举", `CountMode：前端有 "${v}" 但 Rust 没有`);
+        if (!rustSet.has(v))
+          fail("枚举", `CountMode：前端有 "${v}" 但 Rust 没有`);
       }
-      log(`CountMode：Rust ${rustValues.join("/")} ｜ 前端 ${tsValues.join("/")}`);
+      log(
+        `CountMode：Rust ${rustValues.join("/")} ｜ 前端 ${tsValues.join("/")}`,
+      );
     }
   }
 
@@ -499,27 +682,41 @@ function main() {
   if (mockTs && indexTs) {
     const sites = tsCallSites(indexTs);
     // MockBackend 接口里的方法名
-    const interfaceBlock = /export interface MockBackend\s*\{([\s\S]*?)\n\}/.exec(mockTs);
+    const interfaceBlock =
+      /export interface MockBackend\s*\{([\s\S]*?)\n\}/.exec(mockTs);
     if (!interfaceBlock) {
       fail("mock", "找不到 MockBackend 接口定义");
     } else {
       const methods = new Set();
-      for (const m of interfaceBlock[1].matchAll(/^\s{2}([a-zA-Z][A-Za-z0-9]*)\s*\(/gm)) {
+      for (const m of interfaceBlock[1].matchAll(
+        /^\s{2}([a-zA-Z][A-Za-z0-9]*)\s*\(/gm,
+      )) {
         methods.add(m[1]);
       }
       if (methods.size === 0) {
         // 解析规则失效必须报出来：否则下面的逐条比对会"因为集合为空
         // 而全部通过"，检查静默退化成空转 —— 这正是本项此前的问题
-        fail("mock", "MockBackend 接口里一个方法都没解析到，解析规则可能失效了");
+        fail(
+          "mock",
+          "MockBackend 接口里一个方法都没解析到，解析规则可能失效了",
+        );
       } else if (sites.length === 0) {
-        fail("mock", "在 ipc/index.ts 里一个 call(\"命令名\", …, b.方法名(…)) 都没解析到，解析规则可能失效了");
+        fail(
+          "mock",
+          '在 ipc/index.ts 里一个 call("命令名", …, b.方法名(…)) 都没解析到，解析规则可能失效了',
+        );
       } else {
         const missing = sites.filter((s) => !methods.has(s.mockMethod));
         for (const s of missing) {
-          fail("mock", `前端调用了 "${s.command}"，但 MockBackend 没有实现 "${s.mockMethod}"（浏览器降级模式下这个界面是坏的）`);
+          fail(
+            "mock",
+            `前端调用了 "${s.command}"，但 MockBackend 没有实现 "${s.mockMethod}"（浏览器降级模式下这个界面是坏的）`,
+          );
         }
         const commands = tsInvokedCommands(indexTs);
-        log(`mock 覆盖：前端 ${commands.size} 个命令 / ${sites.length} 个调用点，MockBackend ${methods.size} 个方法，缺失 ${missing.length} 个`);
+        log(
+          `mock 覆盖：前端 ${commands.size} 个命令 / ${sites.length} 个调用点，MockBackend ${methods.size} 个方法，缺失 ${missing.length} 个`,
+        );
       }
     }
   } else {
@@ -542,7 +739,13 @@ function main() {
   //
   // 两个方向都是真实故障，因此都要报。
   if (typesTs) {
-    const rustSources = [commandsRs, coreModel, coreTrash, storeStats, fsWorkspace].filter((s) => s !== null);
+    const rustSources = [
+      commandsRs,
+      coreModel,
+      coreTrash,
+      storeStats,
+      fsWorkspace,
+    ].filter((s) => s !== null);
 
     for (const [rustName, tsName, file] of STRUCT_CONTRACTS) {
       const source = read(file);
@@ -558,7 +761,10 @@ function main() {
         // 解析不到就报错。这条纪律来自本文件已有的原则：
         // 一条沉默的检查等于没有检查，而"改了结构体名忘了改脚本"
         // 恰恰会让检查从此永久失效
-        fail("结构体", `在 ${file.split(/[\\/]/).pop()} 里解析不到 pub struct ${rustName}（改名了？还是丢了 rename_all = "camelCase"？）`);
+        fail(
+          "结构体",
+          `在 ${file.split(/[\\/]/).pop()} 里解析不到 pub struct ${rustName}（改名了？还是丢了 rename_all = "camelCase"？）`,
+        );
         continue;
       }
       if (tsFields === null) {
@@ -570,16 +776,25 @@ function main() {
       const tsSet = new Set(tsFields);
       for (const f of rustFields) {
         if (!tsSet.has(f)) {
-          fail("结构体", `${rustName} ↔ ${tsName}：Rust 有字段 "${f}" 但前端没有（前端拿不到这个数据）`);
+          fail(
+            "结构体",
+            `${rustName} ↔ ${tsName}：Rust 有字段 "${f}" 但前端没有（前端拿不到这个数据）`,
+          );
         }
       }
       for (const f of tsFields) {
         if (!rustSet.has(f)) {
-          fail("结构体", `${rustName} ↔ ${tsName}：前端有字段 "${f}" 但 Rust 没有（前端会读到 undefined）`);
+          fail(
+            "结构体",
+            `${rustName} ↔ ${tsName}：前端有字段 "${f}" 但 Rust 没有（前端会读到 undefined）`,
+          );
         }
       }
       if (rustSet.size === 0 || tsSet.size === 0) {
-        fail("结构体", `${rustName} ↔ ${tsName}：字段集合为空（Rust ${rustSet.size} 个 / 前端 ${tsSet.size} 个），解析规则可能失效了`);
+        fail(
+          "结构体",
+          `${rustName} ↔ ${tsName}：字段集合为空（Rust ${rustSet.size} 个 / 前端 ${tsSet.size} 个），解析规则可能失效了`,
+        );
       }
     }
     log(`结构体字段：已比对 ${STRUCT_CONTRACTS.length} 组`);
@@ -587,6 +802,78 @@ function main() {
     void rustSources;
   } else {
     skipped.push("结构体字段（缺少 types.ts）");
+  }
+
+  // ---- 7. 每个命令在界面层都有入口 ----
+  //
+  // ## 为什么需要这一项
+  //
+  // 前六项检查的都是「前后端定义是否一致」，而**一致不等于可用**。
+  // 导出功能就是这样漏过去的：后端 `export_document` 已注册、
+  // 前端绑定与 mock 都齐备、六项检查全绿，但界面层一个调用点都没有
+  // —— 命令面板里没有导出项，也没有导出对话框，作者根本点不到。
+  // 契约检查在结构上看不见这类缺口，所以单独补一项反查。
+  //
+  // ## 判定口径
+  //
+  // 对每个后端命令，取它在 `ipc/index.ts` 里的绑定函数名，
+  // 在界面层（`src/` 去掉 `src/lib/` 与测试）里找调用点。
+  // 一个都没有就报错。
+  //
+  // 刻意**不**去判断「有没有挂到命令面板/菜单上」：那需要理解组件树，
+  // 正则做不到，硬做只会产生假警报。有调用点至少说明这条链路
+  // 从界面出发是通的，剩下的交给组件测试与人工走查。
+  if (indexTs) {
+    const bindings = tsCommandBindings(indexTs);
+    if (bindings.size === 0) {
+      fail(
+        "界面入口",
+        "在 ipc/index.ts 里一个绑定函数都没解析到，解析规则可能失效了",
+      );
+    } else {
+      const uiSources = collectUiSources();
+      const haystack = uiSources.map((f) => read(f)).join("\n");
+      const fresh = [];
+      const waived = [];
+      for (const [command, fns] of bindings) {
+        const used = [...fns].some((name) =>
+          new RegExp(`\\b${name}\\s*\\(`).test(haystack),
+        );
+        if (used) continue;
+        if (KNOWN_UNREACHABLE.has(command)) {
+          waived.push(command);
+          continue;
+        }
+        fresh.push(`${command}（绑定函数 ${[...fns].join(" / ")}）`);
+      }
+      if (fresh.length > 0) {
+        fail(
+          "界面入口",
+          `以下命令在界面层零调用点，用户无法触达：${fresh.join("；")}`,
+        );
+      }
+      // 豁免项里若已有命令悄悄接上了线，提醒把清单缩短
+      const staleWaivers = [...KNOWN_UNREACHABLE.keys()].filter((command) => {
+        const fns = bindings.get(command);
+        if (fns === undefined) return false;
+        return [...fns].some((name) =>
+          new RegExp(`\\b${name}\\s*\\(`).test(haystack),
+        );
+      });
+      if (staleWaivers.length > 0) {
+        fail(
+          "界面入口",
+          `豁免清单已过时，这些命令其实已有界面入口，请从 KNOWN_UNREACHABLE 删除：${staleWaivers.join("、")}`,
+        );
+      }
+      log(
+        `界面入口：${bindings.size} 个命令在 ${uiSources.length} 个界面源文件里反查，新增无入口 ${fresh.length} 个，已知豁免 ${waived.length} 个${
+          waived.length > 0 ? `（${waived.join("、")}）` : ""
+        }`,
+      );
+    }
+  } else {
+    skipped.push("界面入口（缺少 ipc/index.ts）");
   }
 
   // ---- 报告 ----
@@ -605,7 +892,9 @@ function main() {
     log(`  [${f.check}] ${f.message}`);
   }
   console.log("");
-  log("修复方式：改前端 src/lib/ipc/types.ts 或后端 src-tauri/src/commands.rs，使两边一致。");
+  log(
+    "修复方式：改前端 src/lib/ipc/types.ts 或后端 src-tauri/src/commands.rs，使两边一致。",
+  );
   return 1;
 }
 

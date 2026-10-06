@@ -58,6 +58,7 @@ import {
   type CommandItem,
 } from "@/features/command/CommandPalette";
 import { StatsView } from "@/features/stats/StatsView";
+import { ExportDialog } from "@/features/export";
 import { ShortcutPanel } from "@/features/editor/ShortcutPanel";
 import { useShortcuts } from "@/features/editor/shortcut-bindings";
 import { focusMode, toggleFocusMode } from "@/features/editor/focus";
@@ -108,6 +109,7 @@ export function App(): JSX.Element {
   const [settingsOpen, setSettingsOpen] = createSignal(false);
   const [creatingWorkspace, setCreatingWorkspace] = createSignal(false);
   const [shortcutsOpen, setShortcutsOpen] = createSignal(false);
+  const [exportOpen, setExportOpen] = createSignal(false);
   // 首次启动向导（T9.7）：只在「从未引导过」时展示，走完或跳过都会写标记
   const [wizardOpen, setWizardOpen] = createSignal(!hasCompletedOnboarding());
   const [editorSaveState, setEditorSaveState] =
@@ -273,6 +275,15 @@ export function App(): JSX.Element {
       enabled: () => hasOpenWorkspace(),
     },
     {
+      // 导出属于「写作」组而不是「视图」组：它是交稿动作，
+      // 与保存、新建章同级，而不是切换界面布局。
+      id: "export",
+      label: t("command.openExport"),
+      group: t("command.groupWrite"),
+      run: () => setExportOpen(true),
+      enabled: () => hasOpenWorkspace(),
+    },
+    {
       id: "toggleLeft",
       label: t("command.toggleLeft"),
       group: t("command.groupView"),
@@ -432,6 +443,9 @@ export function App(): JSX.Element {
         open={settingsOpen()}
         onClose={() => setSettingsOpen(false)}
       />
+
+      {/* 导出对话框（M7）：格式 / 范围 / 保存位置，并展示降级记录 */}
+      <ExportDialog open={exportOpen()} onClose={() => setExportOpen(false)} />
 
       {/* 首次启动向导：可跳过，跳过与走完的效果完全相同 */}
       <FirstRunWizard
