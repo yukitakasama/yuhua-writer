@@ -47,3 +47,4 @@ coverage/
 # .workbuddy 存放 agent 的会话记忆与工作日志，属于本机数据而非项目源码。
 # 入库会被 prettier --check "**/*.{md}" 扫到并因格式不符让 CI 失败。
 .workbuddy/
+.playwright-mcp/
