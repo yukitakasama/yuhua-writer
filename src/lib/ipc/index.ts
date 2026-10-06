@@ -512,30 +512,20 @@ export function emptyTrash(): Promise<number> {
  * 否则"上次崩溃时没保存完"这个提示会迟到。
  *
  * 因此这里重新打开一次工作区取报告。代价是一次目录扫描，
- * 而这个函数只在恢复面板被打开时调用。
- */
-export async function getRecoveryReport(): Promise<RecoveryReport> {
-  const result = await openWorkspace(currentRoot());
-  return result.recovery;
-}
-
-/**
- * 当前已打开的工作区根路径。
+ * 所以只在恢复面板被打开时调用。
  *
- * 由 workspace-store 在打开/关闭时写入。放在这里而不是让
- * `ipc` 去依赖 store：依赖方向必须是 store → ipc，
- * 反过来会形成循环（store 本来就要 import ipc）。
+ * ## 为什么根路径由调用方传进来
+ *
+ * 从前这里读一个模块级的 `knownRoot`，靠 `setCurrentRoot` 写入 ——
+ * 但那个 setter **一个调用点都没有**，于是 `knownRoot` 恒为空串，
+ * 本函数实际是在 `openWorkspace("")`。这类"隐式全局 + 没人负责填"
+ * 的状态很难被发现：类型是对的，编译是过的，只有真跑到才会炸。
+ * 改成显式参数后，调用方（store 里有 `state.root`）必须给出根路径，
+ * 漏传就是编译错误。
  */
-let knownRoot = "";
-
-/** 记录当前工作区根路径（由 workspace-store 调用）。 */
-export function setCurrentRoot(root: string): void {
-  knownRoot = root;
-}
-
-/** 取当前工作区根路径。未打开时为空串。 */
-export function currentRoot(): string {
-  return knownRoot;
+export async function getRecoveryReport(root: string): Promise<RecoveryReport> {
+  const result = await openWorkspace(root);
+  return result.recovery;
 }
 
 /** 从 Markdown 重建索引。 */
