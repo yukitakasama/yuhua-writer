@@ -171,13 +171,20 @@ impl TrashManager {
                 .unwrap_or_else(|| PathBuf::from("content")),
         );
         if let Err(e) = std::fs::rename(&source, &dest) {
-            // rename 跨卷会失败，退化为「复制 + 删除」
-            if e.raw_os_error().is_some() {
+            if is_cross_device(&e) {
+                // 只有跨卷才退化为「复制 + 删除」。
                 copy_recursive(&source, &dest)?;
-                if source.is_dir() {
-                    let _ = std::fs::remove_dir_all(&source);
+                let removed = if source.is_dir() {
+                    std::fs::remove_dir_all(&source)
                 } else {
-                    let _ = std::fs::remove_file(&source);
+                    std::fs::remove_file(&source)
+                };
+                if let Err(e) = removed {
+                    // 内容已经进回收站（条目完整可用），只是源没删掉。
+                    // 这时保留 meta 比清掉它更好：清掉会变成「有内容、
+                    // 没记录」，而两处各有一份至少是可诊断、可手工收拾的。
+                    // 从前这里用 `let _ =` 把失败吞掉，用户会以为删除成功了。
+                    return Err(YuhuaError::io(&source, e));
                 }
             } else {
                 // 搬运失败：清掉刚写的元数据，保持一致
@@ -251,7 +258,10 @@ impl TrashManager {
         let content = item.content_path();
         if content.exists() {
             if let Err(e) = std::fs::rename(&content, &target) {
-                if e.raw_os_error().is_some() {
+                // 同 move_to_trash：只有真跨卷才退化为复制。
+                // 权限不足 / 目标被占用时必须报错，否则用户会以为
+                // 恢复成功了，而文件其实还躺在回收站里。
+                if is_cross_device(&e) {
                     copy_recursive(&content, &target)?;
                 } else {
                     return Err(YuhuaError::io(&content, e));
@@ -308,6 +318,37 @@ impl TrashManager {
         let items = self.list();
         let bytes = items.iter().map(|i| dir_size(&i.dir)).sum();
         (items.len(), bytes)
+    }
+}
+
+/// `rename` 失败是否因为「源与目标不在同一个卷上」。
+///
+/// **只有这一种失败**才该退化成「复制 + 删除」。
+///
+/// 从前这里判的是 `e.raw_os_error().is_some()` —— 而在 Windows 与
+/// 几乎所有 Unix 上，任何一次真实的 IO 失败都带 OS 错误码
+/// （权限拒绝、文件被云盘占用、路径不存在……），于是那个条件恒真：
+/// 每次 rename 失败都会走进复制分支，可能复制出半份内容，
+/// 再用 `let _ =` 把删除失败静默吞掉，最后源与回收站里各有一份，
+/// 而用户看到的是「删除成功了」。
+///
+/// 常量取值：Unix 的 `EXDEV` 由 POSIX 固定为 18（Linux / macOS / BSD
+/// 一致），Windows 的 `ERROR_NOT_SAME_DEVICE` 为 17。两者都是稳定的
+/// ABI 常量，因此不必为此引入 `libc` 或 `windows-sys` 依赖
+/// （后者还要写 unsafe，与本仓 `unsafe_code = "forbid"` 冲突）。
+fn is_cross_device(e: &std::io::Error) -> bool {
+    #[cfg(unix)]
+    {
+        e.raw_os_error() == Some(18) // EXDEV
+    }
+    #[cfg(windows)]
+    {
+        e.raw_os_error() == Some(17) // ERROR_NOT_SAME_DEVICE
+    }
+    #[cfg(not(any(unix, windows)))]
+    {
+        let _ = e;
+        false
     }
 }
 
@@ -664,6 +705,35 @@ mod tests {
         assert_eq!(count, 1);
         assert!(bytes > 0);
         let _ = dir;
+    }
+
+    #[test]
+    fn cross_device_judgement_only_matches_exdev() {
+        // 回归：从前判的是 `e.raw_os_error().is_some()`。在 Windows 与
+        // 几乎所有 Unix 上，权限不足、文件被云盘占用这些常见失败**也**带
+        // OS 错误码，于是都会被当成「跨卷」而走进复制 + 删除分支 ——
+        // 复制出半份内容、再静默忽略删除失败，用户却看到「删除成功」。
+        #[cfg(unix)]
+        const CROSS: i32 = 18; // EXDEV
+        #[cfg(unix)]
+        const OTHER: i32 = 13; // EACCES
+        #[cfg(windows)]
+        const CROSS: i32 = 17; // ERROR_NOT_SAME_DEVICE
+        #[cfg(windows)]
+        const OTHER: i32 = 5; // ERROR_ACCESS_DENIED
+
+        assert!(
+            is_cross_device(&std::io::Error::from_raw_os_error(CROSS)),
+            "真正的跨卷错误必须被认出来，否则回收站会在跨卷工作区上失效"
+        );
+        assert!(
+            !is_cross_device(&std::io::Error::from_raw_os_error(OTHER)),
+            "权限错误不是跨卷，不该退化成复制 + 删除"
+        );
+        assert!(
+            !is_cross_device(&std::io::Error::other("自定义错误")),
+            "没有 OS 错误码的失败更不是跨卷"
+        );
     }
 
     #[test]
