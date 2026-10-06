@@ -117,6 +117,116 @@ describe("自动保存：flushNow", () => {
   });
 });
 
+describe("自动保存：在途保存与切章竞态", () => {
+  beforeEach(() => vi.useFakeTimers());
+  afterEach(() => vi.useRealTimers());
+
+  it("在途保存期间又打的字，flushNow 会等它落地后补存", async () => {
+    // 旧实现在 performSave 开头写 `if (this.running) return`，
+    // 于是这条路径会静默丢掉第二句：防抖到点开始存 → 等待期间作者
+    // 又打了一句 → 切章 flush → flush 看见在途请求就空转返回。
+    const releases: Array<() => void> = [];
+    const saved: string[] = [];
+    const save = vi.fn().mockImplementation(async (body: string) => {
+      saved.push(body);
+      await new Promise<void>((r) => {
+        releases.push(r);
+      });
+    });
+    let body = "第一句";
+    const s = new AutosaveScheduler({ save, read: () => body });
+
+    s.markDirty();
+    await vi.advanceTimersByTimeAsync(AUTOSAVE_DEBOUNCE_MS + 1);
+    expect(saved).toEqual(["第一句"]);
+
+    // 第一次保存还没回来，作者又打了字
+    body = "第一句第二句";
+    s.markDirty();
+
+    const flushed = s.flushNow();
+    await vi.advanceTimersByTimeAsync(0);
+    // 仍在等在途请求，此刻还没有第二次保存
+    expect(saved).toEqual(["第一句"]);
+
+    releases[0]?.();
+    await vi.advanceTimersByTimeAsync(0);
+    expect(saved).toEqual(["第一句", "第一句第二句"]);
+
+    releases[1]?.();
+    await vi.advanceTimersByTimeAsync(0);
+    await flushed;
+    expect(s.isDirty()).toBe(false);
+  });
+
+  it("正文在发起那一刻就固定，之后 read() 变了也不会串章", async () => {
+    // 保存是异步的。若等到回调真正执行时才 read()，切章后读到的
+    // 会是**新章**正文，然后被写进旧章的文件里。
+    const saved: string[] = [];
+    let release: (() => void) | undefined;
+    const save = vi.fn().mockImplementation(async (body: string) => {
+      saved.push(body);
+      await new Promise<void>((r) => {
+        release = r;
+      });
+    });
+    let body = "第三章的正文";
+    const s = new AutosaveScheduler({ save, read: () => body });
+
+    s.markDirty();
+    await vi.advanceTimersByTimeAsync(AUTOSAVE_DEBOUNCE_MS + 1);
+    // 保存已在途，此时用户切到了第七章
+    body = "第七章的正文";
+
+    release?.();
+    await vi.advanceTimersByTimeAsync(0);
+    expect(saved).toEqual(["第三章的正文"]);
+  });
+
+  it("在途保存不会被并发的防抖触发重复发起", async () => {
+    const releases: Array<() => void> = [];
+    const save = vi.fn().mockImplementation(async () => {
+      await new Promise<void>((r) => {
+        releases.push(r);
+      });
+    });
+    const s = new AutosaveScheduler({ save, read: () => "正文" });
+
+    s.markDirty();
+    await vi.advanceTimersByTimeAsync(AUTOSAVE_DEBOUNCE_MS + 1);
+    expect(save).toHaveBeenCalledTimes(1);
+
+    // 在途期间继续打字：只排队，不并发发起第二次
+    s.markDirty();
+    await vi.advanceTimersByTimeAsync(AUTOSAVE_DEBOUNCE_MS + 1);
+    expect(save).toHaveBeenCalledTimes(1);
+
+    // 在途落地后必须自动补上那一次，否则 dirty 会永远挂着没人存
+    releases[0]?.();
+    await vi.advanceTimersByTimeAsync(AUTOSAVE_DEBOUNCE_MS + 1);
+    expect(save).toHaveBeenCalledTimes(2);
+    releases[1]?.();
+    await vi.advanceTimersByTimeAsync(0);
+    expect(s.isDirty()).toBe(false);
+  });
+
+  it("保存失败后 flushNow 仍能重试（不被在途状态卡死）", async () => {
+    const save = vi
+      .fn()
+      .mockRejectedValueOnce(new Error("云盘占用"))
+      .mockResolvedValue(undefined);
+    const s = new AutosaveScheduler({ save, read: () => "正文" });
+
+    s.markDirty();
+    await expect(s.flushNow()).resolves.toBe(true);
+    expect(s.isDirty()).toBe(true);
+
+    await expect(s.flushNow()).resolves.toBe(true);
+    expect(save).toHaveBeenCalledTimes(2);
+    expect(s.isDirty()).toBe(false);
+  });
+});
+
 describe("自动保存：IME 门控", () => {
   beforeEach(() => vi.useFakeTimers());
   afterEach(() => vi.useRealTimers());

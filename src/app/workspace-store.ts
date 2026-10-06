@@ -191,6 +191,7 @@ export async function openWorkspace(root: string): Promise<boolean> {
     // 而传入的 `root` 是用户手输或对话框给的，两者可能只是写法不同
     // （结尾斜杠、大小写、`..`）。以磁盘那份为准能避免"同一个工作区
     // 被当成两个"这种隐蔽的状态分叉。
+    resetEditingState();
     setState({
       status: "ready",
       root: result.workspace.root,
@@ -212,6 +213,7 @@ export async function createWorkspace(
   setState({ status: "loading", error: null });
   try {
     const result = await ipc.createWorkspace(root, title);
+    resetEditingState();
     setState({
       status: "ready",
       root: result.workspace.root,
@@ -229,6 +231,7 @@ export async function createWorkspace(
 /** 关闭当前工作区，回到书架。 */
 export async function closeWorkspace(): Promise<void> {
   await ipc.closeWorkspace();
+  resetEditingState();
   setState(initialState());
 }
 
@@ -239,6 +242,7 @@ export function clearError(): void {
 
 /** 重置为初始状态（测试用）。 */
 export function __resetWorkspaceState(): void {
+  resetEditingState();
   setState(initialState());
 }
 
@@ -327,6 +331,7 @@ export async function removeVolume(volumeId: string): Promise<boolean> {
   try {
     await ipc.deleteVolume(volumeId);
     await reloadDocument();
+    pruneKnownHashes();
     return true;
   } catch (err) {
     setState("error", ipc.toFailure(err).error);
@@ -428,6 +433,7 @@ export async function removeChapter(chapterId: string): Promise<boolean> {
   try {
     await ipc.deleteChapter(chapterId);
     await reloadDocument();
+    pruneKnownHashes();
     return true;
   } catch (err) {
     setState("error", ipc.toFailure(err).error);
@@ -557,11 +563,56 @@ const [editing, setEditing] = createSignal<EditingChapter | null>(null);
 
 export { editing as editingChapter };
 
+/**
+ * 每章「最后一次已知内容哈希」的账本，章 ID → 哈希。
+ *
+ * ## 为什么不能只靠 `editing()` 里的 hash
+ *
+ * `editing` 只装**当前**这一章。而自动保存是异步的：作者在第三章打了字，
+ * 直接点第七章 —— 切章流程会 flush 第三章，等那次保存真正落到
+ * `saveChapterBody` 时，`editing()` 已经指向第七章了。此时若从
+ * `editing()` 取哈希，就会因为「ID 不匹配」拿到 `undefined`，
+ * 而后端把 `undefined` 理解为**调用方声明不做并发控制**、无条件放行
+ * （见 `commands.rs` 的 `check_no_external_conflict`）。
+ *
+ * 结果是：一次本该被拦下的覆盖被静默放行。若此刻云盘正好把第三章
+ * 同步成了另一台设备的版本，那次写入就会把它冲掉 —— 与本软件
+ * 「零丢失 / 绝不静默覆盖」的核心取向直接冲突。
+ *
+ * 账本按章 ID 存，切章不会丢，因此保存请求总能带上**它发起时那一章**
+ * 的基线哈希。
+ */
+const knownHashes = new Map<string, string>();
+
+/** 丢掉已不在大纲里的章（删章 / 删卷后调），避免账本随会话无限增长。 */
+function pruneKnownHashes(): void {
+  const alive = new Set((state.document?.chapters ?? []).map((c) => c.id));
+  for (const id of knownHashes.keys()) {
+    if (!alive.has(id)) knownHashes.delete(id);
+  }
+}
+
+/**
+ * 清掉与「当前这本工作区」绑定的编辑态。
+ *
+ * 哈希账本与 `editing` 都是**按工作区**有效的：换一本书之后，
+ * 上一本的章 ID 与基线哈希全部作废。留着不只是占内存 ——
+ * 新工作区里的一次保存可能拿到一个不属于它的基线哈希，
+ * 从而误报「已被外部修改」而拒绝写入。
+ *
+ * 调用点：打开 / 新建 / 关闭工作区，以及测试重置。
+ */
+function resetEditingState(): void {
+  knownHashes.clear();
+  setEditing(null);
+}
+
 /** 读取一章正文并放进编辑器状态。 */
 export async function loadChapterBody(chapterId: string): Promise<void> {
   setEditing({ id: chapterId, body: "", hash: "", loading: true });
   try {
     const content: ChapterContent = await ipc.readChapter(chapterId);
+    knownHashes.set(chapterId, content.contentHash);
     setEditing({
       id: chapterId,
       body: content.body,
@@ -579,10 +630,13 @@ export async function saveChapterBody(
   chapterId: string,
   body: string,
 ): Promise<boolean> {
-  const current = editing();
-  const expected = current?.id === chapterId ? current.hash : undefined;
+  // 从账本取，不从 `editing()` 取：切章后 `editing()` 已是新章，
+  // 而这次保存属于旧章（理由见 knownHashes 的说明）。
+  // 账本里没有（如刚新建、尚未读回）时传 undefined，由后端按既有语义放行。
+  const expected = knownHashes.get(chapterId);
   try {
     const content = await ipc.saveChapter(chapterId, body, expected);
+    knownHashes.set(chapterId, content.contentHash);
     setEditing({
       id: chapterId,
       body: content.body,

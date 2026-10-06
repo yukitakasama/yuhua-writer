@@ -58,6 +58,8 @@ export class AutosaveScheduler {
   private firstDirtyAt: number | null = null;
   private dirty = false;
   private running = false;
+  /** 正在飞行中的那次保存。`null` 表示没有在途请求。 */
+  private inflight: Promise<void> | null = null;
   private readonly debounceMs: number;
   private readonly maxWaitMs: number;
 
@@ -90,9 +92,18 @@ export class AutosaveScheduler {
    *
    * 返回的 Promise 会等到保存回调真正完成 —— 关窗路径必须能 await 它，
    * 否则"保存还没写完窗口就关了"。
+   *
+   * ## 为什么有在途请求时要先等它
+   *
+   * 旧实现遇到在途保存就直接返回，于是这条路径会丢字：
+   * 防抖到点开始保存（`dirty` 被清）→ 作者在等待期间又打了几句
+   * （`dirty` 重新置真）→ 作者切章触发 flush → flush 看见在途请求
+   * 就空转返回 → 刚打的那几句再也没人保存。
+   * 等在途请求落地后再判一次 `dirty`，才能把它们带上。
    */
   async flushNow(): Promise<boolean> {
     this.cancelTimer();
+    if (this.inflight !== null) await this.inflight;
     if (!this.dirty) return false;
     await this.performSave();
     return true;
@@ -132,29 +143,47 @@ export class AutosaveScheduler {
     }
   }
 
-  private async performSave(): Promise<void> {
-    if (this.running) return;
+  /**
+   * 执行一次保存。
+   *
+   * 同步部分里就把正文读出来（`options.read()`），不等 await ——
+   * 保存是异步的，等回调真正跑起来时编辑器里可能已经是**另一章**的
+   * 内容了，那时再读就会把新章的正文存进旧章。
+   */
+  private performSave(): Promise<void> {
+    if (this.inflight !== null) return this.inflight;
     // 组合期间不保存：半截拼音不是稿子（见 ime.ts）
     if (this.options.canSave && !this.options.canSave()) {
       // 组合结束后还会再 markDirty 一次，这里只是跳过，不丢状态
-      return;
+      return Promise.resolve();
     }
-    if (!this.dirty) return;
+    if (!this.dirty) return Promise.resolve();
 
     this.running = true;
     this.dirty = false;
     this.firstDirtyAt = null;
     this.cancelTimer();
-    try {
-      await this.options.save(this.options.read());
-    } catch {
-      // 保存失败要把 dirty 放回去，否则这次改动永远不会再被保存。
-      // 具体错误由上层（命令层）统一提示，这里不重复报
-      this.dirty = true;
-      if (this.firstDirtyAt === null) this.firstDirtyAt = Date.now();
-    } finally {
-      this.running = false;
-    }
+    const body = this.options.read();
+
+    const task = (async (): Promise<void> => {
+      try {
+        await this.options.save(body);
+      } catch {
+        // 保存失败要把 dirty 放回去，否则这次改动永远不会再被保存。
+        // 具体错误由上层（命令层）统一提示，这里不重复报
+        this.dirty = true;
+        if (this.firstDirtyAt === null) this.firstDirtyAt = Date.now();
+      } finally {
+        this.running = false;
+        this.inflight = null;
+        // 在途期间防抖又到期的话，`performSave` 只会把在途 promise
+        // 原样返回、不发起第二次保存。这里补一次排队，否则那次改动
+        // 会把 dirty 一直挂着却再没有定时器来存它。
+        if (this.dirty) this.schedule(Date.now());
+      }
+    })();
+    this.inflight = task;
+    return task;
   }
 }
 

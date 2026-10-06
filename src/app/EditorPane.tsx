@@ -116,14 +116,17 @@ export function EditorPane(props: EditorPaneProps = {}): JSX.Element {
   const chapter = createMemo(() => selectedChapter());
 
   /**
-   * 保存当前草稿。
+   * 保存指定章节的正文。
    *
-   * 抽成函数是因为有三个调用点：自动保存、切章前的 flush、卸载前的 flush。
+   * 章 ID 与正文都由调用方**显式传入**，不在函数内部读实时状态 ——
+   * 保存是异步的，等它落地时用户很可能已经切到别的章，那时再读
+   * `mountedChapterId` / `draft()` 就会把新章的正文写进旧章的文件。
+   *
+   * 抽成函数是因为有三个调用点：自动保存、手动保存、卸载前的 flush。
+   * 切章那条路**不走这里**，理由见下面切章 effect 的说明。
    */
-  const persist = async (): Promise<void> => {
-    const id = mountedChapterId;
+  const persist = async (id: string | null, body: string): Promise<void> => {
     if (id === null) return;
-    const body = draft();
     setDirty(false);
     setSaveState("saving");
     const ok = await saveChapterBody(id, body);
@@ -141,7 +144,7 @@ export function EditorPane(props: EditorPaneProps = {}): JSX.Element {
       await scheduler.flushNow();
       return;
     }
-    if (dirty()) await persist();
+    if (dirty()) await persist(mountedChapterId, draft());
   };
 
   /**
@@ -247,7 +250,9 @@ export function EditorPane(props: EditorPaneProps = {}): JSX.Element {
 
   onMount(() => {
     scheduler = new AutosaveScheduler({
-      save: () => persist(),
+      // 正文由调度器在**发起那一刻**读出并传入（见 autosave.ts 的
+      // performSave 说明）；章 ID 同样必须在那一刻固定下来。
+      save: (body) => persist(mountedChapterId, body),
       read: () => draft(),
       // IME 组合期间不保存（T4.4）
       canSave: () => !(handle?.isComposing() ?? false),
@@ -265,7 +270,7 @@ export function EditorPane(props: EditorPaneProps = {}): JSX.Element {
     scheduler?.dispose();
     scheduler = null;
     // 卸载前保存：否则关掉应用的最后一段字会丢
-    if (dirty()) void persist().catch(() => undefined);
+    if (dirty()) void persist(mountedChapterId, draft()).catch(() => undefined);
   });
 
   /**
@@ -274,17 +279,40 @@ export function EditorPane(props: EditorPaneProps = {}): JSX.Element {
    * 用一个独立的 effect 追踪选中的章 ID，与上面的"灌正文"effect 分开 ——
    * 合并写的话，"保存"必须在"载入新章"之前跑完，
    * 而 effect 的执行顺序很难在这种耦合下保持正确。
+   *
+   * ## 为什么这里绕开 scheduler 直接保存
+   *
+   * 三件事必须在**同一个同步块**里定下来，否则就会丢字：
+   *
+   * 1. 旧章的 ID 与正文要当场捕获成快照。等异步保存真跑起来时，
+   *    `draft()` 与 `mountedChapterId` 都已经是新章的了。
+   * 2. `scheduler.reset()` 要在发起保存**之前**调。反过来的话，
+   *    调度器还留着 dirty 状态，稍后可能拿新章的正文再存一次旧章。
+   * 3. 不能像从前那样 `void flushNow()` 之后紧跟 `reset()` ——
+   *    flushNow 在有在途保存时会先 await，而 reset 是同步的，
+   *    它会把 flush 还没读到的 dirty 清掉，那次改动就再也没人存了。
+   *
+   * ## 为什么不走 `persist`
+   *
+   * `persist` 会写 `dirty` 与 `saveState`，而这两个信号此刻已经属于
+   * **新章**。旧章保存失败时若照写，界面就会对着一个干净的章说
+   * 「有未保存的改动」。失败改由 store 的错误横幅报出
+   * （`saveChapterBody` 内部已 `setState("error", …)`）。
+   *
+   * 保存本身不 await：切章不该被 IO 阻塞。磁盘上的旧章内容因为
+   * 原子写并未损坏，用户按提示重开该章即可。
    */
   let lastChapterId: string | null = null;
   createEffect(() => {
     const current = chapter();
     const id = current?.id ?? null;
     if (lastChapterId !== null && lastChapterId !== id) {
+      const previousId = lastChapterId;
+      const previousBody = draft();
+      const hadUnsaved = scheduler?.isDirty() ?? false;
       rememberPosition();
-      // flush 是异步的，但我们不 await —— 切章不能被 IO 阻塞。
-      // 保存失败时 scheduler 会保持 dirty 并在下次重试
-      void scheduler?.flushNow();
       scheduler?.reset();
+      if (hadUnsaved) void saveChapterBody(previousId, previousBody);
     }
     lastChapterId = id;
   });
