@@ -258,25 +258,32 @@ mod tests {
 
     #[test]
     fn fts5_is_available_in_bundled_sqlite() {
-        // 这条测试守住「bundled feature 必须带 FTS5」这一编译期约定
+        // 守住「bundled feature 必须带 FTS5」这一编译期约定：
+        // 整条全文检索链路都建在 FTS5 上，缺了它应用等于没有检索。
+        //
+        // 不用 `pragma_compile_options` 判 —— 那查的是编译开关的**名字**，
+        // 有些构建查不到名字却照样能建 FTS5 表。直接建表、写入、MATCH
+        // 查回，才是真正的能力验证（从前这里写成
+        // `assert!(opts.contains("FTS5") || true)`，恒真，什么都没守住）。
         let conn = open_in_memory().unwrap();
-        let v: String = conn
-            .query_row("SELECT sqlite_version()", [], |r| r.get(0))
-            .unwrap();
-        assert!(!v.is_empty());
-        // 能建 FTS5 表即说明 FTS5 可用（create_tables 已成功建过）
-        let opts: String = conn
+        conn.execute_batch(
+            "CREATE VIRTUAL TABLE fts5_probe USING fts5(
+               body_tokens,
+               tokenize = 'unicode61 remove_diacritics 2'
+             );
+             INSERT INTO fts5_probe(body_tokens) VALUES ('落羽 风起');",
+        )
+        .expect("bundled SQLite 未启用 FTS5，全文检索将不可用");
+
+        // 分词口径与生产一致：写入前把二元组用空格连好，unicode61 按空格切回
+        let hits: i64 = conn
             .query_row(
-                "SELECT group_concat(name) FROM pragma_compile_options WHERE name LIKE '%FTS5%'",
+                "SELECT count(*) FROM fts5_probe WHERE fts5_probe MATCH '风起'",
                 [],
                 |r| r.get(0),
             )
-            .unwrap_or_default();
-        // bundled 构建应当带有 FTS5 编译选项
-        assert!(
-            opts.contains("FTS5") || true,
-            "FTS5 编译选项查询结果：{opts}"
-        );
+            .expect("FTS5 表建得出来却查不动");
+        assert_eq!(hits, 1, "FTS5 的 MATCH 没有命中刚写入的内容");
     }
 
     #[test]

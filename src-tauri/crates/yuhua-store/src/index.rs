@@ -355,6 +355,16 @@ impl Index {
     /// - 用户手动触发「重建索引」（设置页的数据安全区域）
     ///
     /// 由于不变量 1 保证「文件是真源」，重建永远不会丢数据。
+    ///
+    /// ## 为什么整段包在一个事务里
+    ///
+    /// 重建的第一步是**清空**。若中途失败（磁盘满、进程被杀、
+    /// 某章文件读不出来），没有事务就会留下一个「旧数据已删、
+    /// 新数据只写了一半」的索引 —— 而索引是检索的唯一依据，
+    /// 半残状态下搜出来的结果会静默缺章，比直接报错更难发现。
+    ///
+    /// 顺带也快得多：逐条自动提交时每写一行都要 fsync 一次，
+    /// 而重建要写的是整本书。
     pub fn rebuild(
         &self,
         book: &Book,
@@ -362,6 +372,11 @@ impl Index {
         volumes: &[yuhua_core::model::Volume],
         chapters: &[Chapter],
     ) -> Result<IndexOutcome> {
+        // `unchecked_transaction` 而非 `transaction`：后者要 `&mut self`，
+        // 而 `Index` 在会话里是被共享引用持有的。它只是绕过了编译期的
+        // 「同一连接不得有嵌套事务」检查，此处 rebuild 内部不会再开事务。
+        // Transaction 在 Drop 时自动回滚，因此下面的 `?` 提前返回即回滚。
+        let tx = self.conn.unchecked_transaction().map_err(db_err)?;
         reset_all(&self.conn)?;
         create_tables(&self.conn)?;
         set_schema_version_for_reset(&self.conn, CURRENT_SCHEMA_VERSION)?;
@@ -369,7 +384,9 @@ impl Index {
         // 顺序错了会直接触发 FOREIGN KEY constraint failed。
         self.upsert_book(book, root)?;
         self.sync_volumes(volumes)?;
-        self.sync_document(book, root, chapters)
+        let outcome = self.sync_document(book, root, chapters)?;
+        tx.commit().map_err(db_err)?;
+        Ok(outcome)
     }
 
     /// 清空索引内容但保留表结构。
