@@ -828,7 +828,11 @@ body.is-dragging {
 
 .editor__page {
   width: 100%;
-  max-width: 720px;
+  /* 正文宽度是用户的排版设置（设置 → 排版 → 正文宽度）。
+     这里以前写死 720px，那个滑块只改得到设置页的预览块，
+     写作台纹丝不动 —— 「即时生效」就成了假话。默认值本来就是 720px，
+     所以接上令牌之后默认观感不变。 */
+  max-width: var(--measure-body);
   padding: var(--sp-8) var(--sp-6) 40vh;
   /* 章节切换的入场：opacity + translateY，符合只动画这两者的约束 */
   animation: page-in var(--d-base) var(--e-decelerate);
@@ -864,6 +868,17 @@ body.is-dragging {
 
 .editor__loading,
 .editor__hint {
+  color: var(--c-text-muted);
+  font-size: var(--fs-sm);
+}
+
+/* 读章失败：正文没到位，作者要能看见这件事，也要有一条不用再切一次章的路。 */
+.editor__failed {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--sp-4);
+  align-items: center;
+  margin-top: var(--sp-4);
   color: var(--c-text-muted);
   font-size: var(--fs-sm);
 }
@@ -926,12 +941,35 @@ body.is-dragging {
    这里是**加宽正文并放松行距**，不是逐段变暗 ——
    理由见 features/editor/focus.ts 的说明。 */
 .editor--focus .editor__page {
-  max-width: 860px;
+  /* 专注模式至少给到 860px，但作者把正文宽度调得更宽时不该被压低 */
+  max-width: max(860px, var(--measure-body));
   padding-top: 12vh;
 }
 
 .editor--focus .cm-content {
-  line-height: 2;
+  /* 放松行距是「不低于 2」，不是「盖掉用户的行距设置」 */
+  line-height: max(2, var(--lh-read));
+}
+
+/*
+ * 专注模式的第 2 件事（计划书 5.4「其余全部收起」）：工具栏收起，
+ * 但**不消失** —— 鼠标碰一下顶部那条缝就回来，键盘 Tab 进来同样回来。
+ * 收起态留着可点的区域，否则鼠标用户会发现自己没法退出专注模式。
+ *
+ * 不用动画：`height` 不在允许动画的属性里（只动画 opacity/transform），
+ * 而模式切换本来就该是即时的。
+ */
+html[data-focus-mode="on"] .toolbar {
+  height: var(--sp-3);
+  overflow: hidden;
+  border-bottom: 0;
+}
+
+html[data-focus-mode="on"] .toolbar:hover,
+html[data-focus-mode="on"] .toolbar:focus-within {
+  height: var(--toolbar-h);
+  overflow: visible;
+  border-bottom: 1px solid var(--c-border);
 }
 
 /* --------------------------------------------------------------------------

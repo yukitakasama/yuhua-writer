@@ -154,6 +154,23 @@ export function toggleRight(): void {
   persist();
 }
 
+/**
+ * 折叠 / 展开左栏（显式设值，而不是切换）。
+ *
+ * 专注模式需要它：那里要的是「进来就折叠」，切换语义在作者
+ * **本来就折叠着左栏**时会把它展开 —— 正好与目的相反。
+ */
+export function setLeftCollapsed(collapsed: boolean): void {
+  setLayout("leftCollapsed", collapsed);
+  persist();
+}
+
+/** 折叠 / 展开右栏（显式设值，理由同 `setLeftCollapsed`）。 */
+export function setRightCollapsed(collapsed: boolean): void {
+  setLayout("rightCollapsed", collapsed);
+  persist();
+}
+
 /** 切换主视图。 */
 export function setView(view: LayoutState["view"]): void {
   setLayout("view", view);

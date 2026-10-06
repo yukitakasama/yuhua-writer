@@ -35,6 +35,7 @@ const {
   emptyMock,
   rebuildMock,
   recoveryMock,
+  reloadDocMock,
 } = vi.hoisted(() => ({
   listTrashMock: vi.fn(),
   restoreMock: vi.fn(),
@@ -42,6 +43,7 @@ const {
   emptyMock: vi.fn(),
   rebuildMock: vi.fn(),
   recoveryMock: vi.fn(),
+  reloadDocMock: vi.fn(),
 }));
 
 vi.mock("@/lib/ipc", () => ({
@@ -85,6 +87,11 @@ vi.mock("@/app/workspace-store", () => ({
       },
     },
   },
+  /**
+   * 恢复成功的代价是「卷章树里多回一个节点」，所以 TrashSection 会重读文档。
+   * 这里给个可控的替身：断言它被调用，而不是让它去碰没打桩的 `openWorkspace`。
+   */
+  reloadDocument: reloadDocMock,
 }));
 
 import { DataSafetyPanel } from "./DataSafetyPanel";
@@ -129,6 +136,7 @@ beforeEach(() => {
   purgeMock.mockResolvedValue(undefined);
   emptyMock.mockResolvedValue(0);
   rebuildMock.mockResolvedValue(undefined);
+  reloadDocMock.mockResolvedValue(undefined);
   recoveryMock.mockRejectedValue(new Error("不该被调用"));
 });
 
@@ -165,16 +173,21 @@ describe("回收站列表", () => {
 });
 
 describe("回收站动作", () => {
-  it("恢复直接执行，并重新读取列表", async () => {
+  it("恢复直接执行，并重读列表与文稿", async () => {
     listTrashMock.mockResolvedValueOnce([entry()]).mockResolvedValueOnce([]);
     const view = render(() => <TrashSection />);
     await settle();
 
     fireEvent.click(buttonsByText(view.container, "恢复")[0] as HTMLElement);
-    await settle();
+    // 恢复现在多了一步「重读文稿」，动作到列表刷新之间隔的微任务变多了，
+    // 一次 settle 只等到中间态
+    for (let i = 0; i < 4; i += 1) await settle();
 
     expect(restoreMock).toHaveBeenCalledWith("ch_1-20260920");
     expect(listTrashMock).toHaveBeenCalledTimes(2);
+    // 恢复的就是卷章树里的节点：不重读文稿，那章在界面上仍然不存在，
+    // 用户会以为恢复失败，于是再恢复一次或在原地新建同名章。
+    expect(reloadDocMock).toHaveBeenCalledTimes(1);
     // 恢复成功后列表由后端重新决定：这里应回到空态，而不是本地偷偷删一行
     expect(view.container.querySelector(".trash-section__item")).toBeNull();
     expect(screen.queryByText("回收站是空的。")).not.toBeNull();
@@ -200,6 +213,8 @@ describe("回收站动作", () => {
     await settle();
 
     expect(purgeMock).toHaveBeenCalledWith("ch_1-20260920");
+    // 彻底删除只是清掉备份：卷章树里没有它，重读文稿属于多余动作
+    expect(reloadDocMock).not.toHaveBeenCalled();
   });
 
   it("确认态可以取消，取消后不产生任何删除", async () => {

@@ -56,9 +56,11 @@ export const editorTheme: Extension = EditorView.theme({
     padding: "0",
   },
   // 中文排版：段落间距靠 CSS 的 margin 而不是空行，
-  // 后者会让作者的真空行与视觉空行混淆
+  // 后者会让作者的真空行与视觉空行混淆。
+  // 间距取用户的「段间距」设置（--gap-paragraph，写在 <html> 上，全局可读）：
+  // 以前这里钉死 --sp-3，那个滑块只影响设置页的预览块。
   ".cm-paragraph": {
-    marginBottom: "var(--sp-3)",
+    marginBottom: "var(--gap-paragraph)",
   },
   ".cm-cursor, .cm-dropCursor": {
     borderLeftColor: "var(--c-accent)",

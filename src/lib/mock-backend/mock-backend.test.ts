@@ -387,6 +387,67 @@ describe("删除与回收站", () => {
     expect(backend.listTrash().length).toBe(0);
   });
 
+  /**
+   * 恢复的语义是「稿子里回得来」，不是「回收站里没得见」。
+   *
+   * 只看后者会漏掉真正要紧的那一半：卷章树里仍然没有这一章时，
+   * 用户看到的是「点了恢复，什么都没发生」，接着就会再恢复一次
+   * 或在原地新建一章同名的。
+   */
+  it("从回收站恢复后，这一章重新出现在原来的卷里", () => {
+    const volumeId = backend.getOutline()[0]?.volumeId;
+    if (!volumeId) throw new Error("示例数据没有卷");
+    const before = chaptersIn(volumeId).map((c) => c.id);
+    const first = before[0];
+    if (!first) throw new Error("示例数据没有章");
+
+    backend.deleteChapter(first);
+    expect(chaptersIn(volumeId).map((c) => c.id)).not.toContain(first);
+
+    const entry = backend.listTrash()[0];
+    if (!entry) throw new Error("回收站为空");
+    backend.restoreFromTrash(entry.trashDirName);
+
+    const after = chaptersIn(volumeId);
+    expect(after.map((c) => c.id)).toContain(first);
+    // 恢复回来的章不能挤乱其余章的顺序，也不能带出重复的 sort
+    expect(after.map((c) => c.sort).sort((a, b) => a - b)).toEqual(
+      after.map((_, i) => i),
+    );
+  });
+
+  it("原卷已不存在时，恢复报错并把条目留在回收站", () => {
+    const volumeId = backend.getOutline()[0]?.volumeId;
+    if (!volumeId) throw new Error("示例数据没有卷");
+    const first = chaptersIn(volumeId)[0];
+    if (!first) throw new Error("示例数据没有章");
+
+    backend.deleteChapter(first.id);
+    const entry = backend.listTrash()[0];
+    if (!entry) throw new Error("回收站为空");
+    backend.deleteVolume(volumeId);
+
+    expect(() => backend.restoreFromTrash(entry.trashDirName)).toThrowError(
+      MockError,
+    );
+    expect(backend.listTrash().map((t) => t.trashDirName)).toContain(
+      entry.trashDirName,
+    );
+  });
+
+  it("彻底删除后不再有机会恢复摘要被清理", () => {
+    const first = allChapters()[0];
+    if (!first) throw new Error("没有章节");
+    backend.deleteChapter(first.id);
+    const entry = backend.listTrash()[0];
+    if (!entry) throw new Error("回收站为空");
+
+    backend.purgeFromTrash(entry.trashDirName);
+    expect(() => backend.restoreFromTrash(entry.trashDirName)).toThrowError(
+      MockError,
+    );
+  });
+
   it("清空回收站返回清掉的条数", () => {
     const chapters = allChapters();
     backend.deleteChapter(chapters[0]?.id ?? "");

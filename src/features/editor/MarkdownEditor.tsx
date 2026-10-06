@@ -32,7 +32,12 @@
  * 一部分扩展，因此上面三样都保得住。
  */
 
-import { Compartment, EditorState, type Extension } from "@codemirror/state";
+import {
+  Compartment,
+  EditorState,
+  Transaction,
+  type Extension,
+} from "@codemirror/state";
 import {
   EditorView,
   keymap,
@@ -47,7 +52,7 @@ import {
   indentWithTab,
 } from "@codemirror/commands";
 import { search, searchKeymap, openSearchPanel } from "@codemirror/search";
-import { onCleanup, onMount, type JSX } from "solid-js";
+import { createEffect, onCleanup, onMount, type JSX } from "solid-js";
 
 import { markEditorReady } from "@/app/perf";
 
@@ -65,6 +70,14 @@ export interface EditorHandle {
   getValue(): string;
   /** 全量替换正文（保留滚动与光标尽量不动）。 */
   setValue(next: string): void;
+  /**
+   * 换章用的整篇替换：**换掉整个状态**，因此撤销历史从零开始。
+   *
+   * 与 `setValue` 的区别只在历史。作者切到第 7 章后第一件事按 Ctrl+Z，
+   * 如果历史里还留着「第 6 章全文 → 第 7 章全文」这一笔，第 6 章的正文
+   * 就会灌进第 7 章，接着被自动保存写进第 7 章的文件 —— 两章都坏。
+   */
+  resetDocument(next: string): void;
   /** 聚焦。 */
   focus(): void;
   /** 打开查找面板（T4.6）。 */
@@ -224,11 +237,18 @@ export function MarkdownEditor(props: MarkdownEditorProps): JSX.Element {
       if (view === null) return;
       const current = view.state.doc.toString();
       if (current === next) return;
-      // 整体替换不要进撤销历史：作者按 Ctrl+Z 不该回到"上一章的内容"
+      // 整体替换不进撤销历史：作者按 Ctrl+Z 不该回到"上一章的内容"。
+      // 只靠「这是一笔大改动」是挡不住的，必须显式关历史。
       view.dispatch({
         changes: { from: 0, to: view.state.doc.length, insert: next },
-        annotations: [],
+        annotations: [Transaction.addToHistory.of(false)],
       });
+    },
+    resetDocument: (next: string) => {
+      if (view === null) return;
+      // setState 换掉整个状态：历史随之归零，而视图对象没被销毁
+      // （滚动容器、IME 组合、焦点都还在），所以不出现「视图已没了」的窗口期。
+      view.setState(EditorState.create({ doc: next, extensions }));
     },
     focus: () => view?.focus(),
     openFind: (replace: boolean) => {
@@ -251,24 +271,52 @@ export function MarkdownEditor(props: MarkdownEditorProps): JSX.Element {
     isComposing: () => (view ? view.composing : false),
   };
 
+  /**
+   * 建视图用的扩展集。
+   *
+   * 存起来是因为 {@link EditorHandle.resetDocument} 要拿它重建状态：
+   * 换章时重建状态而不重建视图，历史能归零，光标与滚动还活着。
+   */
+  let extensions: Extension[] = [];
+
   onMount(() => {
     if (!container) return;
+    extensions = createEditorExtensions({
+      readOnlyCompartment,
+      fontCompartment,
+      readOnly: props.readOnly ?? false,
+      ...(props.onUserEdit ? { onUserEdit: props.onUserEdit } : {}),
+      ...(props.onChange ? { onDocChange: props.onChange } : {}),
+      ...(props.onScrollLine ? { onScrollLine: props.onScrollLine } : {}),
+    });
     const state = EditorState.create({
       doc: props.initialValue,
-      extensions: createEditorExtensions({
-        readOnlyCompartment,
-        fontCompartment,
-        readOnly: props.readOnly ?? false,
-        ...(props.onUserEdit ? { onUserEdit: props.onUserEdit } : {}),
-        ...(props.onChange ? { onDocChange: props.onChange } : {}),
-        ...(props.onScrollLine ? { onScrollLine: props.onScrollLine } : {}),
-      }),
+      extensions,
     });
     view = new EditorView({ state, parent: container });
     // P3 应用内段的终点：视图已经建好、可以接受输入。
     // 放在 onReady 之前，让「谁调了 onReady」不影响计时口径。
     markEditorReady();
     props.onReady?.(handle);
+  });
+
+  /**
+   * 把只读开关同步进 Compartment（T4.14 的同一套机制）。
+   *
+   * ## 为什么不能用「卸载再重挂编辑器」表达只读
+   *
+   * 读章途中把编辑器卸掉看着省事，实际有三个后果：滚动位置与输入法状态丢；
+   * 视图在**切章流程的中间**被销毁，而上一章的光标记忆和保存都还要读它；
+   * 每次换章都要重建整个 CodeMirror，而 P4 量的就是这次重建的耗时。
+   * Compartment 重配是原子的，视图自始至终活着。
+   */
+  createEffect(() => {
+    const next = props.readOnly ?? false;
+    // onMount 之前没有视图：首帧的只读由上面 createEditorExtensions 传入
+    if (view === null) return;
+    view.dispatch({
+      effects: readOnlyCompartment.reconfigure(EditorState.readOnly.of(next)),
+    });
   });
 
   onCleanup(() => {

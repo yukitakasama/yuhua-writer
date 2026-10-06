@@ -53,6 +53,7 @@ import { LibraryToolbar, Toolbar, type SaveState } from "./app/Toolbar";
 import { IconClose, IconWarning } from "./app/ui/icons";
 import { IconButton } from "./app/ui/IconButton";
 import { SearchPanel } from "@/features/search/SearchPanel";
+import { clearJump } from "@/features/search/search-store";
 import {
   CommandPalette,
   type CommandItem,
@@ -61,7 +62,7 @@ import { StatsView } from "@/features/stats/StatsView";
 import { ExportDialog } from "@/features/export";
 import { ShortcutPanel } from "@/features/editor/ShortcutPanel";
 import { useShortcuts } from "@/features/editor/shortcut-bindings";
-import { focusMode, toggleFocusMode } from "@/features/editor/focus";
+import { toggleFocusMode } from "@/features/editor/focus";
 import {
   LEFT_MAX,
   LEFT_MIN,
@@ -241,8 +242,33 @@ export function App(): JSX.Element {
     if (target) selectChapter(target.id);
   };
 
-  const handleLibrary = (): void => {
-    void closeWorkspace().then(() => setView("library"));
+  /**
+   * 回书架。
+   *
+   * 顺序是**先保存、再关工作区**，反过来会丢字：`closeWorkspace()` 一跑完，
+   * 后端的根句柄与前端 store 都清空了，而 EditorPane 要到 `setView` 之后
+   * 才卸载 —— 它 `onCleanup` 里那次保存于是必然失败（没有工作区）。
+   * 自动保存有 1500 ms 防抖，作者最后打的那一段正好落在这个窗口里。
+   *
+   * 保存状态也要在离开时归位：`editorSaveState` 由 EditorPane 的 effect 同步，
+   * 组件一卸载就没人再更新它。若此刻正卡在 `saving`，保存入口会被
+   * `enabled` 判据一直锁到下次挂载。
+   */
+  const handleLibrary = async (): Promise<void> => {
+    try {
+      await saveEditor?.();
+    } catch {
+      // 存不下也要让人走得掉：失败已经由 store 的错误横幅报出，
+      // 把作者锁在写作台里只会让他多打一段同样存不下的字。
+    }
+    await closeWorkspace();
+    saveEditor = undefined;
+    setEditorSaveState("idle");
+    // 检索跳转也是一次意图：没消费掉就留着，下次重开同一本书、点到那一章
+    // 会被那条旧意图牵着跑（`search-store` 的注释早就写了「关闭工作区时清」，
+    // 但生产代码里从来没人清它）。
+    clearJump();
+    setView("library");
   };
 
   /**
@@ -404,7 +430,6 @@ export function App(): JSX.Element {
               "shell--left-collapsed": layout.leftCollapsed,
               "shell--right-collapsed": layout.rightCollapsed,
             }}
-            data-focus-mode={focusMode() ? "on" : undefined}
             style={{
               "--left-w": `${layout.leftWidth}px`,
               "--right-w": `${layout.rightWidth}px`,

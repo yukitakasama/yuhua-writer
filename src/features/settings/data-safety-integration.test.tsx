@@ -115,7 +115,16 @@ describe("设置面板深链到数据安全分区", () => {
     ) as HTMLElement;
     fireEvent.click(restore);
     await flush();
+    await flush();
 
     expect(document.querySelector(".trash-section__item")).toBeNull();
+    // 恢复回来的不只是备份文件：卷章树里得重新出现这一章。
+    // 少掉「重读文稿」那一步时，备份确实回到稿子里了，界面上却仍然没有它，
+    // 用户只能再恢复一次或在原地新建一章同名的。
+    expect(
+      workspaceState.document?.chapters.some(
+        (c) => c.id === (first as { id: string }).id,
+      ),
+    ).toBe(true);
   });
 });

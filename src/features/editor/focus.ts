@@ -23,7 +23,13 @@
 
 import { createSignal } from "solid-js";
 
-import { layout, setView } from "../../app/layout-store";
+/** 与 `src/features/` 下其它模块一致：跨目录引用走 `@/` 别名。 */
+import {
+  layout,
+  setLeftCollapsed,
+  setRightCollapsed,
+  setView,
+} from "@/app/layout-store";
 
 /** 专注模式是否开启。 */
 const [focusMode, setFocusMode] = createSignal(false);
@@ -50,6 +56,26 @@ export function toggleFocusMode(): void {
   else enterFocusMode();
 }
 
+/**
+ * 把专注模式标在 `<html>` 上，供样式收起工具栏。
+ *
+ * ## 为什么挂在 html 而不是编辑区或 `.shell`
+ *
+ * 计划书 5.4 要求专注模式「其余全部收起」，其中**工具栏**是 `.shell` 的
+ * 兄弟节点（`App.tsx` 里它在 shell 之前），挂在 shell 或编辑区上的选择器
+ * 选不到它。挂在 `<html>` 上人人都能选中，而且与主题
+ * （`html[data-theme]`）用的是同一个先例。
+ *
+ * 这个属性以前写在 `.shell` 上，而四个样式文件里没有任何规则读它 ——
+ * 于是「工具栏收起」这件事只存在于注释里。
+ * `writing-surface-settings.test.ts` 现在会扫样式源文件，
+ * 确认有人真的在读它。
+ */
+function applyFocusAttribute(on: boolean): void {
+  if (on) document.documentElement.setAttribute("data-focus-mode", "on");
+  else document.documentElement.removeAttribute("data-focus-mode");
+}
+
 /** 进入专注模式。 */
 export function enterFocusMode(): void {
   if (focusMode()) return;
@@ -61,17 +87,22 @@ export function enterFocusMode(): void {
     view: layout.view,
   };
   setFocusMode(true);
-  layout.leftCollapsed = true;
-  layout.rightCollapsed = true;
+  // 走 layout-store 的 setter，而不是 `layout.leftCollapsed = true`：
+  // 那种直接赋值在本项目里根本改不动 store（护栏测试里写一次读一次就是旧值），
+  // 而且绕过了 setter 附带的 `persist()` —— 折叠状态就不落 localStorage。
+  setLeftCollapsed(true);
+  setRightCollapsed(true);
+  applyFocusAttribute(true);
 }
 
 /** 退出专注模式并还原布局。 */
 export function exitFocusMode(): void {
   if (!focusMode()) return;
   setFocusMode(false);
+  applyFocusAttribute(false);
   if (saved) {
-    layout.leftCollapsed = saved.leftCollapsed;
-    layout.rightCollapsed = saved.rightCollapsed;
+    setLeftCollapsed(saved.leftCollapsed);
+    setRightCollapsed(saved.rightCollapsed);
     setView(saved.view);
     saved = null;
   }
@@ -91,4 +122,5 @@ export function focusModeClass(): string {
 export function __resetFocusMode(): void {
   setFocusMode(false);
   saved = null;
+  applyFocusAttribute(false);
 }

@@ -143,6 +143,15 @@ export function createMockBackend(): MockBackend {
   /** 每章的正文哈希，用于乐观并发检测。 */
   const hashes = new Map<string, string>();
   const trash: TrashEntry[] = [];
+  /**
+   * 被删掉的章的完整摘要，按 `trashDirName` 存着，供恢复时放回原来的卷。
+   *
+   * 真实后端把章文件整个移进 `.trash/` 目录，恢复就是原样移回稿子里。
+   * 这里原先只有一句 `trash.splice(...)`：恢复完「大纲里依然没有这一章」，
+   * 于是回收站恢复这条链路在浏览器开发路径上**没有任何地方能验证** ——
+   * 而它恰恰是零丢失承诺里最要紧的一步（用户点了恢复，稿子要真的回来）。
+   */
+  const deletedChapters = new Map<string, ChapterSummary>();
   /** 作者便签，刻意不放进摘要（见 updateChapterMeta 的说明）。 */
   const notes = new Map<string, string>();
   for (const [id, body] of bodies) hashes.set(id, `hash-${body.length}`);
@@ -428,11 +437,13 @@ export function createMockBackend(): MockBackend {
       const index = volumes.findIndex((v) => v.id === volumeId);
       const affected = chaptersOf(volumeId);
       affected.forEach((c) => {
+        const trashDirName = `${mockTime(0)}-${c.id}`;
+        deletedChapters.set(trashDirName, { ...c });
         trash.push({
           originalId: c.id,
           originalTitle: c.title,
           originalPath: c.path,
-          trashDirName: `${mockTime(0)}-${c.id}`,
+          trashDirName,
           deletedAt: mockTime(0),
           kind: "chapter",
         });
@@ -637,11 +648,13 @@ export function createMockBackend(): MockBackend {
       const found = requireChapter(chapterId);
       const index = chapters.indexOf(found);
       chapters.splice(index, 1);
+      const trashDirName = `${mockTime(0)}-${found.id}`;
+      deletedChapters.set(trashDirName, { ...found });
       trash.push({
         originalId: found.id,
         originalTitle: found.title,
         originalPath: found.path,
-        trashDirName: `${mockTime(0)}-${found.id}`,
+        trashDirName,
         deletedAt: mockTime(0),
         kind: "chapter",
       });
@@ -757,7 +770,29 @@ export function createMockBackend(): MockBackend {
       if (index < 0) {
         throw new MockError("NOT_FOUND", "回收站里没有这一条", true);
       }
+      const saved = deletedChapters.get(trashDirName);
+      if (
+        saved !== undefined &&
+        !volumes.some((v) => v.id === saved.volumeId) &&
+        !chapters.some((c) => c.id === saved.id)
+      ) {
+        // 原来的卷已经不在稿子里了。放回哪儿是一个**决定**，
+        // mock 不该猜（塞进第一个卷会凭空造出作者没写过的结构），
+        // 所以报错并让条目留在回收站里，跟没 splice 之前一模一样。
+        throw new MockError(
+          "CONFLICT",
+          "这一章原来的卷已不存在，无法决定把它恢复到哪儿",
+          true,
+        );
+      }
       trash.splice(index, 1);
+      deletedChapters.delete(trashDirName);
+      if (saved === undefined || chapters.some((c) => c.id === saved.id)) {
+        // 非章节条目（卷本身），或这一章已经在稿子里了
+        return;
+      }
+      chapters.push({ ...saved, sort: chaptersOf(saved.volumeId).length });
+      renumber(saved.volumeId);
     },
 
     purgeFromTrash(trashDirName) {
@@ -766,11 +801,14 @@ export function createMockBackend(): MockBackend {
         throw new MockError("NOT_FOUND", "回收站里没有这一条", true);
       }
       trash.splice(index, 1);
+      // 彻底删除就不再有机会恢复了，摘要跟着清，别让这张表无限长
+      deletedChapters.delete(trashDirName);
     },
 
     emptyTrash() {
       const n = trash.length;
       trash.length = 0;
+      deletedChapters.clear();
       return n;
     },
 

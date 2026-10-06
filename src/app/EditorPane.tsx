@@ -106,7 +106,6 @@ export function __cursorStore(): CursorStore {
  * 中间编辑区。
  */
 export function EditorPane(props: EditorPaneProps = {}): JSX.Element {
-  const [loading, setLoading] = createSignal(false);
   const [draft, setDraft] = createSignal("");
   const [dirty, setDirty] = createSignal(false);
   const [saveState, setSaveState] = createSignal<EditorSaveState>("idle");
@@ -190,6 +189,19 @@ export function EditorPane(props: EditorPaneProps = {}): JSX.Element {
   };
 
   /**
+   * 发起一次读章。effect 与「重新读取」按钮共用这一个入口。
+   *
+   * 这里**不再自己记 loading**：`loadChapterBody` 一进来就把
+   * `editing` 置成 `{ id, loading: true }`，那就是唯一可靠的读取状态 ——
+   * 面板自己再记一份会出现两个答案不一致的窗口（比如失败后）。
+   */
+  let attemptedChapterId: string | null = null;
+  const requestChapterLoad = (chapterId: string): void => {
+    attemptedChapterId = chapterId;
+    void loadChapterBody(chapterId);
+  };
+
+  /**
    * 选中哪一章，就读哪一章的正文。
    *
    * ## 为什么必须是 effect 而不是 onMount
@@ -207,16 +219,54 @@ export function EditorPane(props: EditorPaneProps = {}): JSX.Element {
    *
    * `loadChapterBody` 一进来就把 `editing` 置成 `{ id, loading: true }`，
    * 所以同一个章不会因 effect 重跑而被读两次；换章时 ID 不同，正好发起新的读。
+   *
+   * ## 为什么还要另外记 `attemptedChapterId`
+   *
+   * 读**失败**时 store 会把 `editing` 清成 `null`。只认 `editing` 的话，
+   * effect 立刻又会觉得「这章还没读」，于是再发一次请求 —— 失败得越快
+   * （文件被锁、路径不存在都是瞬时失败）重试就越密，等于对着磁盘打一个
+   * 无退避的死循环，界面上还永远停在「正在打开」。失败的那一章要由
+   * 作者按下「重新读取」再来，不是由我们自动轰炸。
    */
   createEffect(() => {
     const current = chapter();
-    if (current === null) return;
+    if (current === null) {
+      attemptedChapterId = null;
+      return;
+    }
     if (editingChapter()?.id === current.id) return;
-    setLoading(true);
-    void loadChapterBody(current.id).finally(() => setLoading(false));
+    if (attemptedChapterId === current.id) return;
+    requestChapterLoad(current.id);
   });
 
-  /** 把 loader 读回来的正文灌进编辑器。 */
+  /**
+   * 灌入新章正文。
+   *
+   * 用 `resetDocument` 而不是 `setValue`：换章要**连撤销历史一起换掉**。
+   * 留着上一章的历史，作者切过来后按一次 Ctrl+Z 就把上一章的正文灌进
+   * 这一章，紧接着自动保存会把它写进这一章的文件 —— 两章都坏。
+   */
+  const mountChapter = (chapterId: string, text: string): void => {
+    mountedChapterId = chapterId;
+    setDraft(text);
+    setDirty(false);
+    handle?.resetDocument(text);
+    restorePosition(chapterId, text);
+    // P4 的终点：正文已经在编辑器视图里了（见 workspace-store 的起点注释）
+    finishChapterOpen(chapterId);
+  };
+
+  /**
+   * 把 loader 读回来的正文灌进编辑器。
+   *
+   * ## 为什么读失败时必须清掉 `mountedChapterId`
+   *
+   * 失败后 `editing` 是 `null`，界面上标题已经换成新章、编辑器里却是
+   * 上一章的文档。留着旧 ID，自动保存就会把「在新章标题下打的字」
+   * 写进**上一章的文件**（`persist` 用的就是它）—— 一次读失败换来一次丢稿。
+   * 清成 `null` 之后 `persist` 直接返回，写不到任何文件上；
+   * 同时编辑器处于只读（见下面 `readOnly` 的判据），根本打不进字。
+   */
   createEffect(() => {
     const current = chapter();
     const editing = editingChapter();
@@ -224,9 +274,12 @@ export function EditorPane(props: EditorPaneProps = {}): JSX.Element {
       mountedChapterId = null;
       return;
     }
-    // 正文还没读回来（或在读别的章）时什么都别做
-    if (editing === null || editing.id !== current.id || editing.loading)
+    if (editing === null) {
+      mountedChapterId = null;
       return;
+    }
+    // 还在读（或在读别的章）时什么都别做
+    if (editing.id !== current.id || editing.loading) return;
 
     const next = editing.body;
 
@@ -238,13 +291,7 @@ export function EditorPane(props: EditorPaneProps = {}): JSX.Element {
       return;
     }
 
-    mountedChapterId = current.id;
-    setDraft(next);
-    setDirty(false);
-    handle?.setValue(next);
-    restorePosition(current.id, next);
-    // P4 的终点：正文已经在编辑器视图里了（见 workspace-store 的起点注释）
-    finishChapterOpen(current.id);
+    mountChapter(current.id, next);
   });
 
   /**
@@ -361,17 +408,21 @@ export function EditorPane(props: EditorPaneProps = {}): JSX.Element {
     rememberCursor(cursorStore, mountedChapterId, { ...saved, line });
   };
 
-  /** 编辑器就绪。 */
+  /**
+   * 编辑器就绪。
+   *
+   * 只有一种情况需要在这里补灌：编辑器挂载时正文**已经**读回来了
+   * （离开写作台再回来，store 里的 `editing` 还是这一章）。
+   * 走 `mountChapter` 而不是自己写一遍，是为了让 P4 的终点、
+   * dirty 清零与撤销历史归零这三件事只有一条实现路径。
+   */
   const handleReady = (editorHandle: EditorHandle): void => {
     handle = editorHandle;
     const current = chapter();
     if (current === null) return;
     const editing = editingChapter();
     if (editing !== null && editing.id === current.id && !editing.loading) {
-      mountedChapterId = current.id;
-      setDraft(editing.body);
-      editorHandle.setValue(editing.body);
-      restorePosition(current.id, editing.body);
+      mountChapter(current.id, editing.body);
     }
   };
 
@@ -405,6 +456,19 @@ export function EditorPane(props: EditorPaneProps = {}): JSX.Element {
     return editing.body;
   });
 
+  /**
+   * 编辑器里现在是**这一章**的正文了吗。
+   *
+   * 否有两种情形：还在读（转状态提示），以及读失败 / 读的是别的章
+   * （给「重新读取」）。两种情形编辑器都只读 —— 见下面 `readOnly` 的理由。
+   */
+  const ready = createMemo(() => {
+    const current = chapter();
+    if (current === null) return false;
+    const editing = editingChapter();
+    return editing !== null && editing.id === current.id && !editing.loading;
+  });
+
   return (
     <main
       class={["editor", focusModeClass()].filter(Boolean).join(" ")}
@@ -431,18 +495,43 @@ export function EditorPane(props: EditorPaneProps = {}): JSX.Element {
         {(current) => (
           <article class="editor__page">
             <h1 class="editor__title">{current().title}</h1>
-            <Show
-              when={!loading()}
-              fallback={<p class="editor__loading">{t("app.booting")}</p>}
-            >
-              <MarkdownEditor
-                initialValue={body()}
-                onChange={handleChange}
-                onUserEdit={handleUserEdit}
-                onScrollLine={handleScrollLine}
-                onReady={handleReady}
-                class="editor__cm"
-              />
+            {/*
+              编辑器**一直挂着**，读章期间置为只读。
+              用「卸载再重挂」表达「正在读」会在切章流程的中间销毁视图，
+              而上一次切章的光标记忆与保存都还要读它；每个章都重建一次
+              CodeMirror，代价直接落在 P4 的耗时上。
+              只读还挡掉另一件事：正文没到位时打字，字会落进
+              一个既不属于这章、也没地方保存的文档里。
+            */}
+            <MarkdownEditor
+              initialValue={body()}
+              readOnly={!ready()}
+              onChange={handleChange}
+              onUserEdit={handleUserEdit}
+              onScrollLine={handleScrollLine}
+              onReady={handleReady}
+              class="editor__cm"
+            />
+            <Show when={!ready()}>
+              <Show
+                when={editingChapter()?.loading ?? false}
+                fallback={
+                  <div class="editor__failed">
+                    <p role="alert">{t("editor.readFailed")}</p>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => requestChapterLoad(current().id)}
+                    >
+                      {t("editor.retry")}
+                    </Button>
+                  </div>
+                }
+              >
+                <p class="editor__loading" role="status">
+                  {t("editor.loading")}
+                </p>
+              </Show>
             </Show>
             <Show when={dirty()}>
               <p class="editor__hint" role="status">

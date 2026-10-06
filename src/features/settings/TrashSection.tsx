@@ -37,6 +37,7 @@ import {
 } from "@/features/library/time";
 import * as ipc from "@/lib/ipc";
 import type { TrashEntry } from "@/lib/ipc";
+import { reloadDocument } from "@/app/workspace-store";
 import { t } from "@/strings";
 
 /** 分区自己的加载状态，不复用工作区状态机：它的生命周期比工作区短得多。 */
@@ -152,9 +153,15 @@ export function TrashSection(): JSX.Element {
                             size="sm"
                             disabled={busy() !== null}
                             onClick={() =>
-                              void run(entry.trashDirName, () =>
-                                ipc.restoreFromTrash(entry.trashDirName),
-                              )
+                              void run(entry.trashDirName, async () => {
+                                await ipc.restoreFromTrash(entry.trashDirName);
+                                // 恢复的就是卷章树里的一个节点：不重读文档，
+                                // 那章在界面上仍然不存在，用户会以为没恢复成功，
+                                // 于是再恢复一次或在原地新建同名章。
+                                // reloadDocument 自己把失败记进 store 的错误态，
+                                // 不会 reject，所以这里可以直接 await。
+                                await reloadDocument();
+                              })
                             }
                           >
                             {t("settings.trash.restore")}
