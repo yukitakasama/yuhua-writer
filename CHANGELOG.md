@@ -12,6 +12,10 @@
 
 - Windows 默认目标改为 NSIS，多文件安装包不再默认生成 MSI。
 - 新增 pnpm package:windows，使用本机 7-Zip 生成包含独立应用目录和 xtensions/ 目录的 .7z / .zip 便携包；不生成单文件自解压 EXE。
+- **2026-10-10 22:03 用修复后的代码重跑 `pnpm exec tauri build`，产物 12,238,249 B = 11.67 MiB**：
+  与首包（12,232,587 B）差 **+5,662 B** —— 这就是数据路径修复轮（三条丢稿缺陷 +
+  关闭屏障 + 书级元数据）在安装包体积上的全部代价，P6 预算 25 MB 不受影响。
+  打包前的 `pnpm build`、`check:ipc`、`check:kit` 均在新产物上重跑通过。
 - **2026-10-07 首次端到端跑通 `pnpm exec tauri build` 并产出可安装的 NSIS 包**：
   `bundle/nsis/羽化写作_0.1.0-alpha.2_x64-setup.exe` 12,232,587 B = **11.67 MiB**，
   P6（≤ 25 MB）达标。这条打包链路此前从未在本机完整跑通过，所以这一步本身就是
