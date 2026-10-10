@@ -273,6 +273,13 @@ pnpm exec tauri build        # beforeBuildCommand 会先跑 vite build
 书级元数据 + 关闭屏障）在产物体积上的全部代价 —— 新增一个模块文件与一条命令的成本，
 量出来之后确认没有趋势风险，不需要为体积做任何裁剪。
 
+**两条只读核验**（都不需要安装，用来确认「装进包的是这一轮的代码」而不只是「打包成功」）：
+`target/release/yuhua-writer.exe` 的字节流里找得到 `update_book_meta`、
+`notify_flush_done` 与 `flush-and-close`（各一次）和 `CONFLICT`（八次）；
+前端产物 `dist/assets/*.js` 里找得到「本书信息」「未填写」
+「这一章在磁盘上被外部改过了」「以我的稿子为准」「改用磁盘上的版本」。
+**这只证明代码进了包，不证明装到机器上跑得对** —— 关闭屏障那条仍等真机（见 README 高优先级第 2 项）。
+
 **结论：达标（预算 25 MB）。** 原先记在「未采集项」里的
 「exe 已 14.57 MB，含字体子集后大概率会超」是**没有依据的预判**：
 NSIS 用 LZMA solid 压缩，把 15.3 MB 的 exe（其内部已经含 9.89 MB 的
