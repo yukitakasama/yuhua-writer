@@ -4,14 +4,28 @@
 格式遵循 [Keep a Changelog](https://keepachangelog.com/zh-CN/1.1.0/)，
 版本号遵循 [语义化版本](https://semver.org/lang/zh-CN/)。
 
-## [未发布]
+## [0.1.0-alpha.2] - 2026-10-10
+
+**首次公开发行**（2026-10-10 22:17）：GitHub Release
+<https://github.com/yukitakasama/yuhua-writer/releases/tag/v0.1.0-alpha.2>，
+标为 **prerelease**（版本号自己声明了是 alpha），资产
+`yuhua-writer_0.1.0-alpha.2_x64-setup.exe` 12,238,249 B，
+SHA-256 `8e63e537ba74900bd6d63f3f5b5820b0fca06a013177a80ec34eba347b343e4a`
+—— 该哈希是**从发布页把文件下载回来**算出来的，与本地构建产物逐字节一致，
+不是「上传成功」的回执。标签 `v0.1.0-alpha.2` 指向 `a842fbd`；
+二进制构建于 22:03，含到 `ad88867` 为止的全部代码，此后两个提交只改文档。
+下面每一条都是**本版本包含的内容**：本文件此前整体挂在「未发布」下，
+随首次发版收口，后续改动重新起一节。
+
+> 仍未做的一件事没变：**这个包没有被真正安装并运行过**（不在用户机器上装软件）。
+> 发布说明里也照这一条写了已知限制。
 
 ### 打包
 
 - 使用本机 Inno Setup 6.7.3 生成多文件安装包，安装后保留应用目录与 extensions/ 扩展目录。
 
 - Windows 默认目标改为 NSIS，多文件安装包不再默认生成 MSI。
-- 新增 pnpm package:windows，使用本机 7-Zip 生成包含独立应用目录和 xtensions/ 目录的 .7z / .zip 便携包；不生成单文件自解压 EXE。
+- 新增 pnpm package:windows，使用本机 7-Zip 生成包含独立应用目录和 extensions/ 目录的 .7z / .zip 便携包；不生成单文件自解压 EXE。
 - **2026-10-10 22:03 用修复后的代码重跑 `pnpm exec tauri build`，产物 12,238,249 B = 11.67 MiB**：
   与首包（12,232,587 B）差 **+5,662 B** —— 这就是数据路径修复轮（三条丢稿缺陷 +
   关闭屏障 + 书级元数据）在安装包体积上的全部代价，P6 预算 25 MB 不受影响。
@@ -22,6 +36,15 @@
   一次验证（结果是好的：一次就过，未改任何配置）。
   仍未做的一件事：**没有真正安装并运行过这个包**（不在用户机器上装软件），
   且 `webviewInstallMode = downloadBootstrapper` 意味着安装时需要联网取 WebView2 运行时。
+- **发布资产的文件名必须用 ASCII**：`gh release create` 传中文名产物时，
+  **上传成功但资产名被截掉前缀**（`羽化写作_0.1.0-alpha.2_x64-setup.exe` 变成
+  `_0.1.0-alpha.2_x64-setup.exe`），回执里看不出异常。已改成先 `cp` 一份
+  ASCII 名（`yuhua-writer_0.1.0-alpha.2_x64-setup.exe`，`certutil -hashfile SHA256`
+  核过与原件同哈希）再 `delete-asset` + `upload`。下次发版直接用 ASCII 名，
+  别指望 gh 这一版能保住 CJK 文件名（v2.96.0，且该版本 `upload` 没有改名开关）。
+- **发版是手工的，不是流水线**：`.github/workflows/ci.yml` 里没有任何发布作业或
+  tag 触发（只有 push 到 main 的门禁矩阵），所以 T10.6「发布流水线」仍未落地，
+  本次由 `git tag -a` + `gh release create --notes-file` 完成。
 
 ### 新增
 

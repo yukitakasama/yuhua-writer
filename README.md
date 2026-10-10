@@ -56,6 +56,17 @@
 
 ## 快速开始
 
+### 下载（不想自己构建）
+
+首个公开发行的安装包在
+[Releases · v0.1.0-alpha.2](https://github.com/yukitakasama/yuhua-writer/releases/tag/v0.1.0-alpha.2)：
+`yuhua-writer_0.1.0-alpha.2_x64-setup.exe`（Windows x64，NSIS，11.67 MiB）。
+安装不需要管理员权限；缺 WebView2 运行时时安装过程会联网下载它。
+
+两点请先知道：这是 **alpha**，且**该安装包没有在真机上安装运行验证过**
+（构建与字节层面已核验，界面行为只验到测试层）；稿子始终是你工作区目录里的普通
+`.md` 文件，随时可以换别的编辑器打开，不存在只有本软件能读的状态。
+
 ### 前置条件
 
 - **Node.js** ≥ 20 与 **pnpm** ≥ 9
@@ -215,4 +226,4 @@ pnpm package:windows
 pnpm package:windows:inno
 `
 
-产物位于 arget/release/bundle/inno/。安装包不会把应用压成单文件自解压 EXE；安装后保留正常目录结构，并包含 extensions/ 扩展目录。
+产物位于 target/release/bundle/inno/。安装包不会把应用压成单文件自解压 EXE；安装后保留正常目录结构，并包含 extensions/ 扩展目录。
