@@ -77,6 +77,20 @@ pub enum YuhuaError {
     /// 当前阶段尚未实现的功能（明确暴露，而不是静默返回空数据）。
     #[error("功能尚未实现：{0}")]
     Unimplemented(&'static str),
+
+    /// 我们读取之后，磁盘上的内容被外部改过（云盘同步 / 别的编辑器）。
+    ///
+    /// ## 为什么不塞进 `InvalidInput`
+    ///
+    /// 前端要**按码**给出出路。这条错误与「参数写错了」有本质区别：
+    /// 原样重发一次请求永远不会成功，只有作者能决定两个版本怎么合。
+    /// 混在 `INVALID_INPUT` 里，界面就只能弹一句提示，把作者堵在
+    /// 一条无法解除的冲突前。
+    #[error("这一章在磁盘上被外部改过（可能来自云盘同步或其它编辑器），本次保存已取消，磁盘上的内容没有被改动。")]
+    Conflict {
+        /// 被外部改过的文件路径。
+        path: PathBuf,
+    },
 }
 
 impl YuhuaError {
@@ -111,6 +125,7 @@ impl YuhuaError {
             Self::Database(_) => "DATABASE_ERROR",
             Self::Export(_) => "EXPORT_ERROR",
             Self::Unimplemented(_) => "UNIMPLEMENTED",
+            Self::Conflict { .. } => "CONFLICT",
         }
     }
 
@@ -118,7 +133,7 @@ impl YuhuaError {
     pub fn is_recoverable(&self) -> bool {
         matches!(
             self,
-            Self::InvalidInput(_) | Self::Io { .. } | Self::NotFound { .. }
+            Self::InvalidInput(_) | Self::Io { .. } | Self::NotFound { .. } | Self::Conflict { .. }
         )
     }
 }
@@ -139,6 +154,8 @@ impl Serialize for YuhuaError {
         let detail = match self {
             Self::Io { source, .. } => Some(source.to_string()),
             Self::Parse { message, .. } => Some(message.clone()),
+            // 冲突要能定位到具体文件：作者得知道是哪一章被云盘换了
+            Self::Conflict { path } => Some(path.display().to_string()),
             _ => None,
         };
         st.serialize_field("detail", &detail)?;
@@ -173,5 +190,22 @@ mod tests {
     #[test]
     fn unimplemented_is_not_recoverable() {
         assert!(!YuhuaError::Unimplemented("pdf").is_recoverable());
+    }
+
+    #[test]
+    fn conflict_has_its_own_code_and_points_at_the_file() {
+        // 前端靠这个码给出「以我的稿子为准 / 改用磁盘版本」两个出口，
+        // 混进 INVALID_INPUT 就只剩一句提示，作者被堵在解不开的冲突前
+        let e = YuhuaError::Conflict {
+            path: PathBuf::from("D:/ws/manuscript/甲卷/001-第一章.md"),
+        };
+        let json = serde_json::to_value(&e).unwrap();
+        assert_eq!(json["code"], "CONFLICT");
+        assert_eq!(json["recoverable"], true);
+        assert!(json["detail"].as_str().unwrap().contains("001-第一章.md"));
+        assert!(
+            e.to_string().contains("本次保存已取消"),
+            "文案要说清「没有覆盖任何东西」，got {e}"
+        );
     }
 }

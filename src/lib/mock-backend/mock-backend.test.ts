@@ -282,9 +282,57 @@ describe("读取与保存正文", () => {
       backend.saveChapter(first.id, "不该被写入", "过期的哈希");
       expect.unreachable("应当拒绝");
     } catch (err) {
-      expect((err as MockError).error.code).toBe("INVARIANT_VIOLATION");
-      expect((err as MockError).error.message).toContain("外部修改");
+      // 必须是 CONFLICT：前端按这个码给「以我的稿子为准 / 改用磁盘版本」
+      // 两个出口，换成笼统的码就只剩一句提示
+      expect((err as MockError).error.code).toBe("CONFLICT");
+      expect((err as MockError).error.message).toContain("被外部改过");
     }
+  });
+
+  /**
+   * 这条钉的是 mock 与真实后端**同源**的那个不变量。
+   *
+   * 真实后端曾在 `read_chapter` 里把磁盘正文配上内存旧哈希，于是外部
+   * 改过一次盘之后这一章永远存不下去；mock 的哈希一直与正文同源，
+   * 所以结构上照不出来（`commands.rs` 的
+   * `external_edit_leaves_the_chapter_saveable` 才是那一半的证据）。
+   * 这里把同源这件事本身钉住，顺手保证 mock 不会退化成「永远自洽」。
+   */
+  it("外部改动之后重新读取，拿新哈希保存能通过", () => {
+    const first = allChapters()[0];
+    if (!first) throw new Error("没有章节");
+    const stale = backend.readChapter(first.id).contentHash;
+
+    backend.__simulateExternalEdit(first.id, "云盘从另一台设备同步来的版本");
+
+    const reread = backend.readChapter(first.id);
+    expect(reread.body).toBe("云盘从另一台设备同步来的版本");
+    expect(reread.contentHash).not.toBe(stale);
+    // 旧基线仍要被拒（说明确实是「外部改了」而不是「什么都没发生」）
+    expect(() =>
+      backend.saveChapter(first.id, "不该被写入", stale),
+    ).toThrowError();
+    // 新基线必须放行 —— 否则这一章就再也存不下去了
+    expect(
+      backend.saveChapter(first.id, "作者接着写的一段", reread.contentHash)
+        .body,
+    ).toBe("作者接着写的一段");
+  });
+
+  it("force 保存跳过并发检查，把本地稿写进去", () => {
+    const first = allChapters()[0];
+    if (!first) throw new Error("没有章节");
+    const stale = backend.readChapter(first.id).contentHash;
+    backend.__simulateExternalEdit(first.id, "云盘同步下来的版本");
+
+    const saved = backend.saveChapter(
+      first.id,
+      "作者拍板：以我的稿子为准",
+      stale,
+      true,
+    );
+    expect(saved.body).toBe("作者拍板：以我的稿子为准");
+    expect(backend.readChapter(first.id).body).toBe("作者拍板：以我的稿子为准");
   });
 
   it("拒绝后正文保持原样，没有被静默覆盖", () => {

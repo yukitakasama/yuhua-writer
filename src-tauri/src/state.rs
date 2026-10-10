@@ -127,6 +127,19 @@ impl WorkspaceSession {
         &self.workspace
     }
 
+    /// 写入书级元数据（作者 / 简介）。
+    ///
+    /// 与 [`Self::save_volumes`] 一样是「落盘 + 同步会话内那份配置」，
+    /// 差别只在这里没有卷清单要保目录名，因此直接透传给
+    /// [`Workspace::save_book_meta`]。
+    pub fn save_book_meta(
+        &mut self,
+        author: &str,
+        description: &str,
+    ) -> Result<(String, String), CommandError> {
+        Ok(self.workspace.save_book_meta(author, description)?)
+    }
+
     /// 把当前文稿的卷清单写入 `workspace.json`。
     ///
     /// ## 为什么 `dir_name` 要**沿用**配置里的旧值，而不是现算

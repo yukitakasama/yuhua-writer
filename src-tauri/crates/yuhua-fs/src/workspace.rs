@@ -77,6 +77,17 @@ pub struct WorkspaceConfig {
     /// 书名（冗余存储，便于不解析 manuscript 就能显示）。
     #[serde(default)]
     pub title: String,
+    /// 作者名。导出时进 EPUB 的 `<dc:creator>`、DOCX 的核心属性与
+    /// HTML 的 `<meta name="author">`；空白在导出层回退成「佚名」。
+    ///
+    /// `#[serde(default)]` 不能省，理由与下面的 `volumes` 完全相同：
+    /// 缺这个字段会让旧的 `workspace.json` **整个解析失败**，
+    /// 用户的工作区直接打不开。
+    #[serde(default)]
+    pub author: String,
+    /// 一句话简介（与 `author` 同一条约定）。
+    #[serde(default)]
+    pub description: String,
     /// 卷清单。
     ///
     /// 空表示这是一个**尚未记录卷信息的旧工作区**，由扫描流程
@@ -99,6 +110,10 @@ impl WorkspaceConfig {
             created: now,
             last_opened: Some(now),
             title: title.into(),
+            // 作者与简介留空：它们是「这本书是谁写的」，
+            // 只有作者本人能填，新建时凭空写一个名字反而是伪造。
+            author: String::new(),
+            description: String::new(),
             // 新工作区还没有卷：第一条卷由 scan 的兜底逻辑产出。
             // 这里刻意不放一个默认卷 —— 磁盘上稿件目录的真实内容是
             // 唯一权威，配置里凭空写一个「第一卷」会让首次扫描产生
@@ -127,6 +142,10 @@ pub struct WorkspaceSummary {
     pub workspace_id: String,
     /// 书名。
     pub title: String,
+    /// 作者名（空串表示还没填过；导出层会回退成「佚名」）。
+    pub author: String,
+    /// 一句话简介。
+    pub description: String,
     /// 创建时间。
     pub created: DateTime<FixedOffset>,
     /// 最近打开时间。
@@ -268,6 +287,8 @@ impl Workspace {
                 } else {
                     cfg.title
                 },
+                author: cfg.author,
+                description: cfg.description,
                 created: cfg.created,
                 last_opened: cfg.last_opened,
                 available,
@@ -276,6 +297,8 @@ impl Workspace {
                 root: root.to_path_buf(),
                 workspace_id: String::new(),
                 title: derive_title_from_path(root),
+                author: String::new(),
+                description: String::new(),
                 created: now_local(),
                 last_opened: None,
                 available: false,
@@ -365,6 +388,34 @@ impl Workspace {
         // 制造出内存与磁盘不一致的窗口
         self.config.volumes = config.volumes;
         Ok(())
+    }
+
+    /// 写入书级元数据（作者 / 简介）。
+    ///
+    /// ## 为什么又是「先重读磁盘配置，再整份写回」
+    ///
+    /// 与 [`Self::save_volumes`] 同一条纪律：`self.config` 是打开那一刻的快照，
+    /// 而工作区按设计要放进云盘或 Git —— 直接拿它覆写，会把这一轮之外
+    /// 写进去的卷清单丢掉。写盘成功之后才改内存，反过来会留下
+    /// 「内存已变、磁盘没变」的窗口。
+    ///
+    /// ## 为什么在这里 trim
+    ///
+    /// 作者名是要印进交稿件封面的字段，前后空格会被 Word 与阅读器
+    /// 原样显示。全空保留成空串即可：导出层据此回退成「佚名」，
+    /// 不该存下一个看起来有、实际全是空格的值。
+    pub fn save_book_meta(&mut self, author: &str, description: &str) -> Result<(String, String)> {
+        let mut config = std::fs::read_to_string(self.layout.config_path())
+            .ok()
+            .and_then(|t| serde_json::from_str::<WorkspaceConfig>(&t).ok())
+            .unwrap_or_else(|| self.config.clone());
+        config.author = author.trim().to_string();
+        config.description = description.trim().to_string();
+        write_config(&self.layout, &config)?;
+        let stored = (config.author.clone(), config.description.clone());
+        self.config.author = config.author;
+        self.config.description = config.description;
+        Ok(stored)
     }
 }
 

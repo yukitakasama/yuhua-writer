@@ -76,6 +76,14 @@ export interface MockBackend {
   openWorkspace(root: string): OpenWorkspaceResult;
   closeWorkspace(): void;
   hasWorkspace(): boolean;
+  /**
+   * 关闭屏障的应答（见 ipc.notifyFlushDone）。
+   *
+   * 空操作：拦下关闭的是 Tauri 的窗口事件，而浏览器降级里没有窗口可拦。
+   * 这个占位存在的意义是让「每条前端命令都有对应 mock 实现」这条守卫
+   * 继续成立（`node scripts/check-ipc.mjs`），不要在实现里伪造行为。
+   */
+  notifyFlushDone(): void;
   createVolume(input: CreateVolumeInput): OutlineNode[];
   renameVolume(volumeId: string, title: string): OutlineNode[];
   deleteVolume(volumeId: string): OutlineNode[];
@@ -87,7 +95,12 @@ export interface MockBackend {
     chapterId: string,
     body: string,
     expectedHash?: string,
+    force?: boolean,
   ): ChapterContent;
+  /** 更新书级元数据（作者 / 简介），返回新的摘要。见实现处的说明。 */
+  updateBookMeta(author: string, description: string): WorkspaceSummary;
+  /** 测试钩子：模拟云盘在背后改掉了某一章（见实现处的说明）。 */
+  __simulateExternalEdit(chapterId: string, body: string): void;
   updateChapterMeta(input: UpdateChapterMetaInput): void;
   renameChapter(chapterId: string, title: string): OutlineNode[];
   setChapterStatus(chapterId: string, status: ChapterStatus): void;
@@ -131,6 +144,22 @@ function nextId(prefix: string): string {
   return mockId(prefix, idCounter + 100);
 }
 
+/**
+ * 正文哈希（乐观并发检测的基线）。
+ *
+ * ## 为什么是 body 的纯函数，而不是单独存一张表
+ *
+ * 真实后端的哈希就是对**磁盘正文**算出来的。存一张表会引入一个真实
+ * 后端不存在的自由度 —— 「正文变了而哈希没变」在 mock 里根本发生不了，
+ * 于是外部修改冲突这条链路在浏览器开发路径上永远测不到。
+ * 这也正是真实实现曾经踩过的坑：读章把磁盘正文配上内存里的旧哈希，
+ * 冲突从此解不开。
+ */
+function hashOf(body: string): string {
+  if (body === "") return "empty";
+  return `hash-${body.length}-${body.charCodeAt(0)}`;
+}
+
 /** 创建一份内存中的示例工作区。 */
 export function createMockBackend(): MockBackend {
   const seed = buildSeedData();
@@ -140,8 +169,6 @@ export function createMockBackend(): MockBackend {
   // 正文与摘要分开存：这是 IPC 契约的形状，mock 也照做，
   // 否则前端会在不知不觉中依赖"列表里有正文"这个错误假设
   const bodies = new Map<string, string>(seed.bodies);
-  /** 每章的正文哈希，用于乐观并发检测。 */
-  const hashes = new Map<string, string>();
   const trash: TrashEntry[] = [];
   /**
    * 被删掉的章的完整摘要，按 `trashDirName` 存着，供恢复时放回原来的卷。
@@ -154,10 +181,12 @@ export function createMockBackend(): MockBackend {
   const deletedChapters = new Map<string, ChapterSummary>();
   /** 作者便签，刻意不放进摘要（见 updateChapterMeta 的说明）。 */
   const notes = new Map<string, string>();
-  for (const [id, body] of bodies) hashes.set(id, `hash-${body.length}`);
 
   /** 默认工作区根路径。用绝对路径形状，方便 UI 展示路径截断逻辑。 */
   const defaultRoot = "C:/Users/示例/Documents/羽化录";
+
+  /** 当前「已打开」的根路径。真实后端从会话里拿，mock 只能自己记一份。 */
+  let openedRoot = defaultRoot;
 
   /** 最近打开列表：一条可用、一条已失效，覆盖 UI 的两种状态。 */
   const recents: WorkspaceSummary[] = [
@@ -165,6 +194,8 @@ export function createMockBackend(): MockBackend {
       root: defaultRoot,
       workspaceId: "ws-demo-0001",
       title: book.title,
+      author: book.author,
+      description: book.description,
       created: book.created,
       lastOpened: book.updated,
       available: true,
@@ -173,6 +204,9 @@ export function createMockBackend(): MockBackend {
       root: "D:/素材/旧稿/未完成的小说",
       workspaceId: "ws-demo-0002",
       title: "旧稿",
+      // 失效条目也要有这两个字段：界面对 unavailable 的项同样会读署名
+      author: "",
+      description: "",
       created: mockTime(-60),
       lastOpened: mockTime(-30),
       available: false,
@@ -313,6 +347,10 @@ export function createMockBackend(): MockBackend {
         workspaceId:
           recents.find((r) => r.root === root)?.workspaceId ?? "ws-demo-0000",
         title: doc.book.title,
+        // 与真实后端同一个来源：摘要里的署名取自这份书级元数据，
+        // 前端 `documentFromOpenResult` 再把它填进 `book.author`
+        author: doc.book.author,
+        description: doc.book.description,
         created: doc.book.created,
         lastOpened: doc.book.updated,
         available: true,
@@ -358,6 +396,7 @@ export function createMockBackend(): MockBackend {
     },
 
     createWorkspace(root, title) {
+      openedRoot = root;
       const name = requireTitle(title, "书名");
       book.title = name;
       book.created = mockTime(0);
@@ -376,6 +415,8 @@ export function createMockBackend(): MockBackend {
         root,
         workspaceId: `ws-${idCounter}`,
         title: name,
+        author: book.author,
+        description: book.description,
         created: book.created,
         lastOpened: book.updated,
         available: true,
@@ -384,6 +425,7 @@ export function createMockBackend(): MockBackend {
     },
 
     openWorkspace(root) {
+      openedRoot = root;
       const known = recents.find((r) => r.root === root);
       if (known && !known.available) {
         throw new MockError(
@@ -401,6 +443,38 @@ export function createMockBackend(): MockBackend {
 
     hasWorkspace() {
       return true;
+    },
+
+    /**
+     * 更新书级元数据（作者 / 简介），对应 Rust 的 `update_book_meta`。
+     *
+     * 与真实后端同形的三点：都写进「这本书」而不是这一次导出；
+     * 都 trim（空格不该印上封面）；都会立刻反映到随后每次
+     * `openWorkspace` 交回的摘要里（前端据此刷新 `book.author`）。
+     */
+    updateBookMeta(author, description) {
+      book.author = author.trim();
+      book.description = description.trim();
+      book.updated = mockTime(0);
+      const entry = recents.find((r) => r.root === openedRoot);
+      if (entry !== undefined) {
+        entry.author = book.author;
+        entry.description = book.description;
+      }
+      return {
+        root: openedRoot,
+        workspaceId: entry?.workspaceId ?? "ws-demo-0000",
+        title: book.title,
+        author: book.author,
+        description: book.description,
+        created: book.created,
+        lastOpened: book.updated,
+        available: true,
+      };
+    },
+
+    notifyFlushDone() {
+      /* 见接口处的说明：浏览器降级里没有窗口可放行 */
     },
 
     createVolume(input) {
@@ -535,7 +609,6 @@ export function createMockBackend(): MockBackend {
       summary.path = chapterPath(volume, summary.sort, summary.title);
       // 正文可以为空，但必须在表里占位，否则 readChapter 会误判为"文件不存在"
       bodies.set(summary.id, "");
-      hashes.set(summary.id, "empty");
       return outlineSnapshot();
     },
 
@@ -584,25 +657,28 @@ export function createMockBackend(): MockBackend {
         body,
         words: countWords(body),
         mtime: Date.now(),
-        contentHash: hashes.get(chapterId) ?? "empty",
+        // 哈希必须与 body 同源：前端拿它当作下一次保存的基线
+        contentHash: hashOf(body),
       };
     },
 
-    saveChapter(chapterId, body, expectedHash) {
+    saveChapter(chapterId, body, expectedHash, force) {
       const found = requireChapter(chapterId);
-      const current = hashes.get(chapterId) ?? "empty";
+      const current = hashOf(bodies.get(chapterId) ?? "");
       // 乐观并发：哈希对不上说明文件在编辑期间被外部改过，
-      // 这里必须拒绝而不是覆盖（计划书 4.5 节「绝不静默覆盖」）
-      if (expectedHash !== undefined && expectedHash !== current) {
+      // 这里必须拒绝而不是覆盖（计划书 4.5 节「绝不静默覆盖」）。
+      // `undefined` 与 `""` 都是调用方在说「我不做并发控制」，
+      // 与真实后端的 `check_no_external_conflict` 保持同一套语义。
+      const guarded = expectedHash !== undefined && expectedHash !== "";
+      if (guarded && !force && expectedHash !== current) {
         throw new MockError(
-          "INVARIANT_VIOLATION",
-          "这一章在磁盘上已被外部修改，为避免覆盖你的稿子，保存已取消。",
+          "CONFLICT",
+          "这一章在磁盘上被外部改过（可能来自云盘同步或其它编辑器），本次保存已取消，磁盘上的内容没有被改动。",
           true,
         );
       }
       bodies.set(chapterId, body);
-      const next = `hash-${body.length}-${body.charCodeAt(0) || 0}`;
-      hashes.set(chapterId, next);
+      const next = hashOf(body);
       recount(found, body);
       found.updated = mockTime(0);
       return {
@@ -613,6 +689,17 @@ export function createMockBackend(): MockBackend {
         mtime: Date.now(),
         contentHash: next,
       };
+    },
+
+    /**
+     * 模拟「云盘在背后把这一章换成了另一台设备的版本」。
+     *
+     * 只改正文、不通知任何人 —— 这正是真实故障的形状：前端手里的
+     * 基线哈希因此成了旧值，下一次保存必须被拒（错误码 `CONFLICT`）。
+     */
+    __simulateExternalEdit(chapterId, body) {
+      requireChapter(chapterId);
+      bodies.set(chapterId, body);
     },
 
     updateChapterMeta(input) {

@@ -65,6 +65,7 @@ impl CommandError {
         match self {
             Self::Domain(YuhuaError::Io { source, .. }) => Some(source.to_string()),
             Self::Domain(YuhuaError::Parse { message, .. }) => Some(message.clone()),
+            Self::Domain(YuhuaError::Conflict { path }) => Some(path.display().to_string()),
             Self::Internal(m) => Some(m.clone()),
             _ => None,
         }

@@ -137,14 +137,13 @@ export async function refreshRecents(): Promise<void> {
  * 卷列表从大纲里取：`OutlineNode` 已经带了 `volumeId/title/sort`，
  * 不额外发 `get_volumes` 之类的命令（那种命令不存在，也不该为它存在）。
  *
- * ## ⚠️ 已知缺口：`book` 的元数据在 open 路径上不可得
+ * ## 作者与简介从摘要来
  *
- * `WorkspaceSummary` 只有 `title`，没有作者 / 简介 / 书级更新时间。
- * 这里用一个**最小占位**：`id` 取 `workspaceId`、`title` 取书名，其余空串。
- * **绝不伪造**作者或简介 —— 界面上显示一个假作者名比显示空白更糟。
- *
- * 要真正填上这条缺口，需要后端新增一条返回书级元数据的命令
- * （或在 `OpenResult` 上加字段）。本次修复刻意不扩契约。
+ * `WorkspaceSummary` 带 `author` / `description`（后端存在
+ * `.yuhua/workspace.json`），所以打开工作区时署名是**读回来的**，不是伪造的。
+ * 空串表示这本书还没填过 —— 界面据此显示空输入框，而不是显示「佚名」这类
+ * 占位名字：显示一个假作者名比显示空白更糟。填的入口在导出面板
+ * （{@link saveBookMeta}），展示的地方在右侧「本书信息」。
  *
  * ## 为什么抽成纯函数
  *
@@ -173,8 +172,8 @@ export function documentFromOpenResult(
     book: {
       id: workspace.workspaceId,
       title: workspace.title,
-      author: "",
-      description: "",
+      author: workspace.author,
+      description: workspace.description,
       created: workspace.created,
       updated: workspace.lastOpened ?? workspace.created,
     },
@@ -245,6 +244,11 @@ export function clearError(): void {
 /** 重置为初始状态（测试用）。 */
 export function __resetWorkspaceState(): void {
   resetEditingState();
+  // 选中项同样是模块级的：漏清它，下一个用例会带着上一个用例选中的那一章
+  // 去挂载，编辑器一挂上就自己去读那一章 —— 读请求发生在用例设置桩**之前**，
+  // 于是拿到 undefined 正文、界面上冒出「这一章的正文没能打开」，
+  // 而用例本身看起来像是被测出了冲突。串味的用例比失败的用例更难查。
+  setSelectedChapterId(null);
   setState(initialState());
 }
 
@@ -566,6 +570,25 @@ const [editing, setEditing] = createSignal<EditingChapter | null>(null);
 export { editing as editingChapter };
 
 /**
+ * 保存被判定为「外部修改冲突」的章 ID（没有冲突时为 `null`）。
+ *
+ * ## 为什么要单独记一个信号
+ *
+ * 冲突与其它保存失败的**出路不同**：原样重试永远不会成功，只有作者
+ * 能决定两个版本怎么合。界面据此给出「以我的稿子为准 / 改用磁盘版本」
+ * 两个按钮 —— 而这两个按钮出现在一次普通的磁盘写失败上就是误导。
+ *
+ * ## 为什么不能靠 `state.error.code` 判断
+ *
+ * 那个字段是**全局唯一**的一份：作者在冲突之后点了别的操作（新建卷、
+ * 重命名），它就被换掉了，而冲突本身还在 —— 这一章依然存不下去。
+ * 出路必须挂在「哪一章冲突了」上，而不是「最后一次错误是什么」。
+ */
+const [conflictedId, setConflictedId] = createSignal<string | null>(null);
+
+export { conflictedId as conflictedChapterId };
+
+/**
  * 每章「最后一次已知内容哈希」的账本，章 ID → 哈希。
  *
  * ## 为什么不能只靠 `editing()` 里的 hash
@@ -607,6 +630,7 @@ function pruneKnownHashes(): void {
 function resetEditingState(): void {
   knownHashes.clear();
   setEditing(null);
+  setConflictedId(null);
   // 卷的展开选择同样是**按工作区**有效的：卷 ID 是这本书专属的 ULID，
   // 留着上一本的选择只会让这张表无限增长，并在新书里凭空命中同名旧键。
   __resetTreeUi();
@@ -629,6 +653,9 @@ export async function loadChapterBody(chapterId: string): Promise<void> {
   // 编辑器视图的那一刻 —— 只有 CodeMirror 拿到文档才算「打开完成」，
   // 在 IPC 返回处收工会把渲染耗时漏掉，而那一半才是用户感到的卡。
   startChapterOpen(chapterId);
+  // 重读一次就是重新取一份基线：上一次读到的内容已经被这次覆盖，
+  // 那条「外部改过」的冲突也跟着作废（出路之一就是「改用磁盘版本」）
+  if (conflictedId() === chapterId) setConflictedId(null);
   setEditing({ id: chapterId, body: "", hash: "", loading: true });
   try {
     const content: ChapterContent = await ipc.readChapter(chapterId);
@@ -647,24 +674,50 @@ export async function loadChapterBody(chapterId: string): Promise<void> {
   }
 }
 
-/** 保存当前编辑的正文。 */
+/** {@link saveChapterBody} 的可选参数。 */
+export interface SaveOptions {
+  /**
+   * 以编辑器里的稿子为准，跳过乐观并发检查直接写。
+   *
+   * 只应由作者在冲突提示上明确点选，绝不自动设置 ——
+   * 后端会先把磁盘上的当前版本无条件存进备份再覆盖，
+   * 但那终究是「作者拍板丢掉一个版本」，不能由代码替他拍。
+   */
+  force?: boolean;
+}
+
+/** 保存当前编辑的正文。返回是否写入成功。 */
 export async function saveChapterBody(
   chapterId: string,
   body: string,
+  options: SaveOptions = {},
 ): Promise<boolean> {
   // 从账本取，不从 `editing()` 取：切章后 `editing()` 已是新章，
   // 而这次保存属于旧章（理由见 knownHashes 的说明）。
   // 账本里没有（如刚新建、尚未读回）时传 undefined，由后端按既有语义放行。
   const expected = knownHashes.get(chapterId);
   try {
-    const content = await ipc.saveChapter(chapterId, body, expected);
+    const content = await ipc.saveChapter(
+      chapterId,
+      body,
+      expected,
+      options.force,
+    );
     knownHashes.set(chapterId, content.contentHash);
-    setEditing({
-      id: chapterId,
-      body: content.body,
-      hash: content.contentHash,
-      loading: false,
-    });
+    setConflictedId(null);
+    // 只有 `editing` 还指着这一章时才回写。
+    //
+    // 切章会 flush 上一章，那次保存是异步的：等它落地时作者已经在看
+    // 新章了，照写会把 `editing` 换成上一章 —— 于是界面对着一个刚打开、
+    // 正文明明就在眼前的章说「没能打开」，编辑器还被置成只读，打不进字。
+    if (editing()?.id === chapterId) {
+      setEditing({
+        id: chapterId,
+        body: content.body,
+        hash: content.contentHash,
+        loading: false,
+      });
+    }
     // 字数变了，摘要里的数值要同步刷新
     setState(
       "document",
@@ -674,6 +727,45 @@ export async function saveChapterBody(
         c.wordCount = content.words.withoutPunctuation;
       }),
     );
+    return true;
+  } catch (err) {
+    const error = ipc.toFailure(err).error;
+    if (error.code === ipc.ERROR_CODES.conflict) setConflictedId(chapterId);
+    setState("error", error);
+    return false;
+  }
+}
+
+// ---------------------------------------------------------------------------
+// 书级元数据
+// ---------------------------------------------------------------------------
+
+/**
+ * 写回作者与简介。返回是否写入成功。
+ *
+ * ## 为什么以返回值而不是内存为准
+ *
+ * 后端 `update_book_meta` 先写 `workspace.json` 再改内存文稿，返回的是
+ * **磁盘上真正存下的那一份**（已 trim）。这里用返回值刷新 `document.book`，
+ * 于是「界面上显示的作者」与「文件里存着的作者」在任何时刻都是同一个：
+ * 写失败时一个都不动，写成功时两个一起动。反过来先改内存就会造出一个窗口 ——
+ * 界面已经是新署名，导出交出去的还是旧署名，而作者以为填好了。
+ *
+ * 顺序纪律与本文件其它写路径一致（见 {@link saveChapterBody}）。
+ */
+export async function saveBookMeta(
+  author: string,
+  description: string,
+): Promise<boolean> {
+  try {
+    const summary = await ipc.updateBookMeta(author, description);
+    if (state.document !== null) {
+      setState("document", "book", {
+        ...state.document.book,
+        author: summary.author,
+        description: summary.description,
+      });
+    }
     return true;
   } catch (err) {
     setState("error", ipc.toFailure(err).error);

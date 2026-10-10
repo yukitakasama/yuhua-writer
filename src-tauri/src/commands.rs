@@ -214,12 +214,84 @@ pub fn has_workspace(state: State<'_, AppState>) -> bool {
     state.has_session()
 }
 
+/// 关闭屏障的应答：前端已经把在途的稿子刷到磁盘，放行那次关闭。
+///
+/// ## 为什么由前端来调
+///
+/// 只有前端知道防抖里还有没有货，而 `flushNow()` 是它唯一能等的 promise。
+/// Rust 侧看不到「这次改动值不值得等」。
+///
+/// ## 为什么刷盘失败也要调
+///
+/// 前端把调用放在 `finally` 里。落盘失败时继续拦着关闭，只会把作者困在
+/// 一个关不掉的窗口里 —— 那时他要保存的稿子已经由错误提示报出了，
+/// 窗口必须还能关掉。
+///
+/// 状态机与超时兜底见 [`crate::closing`]。
+#[tauri::command]
+pub fn notify_flush_done(window: tauri::Window) -> CmdResult<()> {
+    use tauri::Manager;
+    let barrier = window.state::<crate::closing::CloseBarrier>();
+    // `release()` 只在前端与超时之间先到者返回 true：窗口只能被关掉一次
+    if barrier.release() {
+        window
+            .close()
+            .map_err(|e| CommandError::internal(format!("关闭窗口失败：{e}")))?;
+    }
+    Ok(())
+}
+
 /// 读取指定目录中的工作区信息（用于「打开」对话框的即时校验）。
 ///
 /// 不需要 \`State\`：这是纯磁盘检查，未打开工作区时也要能用。
 #[tauri::command]
 pub fn inspect_workspace(path: String) -> WorkspaceSummary {
     yuhua_fs::workspace::Workspace::summarize(std::path::Path::new(&path))
+}
+
+/// 更新书级元数据（作者 / 简介），返回新的摘要。
+///
+/// 计划书 7.5.4 与 T7.14 要的「导出前能填作者」落在这条命令上：
+/// 作者是**这本书**的属性，不是某一次导出的参数，所以存进工作区配置 ——
+/// 在导出面板里填，填完就记住。
+#[tauri::command]
+pub fn update_book_meta(
+    state: State<'_, AppState>,
+    author: String,
+    description: String,
+) -> CmdResult<WorkspaceSummary> {
+    update_book_meta_impl(&state, author, description)
+}
+
+/// [`update_book_meta`] 的实现（不含 Tauri 外壳，便于测试）。
+///
+/// ## 为什么既要写盘又要改内存
+///
+/// 导出装配读的是**内存文稿**里的 \`book.author\`（\`scope::assemble_with\`
+/// 拿它建 \`BookMeta\`）。只写盘，作者填完名字立刻导出，成品里还是「佚名」；
+/// 只改内存，下次打开又是空的。
+///
+/// 顺序是**先盘后内存**：落盘失败就地报错、内存不动，界面与磁盘不会
+/// 各说各话（与 \`save_volumes\` 同一条纪律）。
+fn update_book_meta_impl(
+    state: &AppState,
+    author: String,
+    description: String,
+) -> CmdResult<WorkspaceSummary> {
+    let s = session(state)?;
+    // 先落盘。取出来再 `?`：直接写在末尾表达式上会让临时守卫比 `s` 活得久。
+    let (stored_author, stored_description) =
+        lock_session(&s)?.save_book_meta(&author, &description)?;
+
+    state.with_document_mut(|doc| {
+        doc.book.author = stored_author.clone();
+        doc.book.description = stored_description.clone();
+        Ok(())
+    })?;
+
+    // 摘要从磁盘读：它是这次写入的既成事实，也让最近列表立刻带上新署名
+    let guard = lock_session(&s)?;
+    Ok(yuhua_fs::workspace::Workspace::summarize(guard.root()))
 }
 
 // ============================================================================
@@ -681,11 +753,17 @@ pub struct ChapterContent {
 
 /// 读取章节正文。
 ///
-/// 正文取自**磁盘文件**而非内存文稿：内存里的 \`Chapter.body\` 已被扫描
-/// 流程刻意丢弃（见 \`scan\` 模块），磁盘才是真源。
+/// 正文取自**磁盘文件**：磁盘才是真源。内存文稿里也带着一份 \`Chapter.body\`
+/// （扫描时留下的，见 \`scan\` 模块），但它只在保存成功时更新 ——
+/// 作者在外面改过文件之后它是旧的，读章不能拿它糊弄作者。
 #[tauri::command]
 pub fn read_chapter(state: State<'_, AppState>, chapter_id: String) -> CmdResult<ChapterContent> {
-    let s = session(&state)?;
+    read_chapter_impl(&state, chapter_id)
+}
+
+/// [`read_chapter`] 的实现（不含 Tauri 外壳，便于测试）。
+fn read_chapter_impl(state: &AppState, chapter_id: String) -> CmdResult<ChapterContent> {
+    let s = session(state)?;
     let cid = ChapterId::parse(chapter_id)
         .map_err(|e| CommandError::Domain(yuhua_core::YuhuaError::InvalidInput(e)))?;
 
@@ -704,10 +782,16 @@ pub fn read_chapter(state: State<'_, AppState>, chapter_id: String) -> CmdResult
     Ok(ChapterContent {
         id: cid.to_string(),
         title: cf.meta.title,
+        // 哈希必须与 body **同源**：两个字段都来自刚刚读到的磁盘内容。
+        //
+        // 这里曾经是 `chapter.content_hash`（内存里的旧值）。前端把这个
+        // 字段当作下一次保存的并发基线，于是文件被外部改过一次之后，
+        // 基线就永远解不开：每次保存都被判为冲突，而唯一的出路
+        // 「重新读取」又给出同一个错基线 —— 这一章从此存不下去。
+        content_hash: yuhua_store::index::content_hash(&cf.body),
         body: cf.body,
         words,
         mtime: chapter.mtime,
-        content_hash: chapter.content_hash.clone(),
     })
 }
 
@@ -728,7 +812,7 @@ pub fn read_chapter(state: State<'_, AppState>, chapter_id: String) -> CmdResult
 /// | --- | --- |
 /// | `None` / `""` | 无条件放行（向后兼容：调用方没做并发控制时的既有行为） |
 /// | 非空且与磁盘一致 | 放行 |
-/// | 非空且与磁盘不一致 | 拒绝 —— 文件被外部改过 |
+/// | 非空且与磁盘不一致 | 拒绝 —— [`YuhuaError::Conflict`]，文件被外部改过 |
 /// | 非空但**读不出磁盘** | 拒绝 —— 见下面「为什么读失败不能放行」 |
 ///
 /// ## 为什么读失败不能放行
@@ -737,6 +821,10 @@ pub fn read_chapter(state: State<'_, AppState>, chapter_id: String) -> CmdResult
 /// 把读失败塌成空串再判「空串即无冲突」，恰好会在文件被云盘锁住
 /// 或被误删时放行一次覆盖，把用户的稿子冲掉 —— 而那正是这条防护
 /// 存在的理由。因此读失败必须中止保存。
+///
+/// 读失败与「确认被外部改过」也刻意用**不同的码**：前者是
+/// `INVALID_INPUT`（原样重试可能就好了），后者是 `CONFLICT`
+/// （原样重试永远不会成功，只有作者能决定两个版本怎么合）。
 fn check_no_external_conflict(abs: &std::path::Path, expected: Option<&str>) -> CmdResult<()> {
     let Some(expected) = expected else {
         return Ok(());
@@ -757,10 +845,9 @@ fn check_no_external_conflict(abs: &std::path::Path, expected: Option<&str>) -> 
     // 保存都会变，算进去会让每次保存都误判为「内容变了」。
     let current = yuhua_store::index::content_hash(&cf.body);
     if current != expected {
-        return Err(CommandError::Domain(yuhua_core::YuhuaError::InvalidInput(
-            "该章节已被外部修改（可能来自云盘同步或其它编辑器），为避免覆盖你的改动，本次保存已取消。请重新打开该章查看最新内容。"
-                .into(),
-        )));
+        return Err(CommandError::Domain(yuhua_core::YuhuaError::Conflict {
+            path: abs.to_path_buf(),
+        }));
     }
     Ok(())
 }
@@ -781,14 +868,37 @@ fn check_no_external_conflict(abs: &std::path::Path, expected: Option<&str>) -> 
 /// 说明文件被外部（云盘 / 别的编辑器）改过。此时**拒绝覆盖**并报错，
 /// 由前端提示用户处理 —— 这正是不变量「绝不静默覆盖」的落地。
 /// 具体判定见 [`check_no_external_conflict`]。
+///
+/// ## `force`：作者已经拍板要覆盖
+///
+/// 被拒绝之后作者必须有一条出路，否则这一章就存不下去了。
+/// `force = true` 表示「以我编辑器里的稿子为准」，此时跳过并发检查 ——
+/// 但**先无条件把磁盘上的当前版本存进备份**（走 `snapshot_now`，
+/// 不受 5 分钟间隔闸门限制）。那份外部修改是唯一的一份，
+/// 覆盖之后除了备份就再也没有别的地方能找回它。
+///
+/// 这样两个版本都在盘上留了痕，「绝不静默覆盖」这条不变量守的是
+/// 「不声不响地丢掉一个版本」，而不是「永远不许作者选边」。
 #[tauri::command]
 pub fn save_chapter(
     state: State<'_, AppState>,
     chapter_id: String,
     body: String,
     expected_hash: Option<String>,
+    force: Option<bool>,
 ) -> CmdResult<ChapterContent> {
-    let s = session(&state)?;
+    save_chapter_impl(&state, chapter_id, body, expected_hash, force)
+}
+
+/// [`save_chapter`] 的实现（不含 Tauri 外壳，便于测试）。
+fn save_chapter_impl(
+    state: &AppState,
+    chapter_id: String,
+    body: String,
+    expected_hash: Option<String>,
+    force: Option<bool>,
+) -> CmdResult<ChapterContent> {
+    let s = session(state)?;
     let cid = ChapterId::parse(chapter_id)
         .map_err(|e| CommandError::Domain(yuhua_core::YuhuaError::InvalidInput(e)))?;
 
@@ -807,8 +917,12 @@ pub fn save_chapter(
     let layout = lock_session(&s)?.layout().clone();
     let abs = layout.resolve(&rel)?;
 
+    let forced = force.unwrap_or(false);
+
     // ---- 乐观并发检查 ----
-    check_no_external_conflict(&abs, expected_hash.as_deref())?;
+    if !forced {
+        check_no_external_conflict(&abs, expected_hash.as_deref())?;
+    }
 
     // ---- 崩溃日志：begin ----
     let journal = yuhua_fs::journal::Journal::new(layout.journal_dir());
@@ -822,7 +936,11 @@ pub fn save_chapter(
 
     // ---- 轮转备份 ----
     let backup = yuhua_fs::backup::BackupManager::new(layout.backup_dir());
-    let _ = backup.snapshot_if_due(&abs, &rel, now_local());
+    let _ = if forced {
+        backup.snapshot_now(&abs, &rel, now_local())
+    } else {
+        backup.snapshot_if_due(&abs, &rel, now_local())
+    };
 
     // ---- 原子写 ----
     let mut cf = yuhua_fs::chapter_io::read_chapter(&abs)?;
@@ -1266,6 +1384,51 @@ pub struct DegradationDto {
     pub detail: String,
 }
 
+/// 导出时的正文来源：**按章从磁盘现读**，不吃内存文稿里的那一份。
+///
+/// ## 为什么不能直接用 `Document`
+///
+/// `Chapter.body` 只在扫描与 `save_chapter` 成功时被写过。作者在外面
+/// 动过文件（云盘从另一台设备同步下来、用别的编辑器改过）之后，
+/// 内存里那份还是**上次扫描**的版本 —— 比磁盘还旧。
+/// 拿它装配，交出去的稿子就缺一段内容，而且全程没有任何提示；
+/// 交稿缺内容是本应用最贵的一类静默失败。
+///
+/// ## 读不到时报错，不退回内存
+///
+/// `None` 会被 `assemble_with` 翻成「正文不存在」的错误。这比
+/// 「悄悄用旧稿顶上」好：前者作者知道要处理，后者他会以为导出的是新的。
+struct DiskChapterSource {
+    layout: yuhua_fs::layout::WorkspaceLayout,
+    /// 章 ID → 相对工作区根的路径。装配器按章来问正文，这里得能反查。
+    paths: std::collections::HashMap<String, String>,
+}
+
+impl DiskChapterSource {
+    /// 从当前文稿建路径表。
+    ///
+    /// 结构（有哪些章、各自在哪条路径）仍取自内存文稿，只把**正文**
+    /// 换成现读磁盘 —— 这正是 `ChapterSource` 这个抽象的用途。
+    fn new(document: &Document, layout: yuhua_fs::layout::WorkspaceLayout) -> Self {
+        let paths = document
+            .chapters
+            .iter()
+            .map(|c| (c.meta.id.to_string(), c.path.clone()))
+            .collect();
+        Self { layout, paths }
+    }
+}
+
+impl yuhua_export::scope::ChapterSource for DiskChapterSource {
+    fn body_of(&self, id: &ChapterId) -> Option<String> {
+        let rel = self.paths.get(id.as_str())?;
+        let abs = self.layout.resolve(rel).ok()?;
+        yuhua_fs::chapter_io::read_chapter(&abs)
+            .ok()
+            .map(|cf| cf.body)
+    }
+}
+
 /// 导出文档。
 ///
 /// ## 参数
@@ -1299,7 +1462,17 @@ pub fn export_document(
     scope: ExportScopeDto,
     output_path: String,
 ) -> CmdResult<ExportResultDto> {
-    let s = session(&state)?;
+    export_document_impl(&state, format, scope, output_path)
+}
+
+/// [`export_document`] 的实现（不含 Tauri 外壳，便于测试）。
+fn export_document_impl(
+    state: &AppState,
+    format: ExportFormatDto,
+    scope: ExportScopeDto,
+    output_path: String,
+) -> CmdResult<ExportResultDto> {
+    let s = session(state)?;
     let doc = state.document()?;
 
     // 1. 翻译 IPC 范围到领域范围
@@ -1323,19 +1496,21 @@ pub fn export_document(
         ExportScopeDto::Whole => ExportScope::Whole,
     };
 
-    // 2. 装配 IR（按章读正文，不会整书载入内存）
-    let ir = yuhua_export::scope::assemble(&doc, &domain_scope)
+    // 会话数据一次取齐（layout + root），之后全在锁外 —— 渲染整本书
+    // 可能耗时数秒，拿着会话锁渲染会把切章与保存一起卡住。
+    let (layout, root) = {
+        let guard = lock_session(&s)?;
+        (guard.layout().clone(), guard.root().to_path_buf())
+    };
+
+    // 2. 装配 IR：正文按章现读磁盘
+    let source = DiskChapterSource::new(&doc, layout);
+    let ir = yuhua_export::scope::assemble_with(&doc, &source, &domain_scope)
         .map_err(|e| CommandError::Domain(yuhua_core::YuhuaError::export_failed(e.to_string())))?;
 
     // 3. 渲染并原子写盘
     //    图片按「工作区根」解析：正文里写 `![](images/a.png)` 时，
     //    EPUB / DOCX 会把图读进包内（电子书与交稿件必须自包含）。
-    //    根路径在锁内取、锁外用 —— 渲染整本书可能耗时数秒，
-    //    拿着会话锁渲染会把切章与保存一起卡住。
-    let root = {
-        let guard = lock_session(&s)?;
-        guard.root().to_path_buf()
-    };
     let assets = yuhua_export::assets::AssetResolver::new(root);
     let target = std::path::PathBuf::from(output_path);
     let result = yuhua_export::render_to_path_with_assets(
@@ -1541,10 +1716,22 @@ mod tests {
         let stale = yuhua_store::index::content_hash("调用方以为的内容");
 
         let err = check_no_external_conflict(&path, Some(&stale)).unwrap_err();
-        assert_eq!(err.code(), "INVALID_INPUT");
+        // 必须是 CONFLICT 而不是笼统的 INVALID_INPUT：前端按码给「出路」，
+        // 而这条错误原样重试永远不会成功
+        assert_eq!(err.code(), "CONFLICT");
+        assert!(err.is_recoverable(), "作者拍板之后这一章要还能存下去");
         assert!(
-            err.to_string().contains("已被外部修改"),
+            err.to_string().contains("被外部改过"),
             "错误文案要能让用户看懂发生了什么，got {err}"
+        );
+        assert!(
+            err.to_string().contains("本次保存已取消"),
+            "文案要说清「什么都没被覆盖」，got {err}"
+        );
+        assert_eq!(
+            err.detail().unwrap(),
+            path.display().to_string(),
+            "detail 要指到具体文件，作者才知道是哪一章"
         );
         // 磁盘内容必须保持原样 —— 检查函数只能是只读的
         let after = yuhua_fs::chapter_io::read_chapter(&path).unwrap();
@@ -1583,6 +1770,280 @@ mod tests {
             check_no_external_conflict(&path, Some(&expected)).is_ok(),
             "只改 Front Matter 不应被判为外部修改"
         );
+    }
+
+    // ========================================================================
+    //  读章回给前端的基线：外部改过一次盘之后，这一章必须还存得下去
+    //
+    //  这两条用例走 `*_impl(&AppState, …)`，因为要钉的是**读章与保存之间**
+    //  的契约：前端把读章回给的 `content_hash` 当作下一次保存的基线。
+    //  单看 `read_chapter` 或单看 `check_no_external_conflict` 都是对的，
+    //  错的是两者拼起来的缝隙 —— 只有连着跑才照得出来。
+    // ========================================================================
+
+    /// 建一卷一章，返回该章的 (ID, 工作区相对路径, 磁盘绝对路径)。
+    fn chapter_on_disk(state: &AppState) -> (String, String, PathBuf) {
+        create_volume_impl(state, "甲卷".into()).unwrap();
+        let vid = volume_triples(state)[0].0.clone();
+        create_chapter_impl(state, vid.clone(), "第一章".into()).unwrap();
+
+        let chapter = state
+            .document()
+            .unwrap()
+            .chapters
+            .iter()
+            .find(|c| c.volume_id.to_string() == vid)
+            .expect("新章没有挂到目标卷上")
+            .clone();
+        let abs = {
+            let s = state.current().unwrap();
+            let guard = s.lock().unwrap();
+            guard.layout().resolve(&chapter.path).unwrap()
+        };
+        (chapter.meta.id.to_string(), chapter.path.clone(), abs)
+    }
+
+    /// 把磁盘上的正文换成另一个版本，模拟云盘从别的设备同步下来。
+    fn overwrite_on_disk(abs: &std::path::Path, body: &str) {
+        let mut cf = yuhua_fs::chapter_io::read_chapter(abs).unwrap();
+        cf.body = body.to_string();
+        yuhua_fs::chapter_io::write_chapter(abs, &cf).unwrap();
+    }
+
+    /// 某一章现有的备份快照（升序）。
+    fn backups_of(state: &AppState, rel: &str) -> Vec<PathBuf> {
+        let s = state.current().unwrap();
+        let guard = s.lock().unwrap();
+        yuhua_fs::backup::BackupManager::new(guard.layout().backup_dir()).snapshots_of(rel)
+    }
+
+    #[test]
+    fn external_edit_leaves_the_chapter_saveable() {
+        let (_dir, state) = opened_workspace();
+        let (cid, _rel, abs) = chapter_on_disk(&state);
+
+        // 外部改盘：绕过本软件直接改文件，于是内存里的哈希成了旧值
+        overwrite_on_disk(&abs, "外部同步下来的新版本");
+
+        // 作者点开这一章，看到的必须是磁盘上的新版本
+        let payload = read_chapter_impl(&state, cid.clone()).unwrap();
+        assert_eq!(payload.body, "外部同步下来的新版本");
+
+        // 拿着这次读章回给的基线接着写、接着存 —— 必须成功。
+        // 修复前这里被判为冲突：body 来自磁盘而 content_hash 来自内存，
+        // 于是每次保存都被拒，而唯一的出路「重新读取」又给出同一个
+        // 解不开的基线，这一章从此再也存不下去。
+        let continued = "外部同步下来的新版本\n\n作者接着写的一段";
+        let saved = save_chapter_impl(
+            &state,
+            cid.clone(),
+            continued.into(),
+            Some(payload.content_hash.clone()),
+            None,
+        )
+        .expect("用刚读到的基线保存不该被判为冲突");
+        assert_eq!(saved.body, continued);
+        assert_eq!(
+            yuhua_fs::chapter_io::read_chapter(&abs).unwrap().body,
+            continued
+        );
+    }
+
+    #[test]
+    fn read_payload_hash_describes_the_body_it_returns() {
+        // 上面那条钉的是后果，这条钉的是不变量本身：
+        // **回给前端的哈希必须是回给前端那份正文的哈希**。
+        let (_dir, state) = opened_workspace();
+        let (cid, _rel, abs) = chapter_on_disk(&state);
+        overwrite_on_disk(&abs, "磁盘上的内容");
+
+        let payload = read_chapter_impl(&state, cid).unwrap();
+        assert_eq!(
+            payload.content_hash,
+            yuhua_store::index::content_hash(&payload.body),
+            "哈希与正文不同源，前端拿到的基线永远对不上磁盘"
+        );
+    }
+
+    #[test]
+    fn forced_save_preserves_the_external_version_in_backup() {
+        // 冲突被拒绝之后，作者的出路是「以我的稿子为准」。
+        // 这条出路必须是**非丢失**的：被顶掉的那个版本要先留在备份里。
+        let (_dir, state) = opened_workspace();
+        let (cid, rel, abs) = chapter_on_disk(&state);
+        let payload = read_chapter_impl(&state, cid.clone()).unwrap();
+        let external = "云盘从另一台设备同步下来的版本";
+        overwrite_on_disk(&abs, external);
+
+        // 不带 force：被拒，且磁盘分毫未动
+        let err = save_chapter_impl(
+            &state,
+            cid.clone(),
+            "我的稿子".into(),
+            Some(payload.content_hash.clone()),
+            None,
+        )
+        .unwrap_err();
+        assert_eq!(err.code(), "CONFLICT");
+        assert_eq!(
+            yuhua_fs::chapter_io::read_chapter(&abs).unwrap().body,
+            external
+        );
+        assert!(
+            backups_of(&state, &rel).is_empty(),
+            "被拒绝的保存不该留下任何痕迹"
+        );
+
+        // 带 force：写进去，但外部那个版本必须先进备份
+        save_chapter_impl(
+            &state,
+            cid.clone(),
+            "我的稿子".into(),
+            Some(payload.content_hash),
+            Some(true),
+        )
+        .expect("作者拍板之后必须存得下去");
+        assert_eq!(
+            yuhua_fs::chapter_io::read_chapter(&abs).unwrap().body,
+            "我的稿子"
+        );
+
+        let backups = backups_of(&state, &rel);
+        let kept = backups
+            .last()
+            .map(|p| std::fs::read_to_string(p).unwrap())
+            .expect("强制覆盖前必须留一份磁盘版本，否则那个版本就彻底没了");
+        assert!(
+            kept.contains(external),
+            "备份里存的必须是被顶掉的那个版本，got {kept}"
+        );
+    }
+
+    // ========================================================================
+    //  导出装配的正文来源：磁盘，不是内存
+    // ========================================================================
+
+    #[test]
+    fn export_carries_the_disk_body_not_the_stale_memory_one() {
+        // 交稿缺内容是这类缺陷里最贵的一种：全程没有一句提示，
+        // 作者以为导出的就是屏幕上看到的那份。
+        let (dir, state) = opened_workspace();
+        let (cid, _rel, abs) = chapter_on_disk(&state);
+
+        // 作者在外面补了一段（云盘从另一台设备同步下来的）
+        overwrite_on_disk(&abs, "这段只在磁盘上。");
+
+        let out = dir.path().join("交稿.txt");
+        export_document_impl(
+            &state,
+            ExportFormatDto::Txt,
+            ExportScopeDto::Single { chapter_id: cid },
+            out.to_string_lossy().to_string(),
+        )
+        .expect("导出应当成功");
+
+        let written = std::fs::read_to_string(&out).unwrap();
+        assert!(
+            written.contains("这段只在磁盘上"),
+            "导出必须带上磁盘上那一版；修复前吃的是内存里的旧稿（新建章是空串），got {written:?}"
+        );
+    }
+
+    #[test]
+    fn disk_source_yields_nothing_for_a_chapter_the_document_does_not_have() {
+        // 索引还在、文件已被外部删掉时，装配器要拿到 `None` 去明确报错，
+        // 而不是悄悄导出一份少一章的稿子
+        use yuhua_export::scope::ChapterSource;
+
+        let (_dir, state) = opened_workspace();
+        assert!(disk_source(&state)
+            .body_of(&yuhua_core::ChapterId::new())
+            .is_none());
+    }
+
+    // ========================================================================
+    //  书级元数据：作者在导出面板里填的名字要一路走到交稿文件的署名
+    //
+    //  这条链路是「填 → 存进 workspace.json → 扫描带回内存 → 装配进导出 IR」。
+    //  缺任何一环，成品上都是「佚名」，而界面上看着已经填好了。
+    // ========================================================================
+
+    /// 按当前会话造一个磁盘正文来源（与导出走同一条路径）。
+    fn disk_source(state: &AppState) -> DiskChapterSource {
+        let doc = state.document().unwrap();
+        let layout = {
+            let s = state.current().unwrap();
+            let guard = s.lock().unwrap();
+            guard.layout().clone()
+        };
+        DiskChapterSource::new(&doc, layout)
+    }
+
+    #[test]
+    fn book_meta_reaches_the_export_ir() {
+        let (_dir, state) = opened_workspace();
+        chapter_on_disk(&state);
+
+        // 手滑多打的空格不该印上封面
+        update_book_meta_impl(&state, "  四月  ".into(), "一句话说清这本书".into()).unwrap();
+
+        let doc = state.document().unwrap();
+        assert_eq!(
+            doc.book.author, "四月",
+            "内存文稿要立刻拿到新署名，否则当场导出还是佚名"
+        );
+
+        let ir =
+            yuhua_export::scope::assemble_with(&doc, &disk_source(&state), &ExportScope::Whole)
+                .expect("装配应当成功");
+        assert_eq!(ir.book.author, "四月");
+        assert_eq!(ir.book.description, "一句话说清这本书");
+    }
+
+    #[test]
+    fn book_meta_survives_reopen() {
+        // 只改内存不写盘的话，作者名会在下次打开时蒸发
+        let (dir, state) = opened_workspace();
+        let root = dir.path().join("ws");
+        update_book_meta_impl(&state, "四月".into(), "简介".into()).unwrap();
+        state.close().unwrap();
+
+        let reopened = AppState::new();
+        reopened.open(root.clone()).unwrap();
+        let doc = reopened.document().unwrap();
+        assert_eq!(
+            doc.book.author, "四月",
+            "重开之后作者必须还在，说明真的写盘了"
+        );
+        assert_eq!(doc.book.description, "简介");
+        assert_eq!(
+            yuhua_fs::workspace::Workspace::summarize(&root).author,
+            "四月",
+            "摘要也要带上，书架与最近列表靠它显示署名"
+        );
+    }
+
+    #[test]
+    fn opens_config_without_book_meta_fields() {
+        // 旧工作区的 workspace.json 里没有 author / description。
+        // 缺字段必须补成空串：写成必填会让整份配置解析失败，
+        // 用户的工作区直接打不开 —— 这是本 crate 风险最高的一条约定。
+        let (dir, state) = opened_workspace();
+        let root = dir.path().join("ws");
+        let cfg_path = root.join(".yuhua").join("workspace.json");
+        let mut raw: serde_json::Value =
+            serde_json::from_str(&std::fs::read_to_string(&cfg_path).unwrap()).unwrap();
+        let obj = raw.as_object_mut().unwrap();
+        obj.remove("author");
+        obj.remove("description");
+        std::fs::write(&cfg_path, raw.to_string()).unwrap();
+        state.close().unwrap();
+
+        let reopened = AppState::new();
+        reopened
+            .open(root)
+            .expect("缺这两个字段的旧工作区必须还能打开");
+        assert_eq!(reopened.document().unwrap().book.author, "");
     }
 
     // ========================================================================

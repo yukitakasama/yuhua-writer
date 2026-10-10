@@ -22,6 +22,7 @@
  */
 
 import { invoke } from "@tauri-apps/api/core";
+import { listen } from "@tauri-apps/api/event";
 
 import { createMockBackend, type MockBackend } from "../mock-backend";
 import { IpcFailure, normalizeError } from "./errors";
@@ -151,6 +152,53 @@ export function hasWorkspace(): Promise<boolean> {
   return call("has_workspace", {}, (b) => b.hasWorkspace());
 }
 
+/**
+ * 更新书级元数据（作者 / 简介），返回新的摘要。
+ *
+ * 作者是**这本书**的属性：存进 `.yuhua/workspace.json`，填完就记住，
+ * 下次打开与每一次导出都读它。后端把它同时写进内存文稿，
+ * 所以「填完立刻导出」拿到的已经是新署名（见 `commands.rs` 的
+ * `update_book_meta_impl`）。
+ */
+export function updateBookMeta(
+  author: string,
+  description: string,
+): Promise<WorkspaceSummary> {
+  return call("update_book_meta", { author, description }, (b) =>
+    b.updateBookMeta(author, description),
+  );
+}
+
+/**
+ * 关闭屏障事件名 —— 与 `src-tauri/src/closing.rs` 的 `FLUSH_EVENT` 是
+ * 同一个字符串的两份写法（命令名在这里也是这么重复的）。
+ * 改一边必须改另一边：漏了的那一半不会报错，只会让关窗重新变成丢稿。
+ */
+const FLUSH_EVENT = "flush-and-close";
+
+/**
+ * 订阅「请把在途的稿子刷到磁盘」。
+ *
+ * Rust 侧在 `CloseRequested` 里拦下关闭后发这个事件；前端刷完盘要调
+ * {@link notifyFlushDone} 放行，否则窗口等 3 秒超时才关得掉。
+ *
+ * 返回一个「解除订阅」的 Promise：浏览器降级下没有窗口可拦，
+ * 直接给一个空操作，让调用方的清理代码不必分支。
+ */
+export function onFlushAndClose(
+  handler: () => Promise<void>,
+): Promise<() => void> {
+  if (!isTauri()) return Promise.resolve(() => undefined);
+  return listen(FLUSH_EVENT, () => handler()).then(
+    (unlisten) => () => unlisten(),
+  );
+}
+
+/** 告诉后端：稿子已经落盘，可以真的关闭窗口了。 */
+export function notifyFlushDone(): Promise<void> {
+  return call("notify_flush_done", {}, (b) => b.notifyFlushDone());
+}
+
 // ---------------------------------------------------------------------------
 // 卷
 // ---------------------------------------------------------------------------
@@ -266,18 +314,28 @@ export function readChapter(chapterId: string): Promise<ChapterContent> {
  *
  * `expectedHash` 是**乐观并发控制**：Rust 侧会比对它和磁盘上的哈希，
  * 不一致说明文件在编辑期间被外部（云盘 / 别的编辑器）改过，
- * 此时拒绝写入并报冲突，而不是静默覆盖用户的稿子 ——
+ * 此时拒绝写入并报冲突（错误码 `CONFLICT`），而不是静默覆盖用户的稿子 ——
  * 计划书 4.5 节「绝不静默覆盖」就落在这个参数上。
+ *
+ * `force` 是冲突之后作者拍板的出路：跳过并发检查直接写。
+ * 后端在写之前会**无条件**把磁盘上的当前版本存进备份
+ * （不受 5 分钟间隔闸门限制），所以那个被顶掉的版本并没有消失。
  */
 export function saveChapter(
   chapterId: string,
   body: string,
   expectedHash?: string,
+  force?: boolean,
 ): Promise<ChapterContent> {
   return call(
     "save_chapter",
-    { chapterId, body, expectedHash: expectedHash ?? null },
-    (b) => b.saveChapter(chapterId, body, expectedHash),
+    {
+      chapterId,
+      body,
+      expectedHash: expectedHash ?? null,
+      force: force ?? null,
+    },
+    (b) => b.saveChapter(chapterId, body, expectedHash, force),
   );
 }
 

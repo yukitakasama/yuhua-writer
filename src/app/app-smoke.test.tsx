@@ -15,7 +15,7 @@
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { render } from "solid-js/web";
 
-import { App } from "@/App";
+import { App, flushThenAck } from "@/App";
 import { __resetMockBackend, saveChapter } from "@/lib/ipc";
 import {
   __resetWorkspaceState,
@@ -209,6 +209,27 @@ describe("进入写作台", () => {
     expect(snap.chapterOpens.length).toBeGreaterThanOrEqual(1);
   });
 
+  /**
+   * 书级元数据「看得见」的那一半。
+   *
+   * 填的入口在导出面板，展示的地方在右侧「本书信息」。两边都得有人钉：
+   * 「填了记不住」与「记住了看不见」是同一枚硬币的两面。这一条走的是
+   * 真实装配链路（App → MetaPanel → store → `open_workspace` 交回的摘要），
+   * 组件级测试照不出「摘要里的 author 根本没被任何人读」这种缝隙。
+   */
+  it("右侧面板显示这本书的作者与简介", async () => {
+    const host = await mountApp();
+    (
+      host.querySelector(".shelf__card-btn") as HTMLButtonElement | null
+    )?.dispatchEvent(new MouseEvent("click", { bubbles: true }));
+    for (let i = 0; i < 8; i += 1) await Promise.resolve();
+
+    const text = host.textContent ?? "";
+    expect(text).toContain("本书信息");
+    expect(text).toContain("无名");
+    expect(text).toContain("一个关于记忆与羽毛的长篇故事。");
+  });
+
   it("卷章树里出现示例卷名", async () => {
     const host = await mountApp();
     (
@@ -244,5 +265,47 @@ describe("没有 emoji 泄漏到渲染结果", () => {
     const emoji =
       /[\u{1F300}-\u{1FAFF}\u{2600}-\u{27BF}\u{FE0F}\u{1F000}-\u{1F2FF}]/u;
     expect(emoji.test(host.textContent ?? "")).toBe(false);
+  });
+});
+
+/**
+ * 关闭屏障的编排（Rust 侧的状态机在 `src-tauri/src/closing.rs` 里有单测）。
+ *
+ * jsdom 里 `isTauri()` 恒为假，那条 `flush-and-close` 事件收不到，
+ * 所以这里钉的是**收到之后**的两件事：顺序与兜底。
+ * 接线本身（订阅、事件名两边对得上）只有真机能验。
+ */
+describe("关闭屏障的编排", () => {
+  it("ack 排在刷盘真正落地之后", async () => {
+    const order: string[] = [];
+    await flushThenAck(
+      async () => {
+        // 用定时器而不是微任务：真实的 flush 要等 IO。
+        // 只排微任务的话「先 await 再 ack」能被顺序蒙对，钉不住没等完的情形
+        await new Promise((resolve) => setTimeout(resolve, 5));
+        order.push("flushed");
+      },
+      async () => {
+        order.push("acked");
+      },
+    );
+    expect(order).toEqual(["flushed", "acked"]);
+  });
+
+  it("刷盘失败仍然 ack，而且不把失败咽掉", async () => {
+    // 不 ack 的话作者要等 3 秒超时才关得掉窗口，期间他以为程序卡死了；
+    // 而失败必须继续往外抛，由调用方的错误提示报出去
+    let acked = false;
+    await expect(
+      flushThenAck(
+        async () => {
+          throw new Error("磁盘被云盘占着");
+        },
+        async () => {
+          acked = true;
+        },
+      ),
+    ).rejects.toThrow("磁盘被云盘占着");
+    expect(acked).toBe(true);
   });
 });

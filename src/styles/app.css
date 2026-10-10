@@ -890,6 +890,56 @@ body.is-dragging {
 }
 
 /* --------------------------------------------------------------------------
+   外部改动冲突的两条出路（错误码 CONFLICT）
+   --------------------------------------------------------------------------
+   刻意内联在编辑区而不是只靠顶部横幅：横幅会被下一次操作换掉，
+   而这一章在作者拍板之前一直存不下去 —— 出路得钉在章上。
+   底色沿用 .banner--error 那套 danger + surface 的混色（同一个令牌，
+   暗色主题下也跟着 --c-surface 走），左边再加一道实色描边把它
+   和「一句话提示」区分开：这里是要做决定的，不是看一眼就过的。
+   -------------------------------------------------------------------------- */
+.editor__conflict {
+  margin-top: var(--sp-6);
+  padding: var(--sp-4);
+  border: 1px solid var(--c-border);
+  border-left: 3px solid var(--c-danger);
+  border-radius: var(--r-md);
+  background: color-mix(in srgb, var(--c-danger) 6%, var(--c-surface));
+}
+
+.editor__conflict_title {
+  color: var(--c-danger);
+  font-size: var(--fs-sm);
+  font-weight: 600;
+}
+
+.editor__conflict_body {
+  margin-top: var(--sp-2);
+  color: var(--c-text-muted);
+  font-size: var(--fs-sm);
+  line-height: 1.6;
+}
+
+.editor__conflict_actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--sp-6);
+  margin-top: var(--sp-4);
+}
+
+/* 每条按钮下面都跟一句「这一选会失去什么」—— 不许静默覆盖，
+   也不能静默地让作者替我们承担覆盖的后果。 */
+.editor__conflict_choice {
+  min-width: 0;
+}
+
+.editor__conflict_note {
+  margin-top: var(--sp-1);
+  color: var(--c-text-muted);
+  font-size: var(--fs-xs);
+}
+
+/* --------------------------------------------------------------------------
    CodeMirror 宿主（M4）
    --------------------------------------------------------------------------
    编辑器自己的颜色与字体在 features/editor/theme.ts 里由令牌生成，
@@ -1029,6 +1079,20 @@ html[data-focus-mode="on"] .toolbar:focus-within {
   color: var(--c-text-muted);
   direction: rtl;
   text-align: left;
+}
+
+/* 简介是长文本：整行省略号会把后半句藏掉，这里允许换行并夹住行数 */
+.meta__value--wrap {
+  white-space: normal;
+  overflow: hidden;
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 4;
+  line-clamp: 4;
+}
+
+.meta__row--wrap {
+  align-items: flex-start;
 }
 
 .meta__note {
@@ -2613,7 +2677,8 @@ html[data-focus-mode="on"] .toolbar:focus-within {
   align-items: center;
 }
 
-.export-path__input {
+.export-path__input,
+.export-meta__input {
   flex: 1 1 auto;
   min-inline-size: 0;
   padding: var(--sp-2) var(--sp-3);
@@ -2625,9 +2690,31 @@ html[data-focus-mode="on"] .toolbar:focus-within {
   font-size: var(--fs-sm);
 }
 
-.export-path__input:focus-visible {
+.export-path__input:focus-visible,
+.export-meta__input:focus-visible {
   outline: 2px solid var(--c-accent);
   outline-offset: 1px;
+}
+
+/* 作者 / 简介：标签压在字段上方，两对之间留一口气 */
+.export-meta {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-1);
+}
+
+.export-meta__label:not(:first-child) {
+  margin-block-start: var(--sp-2);
+}
+
+.export-meta__label {
+  color: var(--c-text-muted);
+  font-size: var(--fs-xs);
+}
+
+.export-meta__textarea {
+  resize: vertical;
+  min-block-size: 3.25rem;
 }
 
 .export-error {

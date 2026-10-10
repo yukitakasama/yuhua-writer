@@ -326,6 +326,10 @@ export interface WorkspaceSummary {
   workspaceId: string;
   /** 书名。 */
   title: string;
+  /** 作者名（空串表示还没填过；导出时会回退成「佚名」）。 */
+  author: string;
+  /** 一句话简介。 */
+  description: string;
   /** 创建时间。 */
   created: string;
   /** 最近打开时间。 */
@@ -397,19 +401,16 @@ export interface TrashEntry {
 /**
  * 整本文稿的内存视图。
  *
- * ## ⚠️ 已知缺口：`book` 的元数据在「打开工作区」这条路径上不可得
+ * ## 关于 `book` 的元数据从哪来
  *
- * `Book` 需要 `author` / `description` / `created` / `updated` 四个字段，
- * 但 `open_workspace` 返回的 `OpenResult` 里**只有**
- * `WorkspaceSummary`（内含 `title`）与 `outline`。作者、简介与
- * 书级更新时间在后端此刻没有任何一条命令会返回。
+ * `open_workspace` 返回的 `OpenResult` 里只有 `WorkspaceSummary` 与
+ * `outline`，因此这里的 `author` / `description` 取自摘要的那两个同名字段
+ * （曾经没有，前端只能填占位空串 —— 于是导出的每一份成品都署名「佚名」，
+ * 而界面上无处可改）。
  *
- * 因此前端只能用一个最小占位（`id` 取 `workspace.workspaceId`、
- * `title` 取 `workspace.title`，其余空串），**不能伪造**作者或简介 ——
- * 界面上显示一个假作者名比显示空白更糟。
- *
- * 这是一条**待办**：要真正填上，需要后端新增一条返回书级元数据的
- * 命令（或在 `OpenResult` 上加字段）。本次修复刻意不扩契约。
+ * 写入走 `update_book_meta`：作者在导出面板里填完即存进
+ * `.yuhua/workspace.json`，后端扫描时再把它带回这份内存视图，
+ * 所以刷新之后看到的与刚填的一致，而不是又一次「填了但没人读」。
  */
 export interface WorkspaceDocument {
   /** 书。 */
@@ -485,6 +486,14 @@ export const ERROR_CODES = {
   unimplemented: "UNIMPLEMENTED",
   noWorkspace: "NO_WORKSPACE",
   internal: "INTERNAL",
+  /**
+   * 这一章在读进来之后被外部改过（云盘同步 / 别的编辑器）。
+   *
+   * 单列一个码是因为它的处理方式与其它错误都不同：**原样重试永远不会
+   * 成功**，只有作者能决定两个版本怎么合。界面据此给出「以我的稿子为准」
+   * 与「改用磁盘版本」两个出口，而不是只弹一句提示把人堵在冲突前。
+   */
+  conflict: "CONFLICT",
 } as const;
 
 /** 新建卷的参数。 */

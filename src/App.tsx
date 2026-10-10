@@ -37,12 +37,13 @@ import {
   createEffect,
   createMemo,
   createSignal,
+  onCleanup,
   onMount,
   type JSX,
 } from "solid-js";
 
 import { t } from "@/strings";
-import { isTauri } from "@/lib/ipc";
+import { isTauri, notifyFlushDone, onFlushAndClose } from "@/lib/ipc";
 import { ChapterTree } from "@/features/chapters/ChapterTree";
 import { LibraryView } from "@/features/library/LibraryView";
 import { NewWorkspace } from "@/features/library/NewWorkspace";
@@ -100,6 +101,31 @@ import {
   useAppearance,
 } from "@/features/settings";
 
+/**
+ * 关闭屏障里「先刷盘、再放行」的那段编排。
+ *
+ * ## 为什么单独导出
+ *
+ * jsdom 里 `isTauri()` 恒为假，那条事件永远收不到，接线只能在真机验证；
+ * 而这里的**次序与兜底**是可以钉住的：
+ *
+ * - ack 必须排在 flush 之后 —— 抢先 ack 等于让屏障形同不存在，
+ *   作者按 Alt+F4 时丢的还是最新那一段；
+ * - flush 失败也要 ack —— 落盘失败时继续拦着关闭，只会把作者困在
+ *   一个关不掉的窗口里（要等 3 秒超时），而那 3 秒里他以为程序卡死了。
+ *   失败本身已经由错误提示报出去了。
+ */
+export async function flushThenAck(
+  flush: () => Promise<void>,
+  ack: () => Promise<void>,
+): Promise<void> {
+  try {
+    await flush();
+  } finally {
+    await ack();
+  }
+}
+
 /** 应用外壳。 */
 export function App(): JSX.Element {
   // 检索面板（M6）与命令面板（T5.7）是两个独立的东西：
@@ -134,7 +160,20 @@ export function App(): JSX.Element {
   const [wizardOpen, setWizardOpen] = createSignal(!hasCompletedOnboarding());
   const [editorSaveState, setEditorSaveState] =
     createSignal<EditorSaveState>("idle");
-  let saveEditor: (() => Promise<void>) | undefined;
+  let saveEditor: (() => Promise<boolean>) | undefined;
+
+  /**
+   * 把编辑器里的改动落到磁盘；**没落成就抛**。
+   *
+   * 两个调用方都需要「磁盘上到底是不是这一版」：导出（后端现在按章读磁盘，
+   * 没落盘的那一段不在导出里）与关窗（刷完才放行关闭）。
+   * `saveEditor` 现在是报告布尔而不是抛异常 —— 自动保存那条路要靠返回值
+   * 决定要不要重试，而这里需要的是「没落成就别往下走」。
+   */
+  async function flushPendingEdits(): Promise<void> {
+    const landed = await saveEditor?.();
+    if (landed === false) throw new Error(t("export.needsSaved"));
+  }
 
   // 把生效的外观设置写进 CSS 变量与 html[data-theme]。
   // 必须在应用根部调用且只调用一次：多个 effect 争相写同一批变量时行为不确定。
@@ -142,6 +181,24 @@ export function App(): JSX.Element {
 
   onMount(() => {
     void refreshRecents();
+    // 关闭屏障的前端半边（Rust 侧见 `src-tauri/src/closing.rs`）：
+    // 那边拦下 CloseRequested 后发一个事件过来，我们把防抖里的稿子刷完再放行。
+    // 浏览器降级下 `onFlushAndClose` 返回空操作，调用方不必分支。
+    let unsubscribe: (() => void) | null = null;
+    let unmounted = false;
+    void onFlushAndClose(() =>
+      flushThenAck(flushPendingEdits, async () => {
+        await notifyFlushDone();
+      }).catch(() => undefined),
+    ).then((fn) => {
+      // 订阅是异步建立的，而测试里应用可能在这之前就卸载了
+      if (unmounted) fn();
+      else unsubscribe = fn;
+    });
+    onCleanup(() => {
+      unmounted = true;
+      unsubscribe?.();
+    });
   });
 
   /**
@@ -255,12 +312,10 @@ export function App(): JSX.Element {
    * `enabled` 判据一直锁到下次挂载。
    */
   const handleLibrary = async (): Promise<void> => {
-    try {
-      await saveEditor?.();
-    } catch {
-      // 存不下也要让人走得掉：失败已经由 store 的错误横幅报出，
-      // 把作者锁在写作台里只会让他多打一段同样存不下的字。
-    }
+    // 存不下也要让人走得掉：`saveNow` 是报告布尔而不是抛异常，
+    // 失败已经由 store 的错误横幅报出，把作者锁在写作台里
+    // 只会让他多打一段同样存不下的字。
+    await saveEditor?.();
     await closeWorkspace();
     saveEditor = undefined;
     setEditorSaveState("idle");
@@ -499,7 +554,11 @@ export function App(): JSX.Element {
       />
 
       {/* 导出对话框（M7）：格式 / 范围 / 保存位置，并展示降级记录 */}
-      <ExportDialog open={exportOpen()} onClose={() => setExportOpen(false)} />
+      <ExportDialog
+        open={exportOpen()}
+        onClose={() => setExportOpen(false)}
+        flushEditor={flushPendingEdits}
+      />
 
       {/* 首次启动向导：可跳过，跳过与走完的效果完全相同 */}
       <FirstRunWizard
@@ -533,6 +592,9 @@ function ErrorBanner(props: { onDismiss: () => void }): JSX.Element {
         return t("error.parse");
       case "DATABASE_ERROR":
         return t("error.database");
+      case "CONFLICT":
+        // 出路在编辑区里（那两个按钮），横幅只负责说清发生了什么
+        return t("error.externalConflict");
       case "UNIMPLEMENTED":
         return t("error.unimplemented");
       default:

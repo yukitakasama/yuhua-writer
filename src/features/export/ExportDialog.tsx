@@ -18,6 +18,9 @@
  *    导出「成功」但内容被悄悄改写，比失败更糟。
  * 3. **范围要能退化**。整本书永远可用；「当前卷 / 当前章」在没有
  *    选中章时是无效选项，要禁用而不是让用户选完再报错。
+ * 4. **署名要填得进来、记得住**。作者是这本书的属性，存在
+ *    `.yuhua/workspace.json`：这里预填已存的值，改了就在导出前写回，
+ *    下次打开还是它。（入口放在导出面板的理由见 `metaLabel` 那条文案的注释。）
  */
 
 import {
@@ -45,6 +48,7 @@ import {
 import {
   currentBook,
   hasOpenWorkspace,
+  saveBookMeta,
   selectedChapter,
 } from "@/app/workspace-store";
 
@@ -53,6 +57,21 @@ export interface ExportDialogProps {
   open: boolean;
   /** 关闭请求。 */
   onClose: () => void;
+  /**
+   * 把编辑器里未落盘的改动刷到磁盘；**刷不成要抛**。导出在它成功之前不许开始。
+   *
+   * ## 为什么这件事必须有
+   *
+   * 自动保存有 1.5 秒防抖，作者刚敲完的最后一段大概率还在防抖里；
+   * 而后端装配时按章读的是**磁盘**上的正文。少了这一步，那次导出交出去的
+   * 就是上一版，而且全程没有任何提示 —— 交稿缺内容是最贵的一类静默失败。
+   *
+   * ## 为什么是必填而不是可选
+   *
+   * 这个句柄上一版就是可选的，于是生产调用点根本没传，缺陷就藏在
+   * 「传不传都行」里。类型上做成必填，漏传直接编译不过。
+   */
+  flushEditor: () => Promise<void>;
 }
 
 /** 三种可选范围。「选中若干章」暂不开放：树里没有多选交互。 */
@@ -91,6 +110,8 @@ export function ExportDialog(props: ExportDialogProps): JSX.Element {
   const [format, setFormat] = createSignal<ExportFormat>("txt");
   const [scopeKind, setScopeKind] = createSignal<ScopeKind>("whole");
   const [path, setPath] = createSignal("");
+  const [author, setAuthor] = createSignal("");
+  const [description, setDescription] = createSignal("");
   const [busy, setBusy] = createSignal(false);
   const [result, setResult] = createSignal<ExportResult | null>(null);
   const [error, setError] = createSignal<string | null>(null);
@@ -108,6 +129,21 @@ export function ExportDialog(props: ExportDialogProps): JSX.Element {
   const activeExtension = createMemo(() => {
     const id = format();
     return formats().find((f) => f.id === id)?.extension ?? "";
+  });
+
+  /**
+   * 署名与简介相对已存的值有没有改动。
+   *
+   * 后端 `update_book_meta` 每次都会重写 `workspace.json`（trim 之后落盘），
+   * 所以没改就别发：导出是高频动作，没必要每次动一次配置文件。
+   * 比对的是 trim 后的值 —— 后端存的就是 trim 后的。
+   */
+  const metaDirty = createMemo(() => {
+    const book = currentBook();
+    return (
+      (book?.author ?? "") !== author().trim() ||
+      (book?.description ?? "") !== description().trim()
+    );
   });
 
   /**
@@ -138,6 +174,12 @@ export function ExportDialog(props: ExportDialogProps): JSX.Element {
     setResult(null);
     setError(null);
     setBusy(false);
+    // 预填成**已经存着的那一份**：作者是填一次就记住的属性，
+    // 每次打开都从空框开始等于让作者每次重想一遍署名，
+    // 而他很可能以为空着就是"沿用上次"。
+    const book = currentBook();
+    setAuthor(book?.author ?? "");
+    setDescription(book?.description ?? "");
     void listExportFormats()
       .then((list) => {
         setFormats(list);
@@ -197,6 +239,17 @@ export function ExportDialog(props: ExportDialogProps): JSX.Element {
     setBusy(true);
     setError(null);
     try {
+      // 先落盘再导出（见 props.flushEditor）。抛出来的就是「没能存下」，
+      // 下面那句 exportDocument 因此根本不会执行 —— 宁可什么都不交，
+      // 也不交一份看着完整、实际少了最后一段的稿子。
+      await props.flushEditor();
+      // 署名同理，且必须排在导出**之前**：后端装配时读的是内存文稿里的
+      // 作者，而内存只在写回成功之后才更新（见 store 的 saveBookMeta）。
+      // 写回失败还继续导，交出去的文件署的还是旧名字，界面上填的却是新的。
+      if (metaDirty() && !(await saveBookMeta(author(), description()))) {
+        setError(t("export.metaNeedsSaved"));
+        return;
+      }
       setResult(await exportDocument(format(), scope, target));
     } catch (err) {
       setError(toFailure(err).error.message);
@@ -384,6 +437,37 @@ export function ExportDialog(props: ExportDialogProps): JSX.Element {
                   );
                 }}
               </For>
+            </div>
+          </fieldset>
+
+          {/* ---- 本书信息 ---- */}
+          <fieldset class="export-field" disabled={busy()}>
+            <legend class="export-field__label">{t("export.metaLabel")}</legend>
+            <div class="export-meta">
+              <label class="export-meta__label" for="export-author">
+                {t("export.authorLabel")}
+              </label>
+              <input
+                id="export-author"
+                class="export-meta__input"
+                type="text"
+                value={author()}
+                placeholder={t("export.authorPlaceholder")}
+                disabled={busy()}
+                onInput={(event) => setAuthor(event.currentTarget.value)}
+              />
+              <label class="export-meta__label" for="export-description">
+                {t("export.descriptionLabel")}
+              </label>
+              <textarea
+                id="export-description"
+                class="export-meta__input export-meta__textarea"
+                rows={2}
+                value={description()}
+                placeholder={t("export.descriptionPlaceholder")}
+                disabled={busy()}
+                onInput={(event) => setDescription(event.currentTarget.value)}
+              />
             </div>
           </fieldset>
 

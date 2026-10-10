@@ -225,6 +225,34 @@ export function MarkdownEditor(props: MarkdownEditorProps): JSX.Element {
   let view: EditorView | null = null;
   const readOnlyCompartment = new Compartment();
   const fontCompartment = new Compartment();
+  /**
+   * 当前生效的只读取值。
+   *
+   * 单独存一份而不是去问 `view.state.readOnly`，是因为 `resetDocument`
+   * 要用它重建扩展集（见那里的说明），而那一刻旧状态即将被换掉。
+   * 它只有两处写：声明时的初值、以及下面那个把开关同步进 Compartment
+   * 的 effect —— 与 Compartment 里的那一份始终同值。
+   */
+  let currentReadOnly = props.readOnly ?? false;
+
+  /**
+   * 按**当前配置**建一份扩展集。
+   *
+   * 之所以是函数而不是一份建好就存起来的数组：只读走 Compartment，
+   * 重配后的新值只存在于当前状态里，而挂载时那份数组还带着当时的取值 ——
+   * 编辑器是在首次读章期间挂载的，那一刻的只读是 `true`。
+   * 换章重建状态若照旧数组来，刚放开的只读会被悄悄按回去：
+   * 界面上一切正常，作者却打不进字。
+   */
+  const buildExtensions = (): Extension[] =>
+    createEditorExtensions({
+      readOnlyCompartment,
+      fontCompartment,
+      readOnly: currentReadOnly,
+      ...(props.onUserEdit ? { onUserEdit: props.onUserEdit } : {}),
+      ...(props.onChange ? { onDocChange: props.onChange } : {}),
+      ...(props.onScrollLine ? { onScrollLine: props.onScrollLine } : {}),
+    });
 
   /** 供外部使用的句柄。 */
   const handle: EditorHandle = {
@@ -248,7 +276,15 @@ export function MarkdownEditor(props: MarkdownEditorProps): JSX.Element {
       if (view === null) return;
       // setState 换掉整个状态：历史随之归零，而视图对象没被销毁
       // （滚动容器、IME 组合、焦点都还在），所以不出现「视图已没了」的窗口期。
-      view.setState(EditorState.create({ doc: next, extensions }));
+      //
+      // 扩展集必须按**当前配置**重建（`buildExtensions()`），不能用挂载时
+      // 存下的那一份：只读走 Compartment，重配后的新值只在当前状态里。
+      // 照旧数组重建会把刚放开的只读悄悄按回去 —— 界面上一切正常，
+      // 作者却打不进字。（试过的另一条弯路：`extensions: view.state.extension`
+      // 会把 Compartment 摊平，之后的 reconfigure 静默失效。）
+      view.setState(
+        EditorState.create({ doc: next, extensions: buildExtensions() }),
+      );
     },
     focus: () => view?.focus(),
     openFind: (replace: boolean) => {
@@ -271,27 +307,11 @@ export function MarkdownEditor(props: MarkdownEditorProps): JSX.Element {
     isComposing: () => (view ? view.composing : false),
   };
 
-  /**
-   * 建视图用的扩展集。
-   *
-   * 存起来是因为 {@link EditorHandle.resetDocument} 要拿它重建状态：
-   * 换章时重建状态而不重建视图，历史能归零，光标与滚动还活着。
-   */
-  let extensions: Extension[] = [];
-
   onMount(() => {
     if (!container) return;
-    extensions = createEditorExtensions({
-      readOnlyCompartment,
-      fontCompartment,
-      readOnly: props.readOnly ?? false,
-      ...(props.onUserEdit ? { onUserEdit: props.onUserEdit } : {}),
-      ...(props.onChange ? { onDocChange: props.onChange } : {}),
-      ...(props.onScrollLine ? { onScrollLine: props.onScrollLine } : {}),
-    });
     const state = EditorState.create({
       doc: props.initialValue,
-      extensions,
+      extensions: buildExtensions(),
     });
     view = new EditorView({ state, parent: container });
     // P3 应用内段的终点：视图已经建好（正文可能还在读，此刻或许只读）。
@@ -312,7 +332,8 @@ export function MarkdownEditor(props: MarkdownEditorProps): JSX.Element {
    */
   createEffect(() => {
     const next = props.readOnly ?? false;
-    // onMount 之前没有视图：首帧的只读由上面 createEditorExtensions 传入
+    currentReadOnly = next;
+    // onMount 之前没有视图：首帧的只读由上面 buildExtensions 传入
     if (view === null) return;
     view.dispatch({
       effects: readOnlyCompartment.reconfigure(EditorState.readOnly.of(next)),

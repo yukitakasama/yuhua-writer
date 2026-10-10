@@ -42,10 +42,29 @@ const { readChapterMock, saveChapterMock } = vi.hoisted(() => ({
  */
 vi.mock("@/lib/ipc", () => ({
   readChapter: (chapterId: string) => readChapterMock(chapterId),
-  saveChapter: (chapterId: string, body: string, expectedHash?: string) =>
-    saveChapterMock(chapterId, body, expectedHash),
+  saveChapter: (
+    chapterId: string,
+    body: string,
+    expectedHash?: string,
+    force?: boolean,
+  ) => saveChapterMock(chapterId, body, expectedHash, force),
+  // 真实实现按错误码分支，冲突的出路全靠这个码，所以打桩不能把它抹掉
+  ERROR_CODES: { conflict: "CONFLICT" },
   toFailure: (err: unknown) => ({
-    error: { kind: "unknown", message: String(err) },
+    error:
+      err !== null && typeof err === "object" && "code" in err
+        ? (err as {
+            code: string;
+            message: string;
+            recoverable: boolean;
+            detail: string | null;
+          })
+        : {
+            code: "INTERNAL",
+            message: String(err),
+            recoverable: false,
+            detail: null,
+          },
   }),
 }));
 
@@ -234,10 +253,12 @@ describe("换章", () => {
     await settle();
 
     // 章 ID 必须是上一章的：把甲章的字写进乙章同样是丢稿
+    // （第四个参数是冲突时的强制覆盖标记，正常保存不带）
     expect(saveChapterMock).toHaveBeenCalledWith(
       "ch_a",
       expect.stringContaining("甲章补充"),
       "hash-a",
+      undefined,
     );
     expect(view().state.doc.toString()).toContain("乙章的正文");
   });
@@ -303,6 +324,103 @@ describe("保存入口", () => {
 
     const ok = await saveChapterBody("ch_b", "乙章改过");
     expect(ok).toBe(true);
-    expect(saveChapterMock).toHaveBeenCalledWith("ch_b", "乙章改过", "hash-b");
+    expect(saveChapterMock).toHaveBeenCalledWith(
+      "ch_b",
+      "乙章改过",
+      "hash-b",
+      undefined,
+    );
+  });
+});
+
+/**
+ * 外部改动冲突（错误码 `CONFLICT`）的两条出路。
+ *
+ * 三条用例钉的是同一个形状：**读章成功、保存被拒**。
+ * 此时 `ready()` 为真，而「重新读取」的入口曾经挂在 `!ready()` 下面，
+ * 于是这个按钮永不出现、作者只能对着一个不可能通过的冲突一直重试，
+ * 这一章在本会话里永久存不下去。
+ *
+ * 为什么后端那一半不在这里测：mock 后端的 `readChapter` 哈希与正文
+ * 同源、永远自洽，「body 取磁盘而 hash 取内存」这类缺陷在结构上
+ * 照不出来 —— 它由 `commands.rs` 的 `external_edit_leaves_the_chapter_saveable`
+ * 与 `forced_save_preserves_the_external_version_in_backup` 钉死。
+ */
+describe("外部改动冲突的出路", () => {
+  const conflict = {
+    code: "CONFLICT",
+    message: "这一章在磁盘上被外部改过了",
+    recoverable: true,
+    detail: null,
+  };
+
+  /** 打开甲章 → 打字 → 保存撞上 CONFLICT。 */
+  async function typeThenConflict(): Promise<void> {
+    readChapterMock.mockResolvedValue(
+      content("ch_a", "云盘同步下来的版本", "hash-disk"),
+    );
+    selectChapter("ch_a");
+    await settle();
+    // 读是成功的：这条提示不该出现，而出路恰恰要在这种状态下才最需要
+    expect(host.textContent).not.toContain("这一章的正文没能打开");
+
+    type("作者接着写的一段");
+    saveChapterMock.mockRejectedValue(conflict);
+    // 走真实的失焦落盘路径，不等 1500 ms 防抖（干等会得到恒绿的空断言）
+    window.dispatchEvent(new Event("blur"));
+    await settle();
+  }
+
+  /** 按文本找按钮。每次都重查：`<Show>` 换分支会重建节点，旧引用脱离 DOM。 */
+  function clickButton(label: string): void {
+    const button = [...host.querySelectorAll("button")].find(
+      (b) => b.textContent?.trim() === label,
+    ) as HTMLElement;
+    button.dispatchEvent(new MouseEvent("click", { bubbles: true }));
+  }
+
+  it("读章成功而保存被拒时，两条出路都摆在编辑区里", async () => {
+    await typeThenConflict();
+
+    expect(host.textContent).toContain("这一章在磁盘上被外部改过了");
+    expect(host.textContent).toContain("以我的稿子为准");
+    expect(host.textContent).toContain("改用磁盘上的版本");
+    // 两条路的起点都不许先丢一个版本
+    expect(view().state.doc.toString()).toContain("作者接着写的一段");
+  });
+
+  it("「以我的稿子为准」带 force 再存一次，之后提示消失", async () => {
+    await typeThenConflict();
+
+    saveChapterMock.mockReset();
+    saveChapterMock.mockResolvedValue(
+      content("ch_a", "云盘同步下来的版本｜作者接着写的一段", "hash-mine"),
+    );
+    clickButton("以我的稿子为准");
+    await settle();
+
+    expect(saveChapterMock).toHaveBeenCalledWith(
+      "ch_a",
+      expect.stringContaining("作者接着写的一段"),
+      "hash-disk",
+      true,
+    );
+    expect(host.textContent).not.toContain("以我的稿子为准");
+  });
+
+  it("「改用磁盘上的版本」把编辑器换成读回来的那一版", async () => {
+    await typeThenConflict();
+
+    readChapterMock.mockResolvedValue(
+      content("ch_a", "磁盘上的最终版本", "hash-disk-2"),
+    );
+    clickButton("改用磁盘上的版本");
+    await settle();
+
+    const text = view().state.doc.toString();
+    expect(text).toContain("磁盘上的最终版本");
+    expect(text).not.toContain("作者接着写的一段");
+    // 选完要能接着写：只读与「有未保存改动」都该回到干净状态
+    expect(view().state.readOnly).toBe(false);
   });
 });

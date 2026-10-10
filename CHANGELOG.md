@@ -86,6 +86,25 @@
   鼠标碰到或 Tab 进入即恢复，键盘与鼠标用户都不会被锁在专注模式里。
 - **设置里的排版项从此对写作台生效**：正文宽度与段间距的滑块拖动后，
   真正写字的那一栏会跟着变（此前只有设置页的预览块在变）。
+- **书级元数据（作者 / 简介）：填得进来、存得下来、导出用得上**
+  （计划书 附录「仍待确认」第 4 项的落地）。此前 `dc:creator` 这一路是空的：
+  `WorkspaceSummary` 不带作者 / 简介，`OpenResult` 也不带，前端只能填最小占位，
+  于是「这本书署谁的名」在应用里**没有任何地方能填**，EPUB 与 DOCX 的署名
+  永远落在回退值上。现在：
+  ① 后端 `.yuhua/workspace.json` 新增 `author` / `description` 两个
+  `#[serde(default)]` 字段（**必须带 default**，否则旧工作区解析失败、
+  用户的书直接打不开），`WorkspaceSummary` 与 `scan_workspace` 把它读回来，
+  新增 `update_book_meta` 命令（先写盘、成功后才改内存文稿，
+  所以「填完立刻导出」拿到的就是新署名）；
+  ② 界面入口在**导出面板**（`ExportDialog`）：预填已存的值，改了就在导出前
+  写回，写回失败**取消这次导出** —— 带着没写回的署名继续导，交出去的文件署的
+  还是旧名字而界面上填的是新的，这种不一致比一次明确的失败更难发现；
+  一个字没改时不发请求，避免每次导出都重写配置文件；
+  ③ 展示在右侧「本书信息」（`MetaPanel`），空值显示「未填写」而不是编一个名字。
+  测试分两层钉：Rust 侧 `book_meta_reaches_the_export_ir`（署名真的进了导出 IR）、
+  `book_meta_survives_reopen`（重开还在）、`opens_config_without_book_meta_fields`
+  （旧配置照样打得开）；前端 `saveBookMeta` 的「以后端返回值刷新内存」与
+  导出面板的「刷盘 → 写回 → 导出」顺序各钉一条，均验证过摘掉即变红。
 - 构建期脚本：图标派生、字体获取流水线
 - 开源工程文件：MIT 许可证、README、贡献指南、行为准则、Issue / PR 模板
 
@@ -262,6 +281,58 @@ P0 缺陷修复轮（详见 [docs/fix-plan-p0.md](./docs/fix-plan-p0.md)）。
   后者刻意**断言源码里存在这条规则**而不是量计算样式：jsdom 不做 CSS 级联，
   `getComputedStyle` 在这类规则上只会给出恒真或恒假的读数。
 
+数据路径修复轮（2026-10-07）。三条都会**真的丢稿或交出错的稿子**，
+且全都躲在「mock 后端与真实后端同源」这个盲区里 —— 前端测试结构上照不出来，
+所以每条都在 **Rust 层**钉了测试，并逐一验证过「先红后绿 + 摘掉修复就变红」。
+
+- **外部改动之后，这一章永久存不下去**（恶性）：`read_chapter` 交回的
+  `content_hash` 取自**内存文稿**里那份正文，而 `body` 取自**磁盘**，
+  两边不同源。保存时乐观并发检查拿这个哈希去比对磁盘当前内容，于是只要
+  云盘同步或另一台设备改过一次，基线就**永久不等**：作者每次保存都被
+  自己的基线判成冲突，而界面上只有一行通用错误、没有任何出路。
+  现在 `read_chapter_impl` 按返回的那份正文算哈希（`content_hash(&cf.body)`）；
+  冲突单独成码 `CONFLICT`（`YuhuaError::Conflict`，detail 带绝对路径）；
+  前端按**章**记 `conflictedChapterId`（不能靠全局的 `state.error`：作者点个
+  新建卷它就被换掉，而这一章依然存不下去），编辑区据此给出两条出路 ——
+  「以我的稿子为准」走 `force`：**后端先把磁盘那份存进备份再覆盖**，
+  且绕过 5 分钟的备份节流；「改用磁盘版本」重读一次并重建基线。
+  钉测试：`external_edit_leaves_the_chapter_saveable`、
+  `read_payload_hash_describes_the_body_it_returns`、
+  `forced_save_preserves_the_external_version_in_backup`。
+- **关窗丢掉最后一段**：`beforeunload` 里的 `void flush()` 没人 await
+  （浏览器不等），而 Rust 侧 `CloseRequested` **一个处理器都没接**，窗口直接关。
+  新增 `src-tauri/src/closing.rs` 的关闭屏障（原子 u8 状态机
+  IDLE / WAITING / RELEASED，`Decision::{InterceptAndAsk, InterceptSilently, Allow}`）：
+  拦下关闭 → `api.prevent_close()` → `emit("flush-and-close")` → 前端刷完盘
+  调 `notify_flush_done` 放行；另有 3 秒看门狗超时兜底，刷不成也关得掉，
+  不把作者锁在窗口里。屏障本身四个 Rust 单测。
+  **真机未验**：jsdom 里 `isTauri()` 恒假，「订阅与事件名两边对得上」这一环
+  只有装包运行才能证明，本轮只钉住了收到事件之后的顺序与兜底。
+- **导出静默交出一份旧稿**：`export_document` 装配时读的是**内存**正文
+  （`scan_workspace` 留着全书正文就是为了字数统计与标题兜底），而自动保存
+  有 1500 ms 防抖 —— 作者刚敲完的那一段大概率还没落盘，导出却写着「导出完成」。
+  现在导出走新增的 `DiskChapterSource`（`ChapterSource` 的磁盘实现，逐章读盘），
+  导出面板的 `flushEditor` 句柄做成**必填**（上一版是可选的，于是生产调用点
+  根本没传，缺陷就藏在「传不传都行」里），先落盘、落盘失败就取消这次导出。
+  钉测试：`export_carries_the_disk_body_not_the_stale_memory_one`、
+  `disk_source_yields_nothing_for_a_chapter_the_document_does_not_have`。
+  **前置纠正**：`scan.rs` 的模块注释写着「扫描不保留正文」，实际是保留的 ——
+  照那条注释去改装配会得到一堆**空文件**，所以先改注释再改代码。
+- **切换只读从未生效**（本轮上一条修复引入的）：`MarkdownEditor.resetDocument`
+  用挂载时捕获的那份 extension 数组重建状态，等于把 `Compartment` 拍平成
+  死值，之后 `reconfigure` 静默空转 —— 该只读时还能打字。改为
+  `buildExtensions()` 按当前 `currentReadOnly` 现算。
+- **上一章的保存落地时把编辑态从新章顶掉**：`saveChapterBody` 成功后无条件
+  `setEditing`，而切章会 flush 上一章、那次保存回来时作者已经在看新章，
+  于是界面对着一个刚打开、正文明明就在眼前的章说「这一章的正文没能打开」，
+  编辑器还被置成只读。现在只有 `editing()` 仍指向这一章时才回写。
+- 测试基建：`__resetWorkspaceState()` 漏清模块级的 `selectedChapterId`，
+  下一个用例带着一章挂载，编辑器自己发的读章请求发生在用例设桩**之前**，
+  拿到 `undefined` 正文后冒出假失败。串味的用例比失败的用例更难查。
+- 「本书信息」那一栏曾渲染成**有标签、没数据**：`<Show when={book() !== null}>`
+  传给回调的是布尔值，于是 `info().author` 全是不存在的属性，Solid 安静地
+  渲染出三个空 `<dd>`。冒烟测试把它抓出来的（断言的是界面文本，不是类型）。
+
 ### 构建
 
 - CI 接入此前**定义了却从未被调用**的两道守卫脚本：`pnpm check:ipc`
@@ -384,7 +455,8 @@ P0 缺陷修复轮（详见 [docs/fix-plan-p0.md](./docs/fix-plan-p0.md)）。
   `.trash/` 目录取回。`README.md` 把回收站列为「零丢失」的一环，
   因此这是导出之后最该补的一块。
 - **已知缺口**：设置页缺「数据安全」区域，`rebuild_index`（从 Markdown
-  重建索引）同样点不到。`docs/done-list.md` 描述过这个区域，属文档超前于实现。- **已修复（本轮）**：EPUB 的 `<manifest>` 空壳与 DOCX 图片降级 ——
+  重建索引）同样点不到。`docs/done-list.md` 描述过这个区域，属文档超前于实现。
+- **已修复（本轮）**：EPUB 的 `<manifest>` 空壳与 DOCX 图片降级 ——
   见上「EPUB / DOCX 图片内嵌」。**遗留边界**：图片路径按**工作区根**解析，
   不是按所在章文件的目录，所以 `![](images/a.png)` 指
   `<工作区根>/images/a.png`；若作者习惯写相对当前章的 `../images/a.png`，

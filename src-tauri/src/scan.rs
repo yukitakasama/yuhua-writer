@@ -23,16 +23,25 @@
 //! | 隐藏目录（.yuhua / .trash / .git） | 跳过 |
 //! | Front Matter 损坏 | 用文件名推导标题（chapter_io 已保证不丢正文） |
 //!
-//! ## 一个刻意的取舍：扫描时**读取正文**
+//! ## 一个刻意的取舍：扫描时**读取正文并留在内存里**
 //!
 //! 装配文稿需要每章的 `word_count`（卷章树要显示字数）。
 //! 这意味着扫描要读一遍全部文件。对 100 万字工作区，
 //! 这是一次几秒级的操作，发生在「打开工作区」时，用户有心理预期。
 //!
 //! 替代方案（先只读 Front Matter、字数懒加载）会让卷章树出现
-//! 「字数先空后跳」的闪烁，体验更差。因此选择一次性读完，
-//! **但读完即丢正文**：装配后的 `Document.chapters` 里 `body` 为空、
-//! `body_loaded = false`，内存占用与书名总字数无关。
+//! 「字数先空后跳」的闪烁，体验更差。
+//!
+//! **正文是留下的**（`load_chapter` 把 `body` 与 `body_loaded = true`
+//! 一起装配，这里曾写着「读完即丢」，那与实现相反，别照它改代码）。
+//! 为什么留着：字数是从 `Chapter.body` 现算的，标题兜底链也要看正文第一段，
+//! 真的丢掉会让卷章树整片显示 0 字。代价是 `AppState::document()`
+//! 每次调用都 clone 整本书的正文 —— 这是内存口径里一笔已知开销，
+//! 要动它得连字数与标题兜底一起重设计，不是删一行赋值。
+//!
+//! 顺带说明：导出**不依赖**内存里这份正文（它按章现读磁盘，
+//! 见 `commands.rs` 的 `DiskChapterSource`）。作者在外面改过文件时，
+//! 内存这份是旧的，交出去的稿子必须不是它。
 
 use std::path::Path;
 
@@ -83,6 +92,11 @@ pub fn scan_workspace_with_dirs(workspace: &Workspace) -> Result<(Document, Volu
 
     let mut book = Book::new(&title, workspace.config.created);
     book.updated = now;
+    // 书级元数据从配置带进来：导出层（EPUB 的 `<dc:creator>`、DOCX 的
+    // 核心属性、HTML 的 author 元信息）吃的就是 `book.author`。
+    // 少了这两行，作者在导出面板里填的名字就只存在磁盘上、永远进不了成品。
+    book.author = workspace.config.author.clone();
+    book.description = workspace.config.description.clone();
 
     let mut volumes: Vec<Volume> = Vec::new();
     let mut chapters: Vec<Chapter> = Vec::new();

@@ -90,6 +90,10 @@ const RUST_OPEN_RESULT: OpenWorkspaceResult = {
     root: "/x",
     workspaceId: "ws_1",
     title: "测试书",
+    // 书级元数据：Rust 的 `WorkspaceSummary` 带上这两个字段之后，
+    // 这份「合法载荷」也必须跟上，否则 `pnpm typecheck` 在这里就拦住
+    author: "四月",
+    description: "一句话说清这本书",
     created: "2026-01-01T00:00:00+08:00",
     lastOpened: null,
     available: true,
@@ -277,15 +281,28 @@ describe("IPC 契约：前端消费 Rust 的返回形状", () => {
     expect(workspaceState.document?.volumes).toHaveLength(1);
   });
 
-  it("book 元数据用最小占位而不是伪造", async () => {
-    // 「book 在 open 路径上不可得」是一条**已知缺口**（见 types.ts 的
-    // WorkspaceDocument 文档）。这条测试把它钉死：宁可空串，
-    // 也不能编出一个作者名或简介。
+  /**
+   * 署名的折算方向。
+   *
+   * 这里钉的是 `open_workspace` → `document.book` 这一跳：**摘要里有就照抄，
+   * 摘要里空着就留空**。两个方向都曾错过 ——
+   * 早先的实现把 author / description 一律折成空串（那时摘要里确实没有这两个
+   * 字段），于是后端存了署名、界面还是看不见；反过来若把空串填成「佚名」之类
+   * 的占位，作者会以为自己的书署过名，而导出文件里印着假的作者。
+   */
+  it("署名从摘要里读回来，空的就留空", async () => {
     const { documentFromOpenResult } = await import("@/app/workspace-store");
     const doc = documentFromOpenResult(RUST_OPEN_RESULT);
 
-    expect(doc.book.author).toBe("");
-    expect(doc.book.description).toBe("");
+    expect(doc.book.author).toBe("四月");
+    expect(doc.book.description).toBe("一句话说清这本书");
     expect(doc.book.title).toBe("测试书");
+
+    const blank = documentFromOpenResult({
+      ...RUST_OPEN_RESULT,
+      workspace: { ...RUST_OPEN_RESULT.workspace, author: "", description: "" },
+    });
+    expect(blank.book.author).toBe("");
+    expect(blank.book.description).toBe("");
   });
 });

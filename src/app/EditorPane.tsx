@@ -60,6 +60,7 @@ import { consumeJump, pendingJump } from "@/features/search/search-store";
 import {
   selectedChapter,
   editingChapter,
+  conflictedChapterId,
   loadChapterBody,
   createFirstChapter,
   saveChapterBody,
@@ -69,7 +70,8 @@ export type EditorSaveState = "idle" | "saving" | "dirty" | "failed";
 
 export interface EditorPaneProps {
   onSaveStateChange?: (state: EditorSaveState) => void;
-  onSaveReady?: (save: () => Promise<void>) => void;
+  /** 交出一个「立刻保存，并报告是否真的落盘」的句柄。 */
+  onSaveReady?: (save: () => Promise<boolean>) => void;
 }
 
 /** 每章的光标记忆表。模块级单例：它与编辑器实例的生命周期无关。 */
@@ -122,14 +124,21 @@ export function EditorPane(props: EditorPaneProps = {}): JSX.Element {
    * 保存是异步的，等它落地时用户很可能已经切到别的章，那时再读
    * `mountedChapterId` / `draft()` 就会把新章的正文写进旧章的文件。
    *
-   * 抽成函数是因为有三个调用点：自动保存、手动保存、卸载前的 flush。
+   * 抽成函数是因为有四个调用点：自动保存、手动保存、卸载前的 flush、
+   * 以及冲突之后作者拍板的强制覆盖。
    * 切章那条路**不走这里**，理由见下面切章 effect 的说明。
+   *
+   * `force` 只有一条路径会传：作者在冲突提示上点了「以我的稿子为准」。
    */
-  const persist = async (id: string | null, body: string): Promise<void> => {
+  const persist = async (
+    id: string | null,
+    body: string,
+    force = false,
+  ): Promise<void> => {
     if (id === null) return;
     setDirty(false);
     setSaveState("saving");
-    const ok = await saveChapterBody(id, body);
+    const ok = await saveChapterBody(id, body, { force });
     if (!ok) {
       setDirty(true);
       setSaveState("failed");
@@ -138,13 +147,26 @@ export function EditorPane(props: EditorPaneProps = {}): JSX.Element {
     setSaveState(dirty() ? "dirty" : "idle");
   };
 
-  const saveNow = async (): Promise<void> => {
+  /**
+   * 立刻保存，并报告**磁盘上现在是不是这份内容**。
+   *
+   * 返回布尔而不是把异常抛出去：调度器会把保存失败咽下来留着重试
+   * （那是自动保存该有的行为），而另外两个调用方 —— 导出与关窗 ——
+   * 必须知道结果，否则它们会把没落盘的旧稿当成新的交出去
+   * （见 `ExportDialog` 的 `flushEditor` 与 App 的关闭屏障）。
+   */
+  const saveNow = async (): Promise<boolean> => {
     rememberPosition();
     if (scheduler !== null) {
       await scheduler.flushNow();
-      return;
+      // 调度器在失败时把 dirty 放回去等着重试；编辑器那份 dirty 由
+      // `persist` 清。两边都干净，才算真的落盘了。
+      return !scheduler.isDirty() && !dirty();
     }
-    if (dirty()) await persist(mountedChapterId, draft());
+    if (!dirty()) return true;
+    // 调度器还没建（onMount 之前的极端路径）：直接存一次，别把改动咽掉
+    await persist(mountedChapterId, draft()).catch(() => undefined);
+    return !dirty();
   };
 
   /**
@@ -246,12 +268,23 @@ export function EditorPane(props: EditorPaneProps = {}): JSX.Element {
    * 留着上一章的历史，作者切过来后按一次 Ctrl+Z 就把上一章的正文灌进
    * 这一章，紧接着自动保存会把它写进这一章的文件 —— 两章都坏。
    */
-  const mountChapter = (chapterId: string, text: string): void => {
+  /**
+   * 把一份正文摆进编辑器，并把它认作这一章的当前内容。
+   *
+   * 抽出来是因为有两个调用点要做完同样的四件事（灌正文、清 dirty、
+   * 换掉撤销历史、恢复光标），少做任何一件都会留下「编辑器里的内容
+   * 与刚读回来的不一致，却又没人负责收敛」的中间态。
+   */
+  const showChapterText = (chapterId: string, text: string): void => {
     mountedChapterId = chapterId;
     setDraft(text);
     setDirty(false);
     handle?.resetDocument(text);
     restorePosition(chapterId, text);
+  };
+
+  const mountChapter = (chapterId: string, text: string): void => {
+    showChapterText(chapterId, text);
     // P4 的终点：正文已经在编辑器视图里了（见 workspace-store 的起点注释）
     finishChapterOpen(chapterId);
   };
@@ -432,6 +465,40 @@ export function EditorPane(props: EditorPaneProps = {}): JSX.Element {
     void scheduler?.flushNow();
   };
 
+  /**
+   * 冲突出路之一：以编辑器里这一份为准写回磁盘。
+   *
+   * 后端在覆盖之前会**无条件**把磁盘上的当前版本存进备份（不受 5 分钟
+   * 间隔闸门限制），所以这不是「二选一丢一个」：作者的稿子成为正文，
+   * 另一个版本进备份。
+   */
+  const keepLocalDraft = async (chapterId: string): Promise<void> => {
+    rememberPosition();
+    try {
+      await persist(chapterId, draft(), true);
+      // 已经落盘了，调度器不该再过一遍这份改动
+      scheduler?.reset();
+    } catch {
+      // 失败由 store 的错误横幅与这条冲突提示一起报出，这里不再处理
+    }
+  };
+
+  /**
+   * 冲突出路之二：改用磁盘上那一份，放弃编辑器里没存进去的改动。
+   *
+   * 不能只调 `loadChapterBody` 就完事：灌正文那个 effect 在 `dirty()`
+   * 为真时刻意**不覆盖**编辑器（那是为了保护正在打的字），
+   * 而冲突场景里作者恰恰在打着字。所以等读回来之后自己灌一次。
+   */
+  const useDiskVersion = async (chapterId: string): Promise<void> => {
+    scheduler?.reset();
+    await loadChapterBody(chapterId);
+    const loaded = editingChapter();
+    if (loaded === null || loaded.id !== chapterId || loaded.loading) return;
+    showChapterText(chapterId, loaded.body);
+    setSaveState("idle");
+  };
+
   onMount(() => {
     const onBeforeUnload = (): void => {
       rememberPosition();
@@ -532,6 +599,46 @@ export function EditorPane(props: EditorPaneProps = {}): JSX.Element {
                   {t("editor.loading")}
                 </p>
               </Show>
+            </Show>
+            {/*
+              外部改动冲突的出路，两条都摆在作者眼前。
+              刻意**不**包在 `!ready()` 里：冲突时的读章是**成功**的
+              （`ready()` 恒真），挂在「没读到正文」那个分支上等于永不出现 ——
+              作者只能对着一个不可能通过的冲突一直重试。
+            */}
+            <Show when={conflictedChapterId() === current().id}>
+              <div class="editor__conflict" role="alert">
+                <p class="editor__conflict_title">
+                  {t("editor.conflictTitle")}
+                </p>
+                <p class="editor__conflict_body">{t("editor.conflictBody")}</p>
+                <div class="editor__conflict_actions">
+                  <div class="editor__conflict_choice">
+                    <Button
+                      variant="solid"
+                      size="sm"
+                      onClick={() => void keepLocalDraft(current().id)}
+                    >
+                      {t("editor.conflictKeepMine")}
+                    </Button>
+                    <p class="editor__conflict_note">
+                      {t("editor.conflictKeepMineNote")}
+                    </p>
+                  </div>
+                  <div class="editor__conflict_choice">
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => void useDiskVersion(current().id)}
+                    >
+                      {t("editor.conflictUseDisk")}
+                    </Button>
+                    <p class="editor__conflict_note">
+                      {t("editor.conflictUseDiskNote")}
+                    </p>
+                  </div>
+                </div>
+              </div>
             </Show>
             <Show when={dirty()}>
               <p class="editor__hint" role="status">

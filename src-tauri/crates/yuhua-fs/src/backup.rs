@@ -100,6 +100,35 @@ impl BackupManager {
         relative_path: &str,
         now: DateTime<FixedOffset>,
     ) -> Result<SnapshotOutcome> {
+        self.snapshot(source, relative_path, now, true)
+    }
+
+    /// 无条件为文件创建一份快照（只保留「内容没变就不重复备份」那一档）。
+    ///
+    /// ## 为什么需要绕过间隔闸门
+    ///
+    /// 用在**强制覆盖**这条路上：调用方已经决定以本地稿为准，磁盘上那份
+    /// 外部修改（云盘从别的设备同步下来的）马上就要被顶掉。
+    /// [`MIN_SNAPSHOT_INTERVAL_SECS`] 那道闸门是为自动保存的频率设的 ——
+    /// 每几秒一次的保存不该每次都拷一份文件；而这里保的是一次
+    /// **不可重来**的覆盖，跳过闸门的代价是一次文件拷贝，
+    /// 不跳过的代价是那个版本从此不存在。
+    pub fn snapshot_now(
+        &self,
+        source: &Path,
+        relative_path: &str,
+        now: DateTime<FixedOffset>,
+    ) -> Result<SnapshotOutcome> {
+        self.snapshot(source, relative_path, now, false)
+    }
+
+    fn snapshot(
+        &self,
+        source: &Path,
+        relative_path: &str,
+        now: DateTime<FixedOffset>,
+        respect_interval: bool,
+    ) -> Result<SnapshotOutcome> {
         // 源文件不存在（新建的章节）或为空：没有内容值得备份
         let Ok(meta) = std::fs::metadata(source) else {
             return Ok(SnapshotOutcome::SkippedNoSource);
@@ -110,13 +139,15 @@ impl BackupManager {
 
         // 检查该文件最近一次快照的时间
         let existing = self.snapshots_of(relative_path);
-        if let Some(latest) = existing.last() {
-            if let Some(ts) = parse_timestamp_from_name(latest) {
-                let elapsed = now.signed_duration_since(ts).num_seconds();
-                if elapsed < MIN_SNAPSHOT_INTERVAL_SECS {
-                    return Ok(SnapshotOutcome::SkippedTooSoon {
-                        wait_secs: MIN_SNAPSHOT_INTERVAL_SECS - elapsed,
-                    });
+        if respect_interval {
+            if let Some(latest) = existing.last() {
+                if let Some(ts) = parse_timestamp_from_name(latest) {
+                    let elapsed = now.signed_duration_since(ts).num_seconds();
+                    if elapsed < MIN_SNAPSHOT_INTERVAL_SECS {
+                        return Ok(SnapshotOutcome::SkippedTooSoon {
+                            wait_secs: MIN_SNAPSHOT_INTERVAL_SECS - elapsed,
+                        });
+                    }
                 }
             }
         }

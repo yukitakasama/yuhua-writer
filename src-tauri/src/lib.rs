@@ -19,16 +19,18 @@
 //!
 //! | 模块 | 职责 |
 //! | --- | --- |
-//! | [\`commands\`] | Tauri 命令（IPC 边界） |
-//! | [\`state\`]    | 应用运行时状态（当前工作区 + 文稿） |
-//! | [\`error\`]    | 命令层错误类型与序列化形状 |
-//! | [\`scan\`]     | 从磁盘目录树装配领域模型 |
-//! | [\`recent\`]   | 最近打开的工作区列表 |
-//! | [\`webview2\`] | WebView2 运行时探测与缺失兜底 |
+//! | [`commands`] | Tauri 命令（IPC 边界） |
+//! | [`state`]    | 应用运行时状态（当前工作区 + 文稿） |
+//! | [`closing`]  | 关闭屏障：关窗前等前端把在途稿子刷到磁盘 |
+//! | [`error`]    | 命令层错误类型与序列化形状 |
+//! | [`scan`]     | 从磁盘目录树装配领域模型 |
+//! | [`recent`]   | 最近打开的工作区列表 |
+//! | [`webview2`] | WebView2 运行时探测与缺失兜底 |
 
 #![forbid(unsafe_code)]
 #![warn(missing_docs)]
 
+pub mod closing;
 pub mod commands;
 pub mod error;
 pub mod recent;
@@ -56,13 +58,53 @@ pub fn run() {
         .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_opener::init())
         .manage(AppState::new())
+        .manage(closing::CloseBarrier::default())
+        // 关闭屏障（计划书 4.4「断电不丢稿」里属于「关窗」的那一半）。
+        //
+        // 前端的自动保存有 1.5 秒防抖，而 `beforeunload` 里那句 flush 是
+        // `void` 掉的 —— 不等它跑完。关掉最后一个窗口就意味着进程结束，
+        // 在途的 invoke 与磁盘写都不会跑完，作者按 Alt+F4 收尾时丢掉的
+        // 正好是最新那一段。所以：**先拦下关闭，等前端确认落盘，再放行**。
+        //
+        // 详见 [`closing`]，状态机与超时兜底都在那里（并有单测）。
+        .on_window_event(|window, event| {
+            use tauri::{Emitter, Manager};
+            let tauri::WindowEvent::CloseRequested { api, .. } = event else {
+                return;
+            };
+            let barrier = window.state::<closing::CloseBarrier>();
+            match barrier.on_close_requested() {
+                // 已经放行过了：让这次关闭真正发生
+                closing::Decision::Allow => {}
+                // 等待期间作者又点了一次：仍然拦下，但不再重复通知前端
+                closing::Decision::InterceptSilently => api.prevent_close(),
+                closing::Decision::InterceptAndAsk => {
+                    api.prevent_close();
+                    let _ = window.emit(closing::FLUSH_EVENT, ());
+                    // 超时兜底。没有它，前端挂住时窗口就永远关不掉，
+                    // 作者唯一的出路变成任务管理器 —— 那比丢一段字更糟。
+                    // 用独立线程而不是 async 定时器：本 crate 没直接依赖 tokio。
+                    let watchdog = window.clone();
+                    std::thread::spawn(move || {
+                        std::thread::sleep(std::time::Duration::from_millis(
+                            closing::FLUSH_TIMEOUT_MS,
+                        ));
+                        if watchdog.state::<closing::CloseBarrier>().release() {
+                            let _ = watchdog.close();
+                        }
+                    });
+                }
+            }
+        })
         .invoke_handler(tauri::generate_handler![
             // ---- 工作区 ----
             commands::create_workspace,
             commands::open_workspace,
             commands::close_workspace,
             commands::has_workspace,
+            commands::notify_flush_done,
             commands::inspect_workspace,
+            commands::update_book_meta,
             commands::list_recent_workspaces,
             // ---- 文稿结构 ----
             commands::get_outline,

@@ -1,5 +1,11 @@
 /**
- * 右侧章节元数据面板（T5.4）+ 字数面板（T5.5）。
+ * 右侧章节元数据面板（T5.4）+ 字数面板（T5.5）+ 本书信息。
+ *
+ * ## 「本书信息」为什么也在这一栏
+ *
+ * 作者与简介存在 `.yuhua/workspace.json`，填的入口在导出面板
+ * （{@link saveBookMeta}），这里只**展示**已经存着的值 —— 让作者能不问
+ * 「我上次署的名还在不在」。空值显示「未填写」而不是编一个名字。
  *
  * ## 为什么字数面板与元数据放同一个右侧栏
  *
@@ -31,16 +37,18 @@ import { loadStats, statsState } from "@/features/stats/store";
 import { ratio } from "@/features/stats/model";
 import { onMount } from "solid-js";
 import {
+  currentBook,
   selectedChapter,
   totalChapters,
   totalWords,
-  workspaceState,
   volumes,
+  workspaceState,
 } from "./workspace-store";
 
 /** 右侧信息面板。 */
 export function MetaPanel(): JSX.Element {
   const chapter = createMemo(() => selectedChapter());
+  const book = createMemo(() => currentBook());
 
   // 今日字数需要统计。这里**按需触发一次**：已有数据时（用户去过统计页）
   // 什么都不做，没有时才拉一次。放在 onMount 里而不是 createMemo 里，
@@ -65,6 +73,36 @@ export function MetaPanel(): JSX.Element {
 
   return (
     <aside class="meta" aria-label={t("a11y.rightPanel")}>
+      {/* 本书信息放在选章的空态**之外**：作者是这本书的属性，
+          与「当前选中哪一章」无关。跟着章走会让人以为没选章就没有署名。
+
+          `when` 传的是**对象本身**而不是 `!== null`：Show 给回调的那个
+          accessor 就是 `when` 的值，写成布尔时 `info().title` 全是不存在的
+          属性，界面会安静地渲染出一排空值 —— 有标签、没数据，最难发现的那种坏。 */}
+      <Show when={book()}>
+        {(info) => (
+          <section class="meta__section">
+            <h3 class="meta__heading">{t("book.panelTitle")}</h3>
+            <dl class="meta__list">
+              <MetaRow label={t("book.title")} value={info().title} />
+              <MetaRow
+                label={t("book.author")}
+                value={info().author === "" ? t("book.unset") : info().author}
+              />
+              <div class="meta__row meta__row--wrap">
+                <dt class="meta__key">{t("book.description")}</dt>
+                <dd class="meta__value meta__value--wrap">
+                  {info().description === ""
+                    ? t("book.unset")
+                    : info().description}
+                </dd>
+              </div>
+            </dl>
+            <p class="meta__note">{t("book.editHint")}</p>
+          </section>
+        )}
+      </Show>
+
       <Show
         when={chapter()}
         fallback={
